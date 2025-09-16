@@ -1,0 +1,132 @@
+Define CSS variables for light and dark mode
+:root {
+    --background-light: rgba(255, 255, 255, 0.6);
+    --background-dark: rgba(30, 30, 30, 0.8); /* Darker background for glassmorphism */
+    --text-color-light: #333;
+    --text-color-dark: #fff; /* White text for dark mode */
+    --button-bg-light: rgba(0, 123, 255, 0.8);
+    --button-bg-dark: rgba(0, 123, 255, 0.9);
+    --button-hover-light: rgba(0, 123, 255, 1);
+    --button-hover-dark: rgba(0, 123, 255, 1);
+  }
+
+  body {
+    background: url('https://images.unsplash.com/photo-1534183739801-d4350673a8d5?q=80&w=1734&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center/cover;
+  }
+  
+  /* Apply Glassmorphism Effect on Job Card */
+  .job-card {
+    background: var(--background-light); /* Default to light theme */
+    backdrop-filter: blur(12px); /* Frosted glass effect */
+    border-radius: 20px;
+    margin: 0px;
+    padding: 0px;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    color: var(--text-color-light);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    width: 100%;
+    transition: all 0.3s ease;
+    position: relative; /* Important for layering */
+  }
+  
+  /* Add an interesting background gradient or image */
+  .job-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('https://source.unsplash.com/random/800x600') no-repeat center center/cover; /* Use a background image */
+    opacity: 0.3; /* Make it subtle */
+    border-radius: 15px; /* Match border-radius of card */
+    z-index: -1; /* Place it behind the content */
+  }
+  
+  /* Hover Effect */
+  .job-card:hover {
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Title and Text */
+  .job-card h3 {
+    font-size: 1.3rem;
+    /* margin-bottom: 10px; */
+    margin: 0;
+  }
+  
+  .job-card p {
+    font-size: 1rem;
+    color: #aaa;
+    /* margin-bottom: 15px; */
+    margin: 0;
+  }
+  
+  /* Button Styling */
+  .job-card button {
+    background-color: var(--button-bg-light);
+    color: white;
+    border: none;
+    padding: px 0px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .job-card button:hover {
+    background-color: var(--button-hover-light);
+  }
+  
+  /* Dark Mode Specific Styles */
+  body.dark-mode .job-card {
+    background: var(--background-dark);
+    color: var(--text-color-dark);
+  }
+  
+  body.dark-mode .job-card::before {
+    opacity: 0.5; /* Dark mode should have more opacity */
+  }
+  
+  body.dark-mode .job-card button {
+    background-color: var(--button-bg-dark);
+  }
+  
+  body.dark-mode .job-card button:hover {
+    background-color: var(--button-hover-dark);
+  }
+  
+
+  @media (max-width: 768px) {
+    .job-card {
+      width: 100%; /* Ensure cards are full width on smaller screens */
+      padding: 0px;
+    }
+  
+    .job-card h3 {
+      font-size: 1.1rem;
+    }
+  
+    .job-card p {
+      font-size: 0.9rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .job-card {
+      padding: 0px;
+    }
+  
+    .job-card h3 {
+      font-size: 1rem;
+    }
+  
+    .job-card p {
+      font-size: 0.85rem;
+    }
+  }
+  

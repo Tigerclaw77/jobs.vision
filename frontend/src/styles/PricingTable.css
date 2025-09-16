@@ -1,0 +1,385 @@
+/* ================================
+   Modern pricing — clean, familiar
+   ================================ */
+.pricing-root{
+  --max-w:1100px;
+  --pad:24px;
+  --radius:16px;
+  --radius-sm:12px;
+
+  --ink:#0f172a;      /* near-black */
+  --ink-2:#334155;    /* slate-700 */
+  --ink-3:#475569;    /* slate-600 */
+  --muted:#667085;    /* gray-600 */
+  --ok:#12b76a;
+  --brand:#7c3aed;
+
+  --border:1px solid #e5e7eb;
+  --shadow:0 6px 18px rgba(16,24,40,.08);
+  --shadow-strong:0 12px 26px rgba(16,24,40,.12);
+
+  --cta-width:320px;
+  --card-min-h:500px;           /* a bit tighter than before */
+  --glass-alpha:0.95;           /* tweak 0.90–0.97 for more/less transparency */
+}
+
+.pricing-root,
+.pricing-tables{
+  max-width:var(--max-w);
+  margin:0 auto;
+  padding:var(--pad);
+  user-select:none;
+}
+
+.pricing-section{ position:relative; }
+
+/* ================================
+   Segmented control (conventional)
+   ================================ */
+/* SEGMENTED CONTROL — final polish */
+.seg-tabs{
+  --seg-h: 46px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  gap: 0;
+  height: var(--seg-h);
+  border-radius: 999px;
+  background: rgba(241,245,249,.88);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(16,24,40,.10);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.seg-tabs .seg-btn{
+  position: relative;
+  z-index: 2;
+  min-width: 190px;
+  height: calc(var(--seg-h) - 8px);
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 0 !important;
+  outline: none;
+  cursor: pointer;
+  font-weight: 800;
+  color: #334155;
+
+  /* kill ANY inherited button UI */
+  background: transparent !important;
+  box-shadow: none !important;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.seg-tabs .seg-btn[aria-selected="true"]{ color: #0f172a; }
+
+.seg-tabs .seg-thumb{
+  position: absolute;
+  z-index: 1;
+  top: 4px; left: 4px;
+  width: calc(50% - 4px);
+  height: calc(var(--seg-h) - 8px);
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 18px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.9);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1);
+}
+
+/* slide the thumb */
+.seg-tabs.is-candidate .seg-thumb{ transform: translateX(100%); }
+
+
+/* ================================
+   Grid
+   ================================ */
+.pricing-root .card-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:20px;
+}
+@media (max-width:960px){
+  .pricing-root .card-grid{ grid-template-columns:1fr; }
+}
+
+/* ================================
+   Card — glassy elevated sheet
+   ================================ */
+.pricing-root .card{
+  display:flex; flex-direction:column;
+  min-height:var(--card-min-h);
+  border-radius:var(--radius);
+  border:1px solid rgba(229,231,235,.88);
+  background: rgba(255,255,255,var(--glass-alpha));
+  backdrop-filter: blur(8px) saturate(115%);
+  -webkit-backdrop-filter: blur(8px) saturate(115%);
+  box-shadow: var(--shadow);
+  overflow:hidden;
+  transition:transform .06s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.pricing-root .card:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-strong);
+  border-color:#e2e8f0;
+}
+
+/* Head */
+.pricing-root .card-head{
+  padding:18px 20px 6px;
+  text-align:center;
+}
+.pricing-root .card-head .title{
+  margin:0;
+  font-size:22px;
+  font-weight:800;
+  color:var(--ink);
+  letter-spacing:-.01em;
+}
+.pricing-root .card-head .subtitle{
+  margin:6px 0 10px;
+  color:var(--ink-3);
+  font-size:14px;
+}
+
+/* Body */
+.pricing-root .card-body{
+  display:flex; flex-direction:column; flex:1;
+  padding:12px 20px 16px;
+  text-align:center;
+}
+
+/* Pricing block (more visual snap) */
+.pricing-root .price-block{ margin:8px 0 12px; }
+.pricing-root .price-line{ display:flex; justify-content:center; align-items:baseline; gap:10px; }
+.pricing-root .price{
+  display:inline-flex; align-items:baseline; gap:2px; color:var(--ink);
+}
+.pricing-root .price .currency{ font-size:18px; font-weight:800; opacity:.9; }
+.pricing-root .price .amount{ font-size:42px; font-weight:900; letter-spacing:-0.02em; }
+.pricing-root .price.small .amount{ font-size:24px; font-weight:800; color:var(--brand); }
+.pricing-root .period{ color:#4b5563; font-size:12px; }
+
+/* Bullets (condensed) */
+.pricing-root .bullets{ list-style:none; padding:0; margin:4px 0 12px; }
+.pricing-root .bullets li{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  padding:6px 0; color:#1f2937;
+}
+.pricing-root .bullets li::before{
+  content:""; width:14px; height:14px; border-radius:3px;
+  background:conic-gradient(from 210deg,#12b76a 0 75%, #12b76a 75% 100%);
+  -webkit-mask:url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path fill='white' d='M7.629 13.233L3.9 9.504l1.414-1.414 2.315 2.315L14.686 3.35l1.414 1.414z'/></svg>") center/14px 14px no-repeat;
+          mask:url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><path fill='white' d='M7.629 13.233L3.9 9.504l1.414-1.414 2.315 2.315L14.686 3.35l1.414 1.414z'/></svg>") center/14px 14px no-repeat;
+}
+
+/* Spacer aligns CTAs */
+.pricing-root .spacer{ flex:1 1 auto; }
+
+/* Actions / Buttons */
+.pricing-root .actions{ display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:10px; }
+.pricing-root .actions .btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:var(--cta-width); max-width:100%;
+  height:46px; padding:0 18px; box-sizing:border-box;
+  border-radius:12px;
+  font-weight:800; cursor:pointer; border:none;
+  transition:transform .04s ease, box-shadow .2s ease, filter .15s ease;
+}
+.pricing-root .btn.primary{ background:var(--brand); color:#fff; box-shadow:0 8px 18px rgba(124,58,237,.22); }
+.pricing-root .btn.primary:hover{ transform:translateY(-1px); filter:brightness(1.05); }
+.pricing-root .btn.ghost{ background:#fff; border:1.6px solid var(--brand); color:var(--brand); }
+.pricing-root .btn.ghost:hover{ background:#fff; }
+.pricing-root .btn.disabled{
+  background:#eef2f7; color:#667085; border:1px solid #d0d5dd;
+  border-radius:12px; cursor:not-allowed;
+}
+
+/* Microcopy */
+.pricing-root .fineprint{ color:var(--muted); font-size:12px; }
+
+/* Candidate CTA padding so it doesn't hug the radius */
+.pricing-root .card.candidate .actions{ padding:4px 16px 16px; }
+
+/* Responsive */
+@media (max-width:768px){
+  .pricing-root{ --cta-width:100%; --card-min-h:auto; }
+  .seg-tabs{ width:100%; justify-content:space-between; }
+  .seg-tabs .seg-btn{ flex:1; min-width:0; text-align:center; }
+  .seg-tabs .seg-thumb{ width:calc(50% - 6px); }
+  .pricing-root .price .amount{ font-size:36px; }
+}
+
+/* --- Segmented control: refined, no double-pill --- */
+.seg-tabs{
+  --seg-h: 46px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--seg-h);
+  gap: 0;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(241,245,249,.85);           /* slate-100-ish */
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(16,24,40,.10);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.seg-tabs .seg-btn{
+  position: relative;
+  z-index: 2;
+  min-width: 190px;
+  height: calc(var(--seg-h) - 8px);
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 0;
+  outline: none;
+  cursor: pointer;
+  font-weight: 800;
+  color: #334155;
+  background: none;            /* <- ensure no native bg */
+  appearance: none;            /* <- kill default inner button on some browsers */
+}
+
+.seg-tabs .seg-btn[aria-selected="true"]{
+  color: #0f172a;
+}
+
+.seg-tabs .seg-thumb{
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(var(--seg-h) - 8px);
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 18px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.9);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1);
+}
+
+.seg-tabs.is-candidate .seg-thumb{
+  transform: translateX(100%);
+}
+
+/* --- Pricing cards: force glass translucency inside pricing section --- */
+.pricing-root{
+  --glass-alpha: 0.92; /* tweak 0.88–0.97 */
+}
+
+.pricing-root.is-glass .card{
+  background: rgba(255,255,255,var(--glass-alpha)) !important;
+  border: 1px solid rgba(229,231,235,.2) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(120%) !important;
+  backdrop-filter: blur(10px) saturate(120%) !important;  
+  box-shadow: 0 10px 26px rgba(16,24,40,.12) !important;
+}
+
+/* Optional: slightly reduce internal whitespace so glass reads stronger */
+.pricing-root .card-head{ padding: 16px 18px 6px; }
+.pricing-root .card-body{ padding: 12px 18px 16px; }
+
+.seg-tabs{ --seg-h:46px; position:relative; display:inline-flex; align-items:center;
+  gap:0; padding:4px; height:var(--seg-h); border-radius:999px;
+  background:rgba(241,245,249,.88); border:1px solid #e5e7eb;
+  box-shadow:0 4px 14px rgba(16,24,40,.10); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+.seg-tabs .seg-btn{
+  margin:0 !important; background:transparent !important; box-shadow:none !important;
+  border:0 !important; transform:none !important; appearance:none; -webkit-appearance:none;
+  position:relative; z-index:2; min-width:190px; height:calc(var(--seg-h) - 8px);
+  padding:0 18px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:999px; font-weight:800; color:#334155; cursor:pointer;
+}
+.seg-tabs .seg-btn[aria-selected="true"]{ color:#0f172a; }
+.seg-tabs .seg-thumb{
+  position:absolute; z-index:1; top:4px; left:4px; width:calc(50% - 4px); height:calc(var(--seg-h) - 8px);
+  border-radius:999px; background:#fff; border:1px solid #e5e7eb;
+  box-shadow:0 8px 18px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);
+}
+.seg-tabs.is-candidate .seg-thumb{ transform:translateX(100%); }
+
+/* ==== Segmented control container (keeps it off the cards) ==== */
+.seg-wrap{
+  display:flex;
+  justify-content:center;     /* center on wide screens */
+  margin: 6px 0 18px;         /* space above/below tabs */
+  position: relative;
+  z-index: 3;                 /* sit above card shadows */
+}
+
+/* ==== Segmented control (final) ==== */
+.seg-tabs{
+  --seg-h: 48px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: var(--seg-h);
+  padding: 6px;                         /* inner gutter around thumb */
+  border-radius: 9999px;
+  background: rgba(241,245,249,.90);
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 16px rgba(16,24,40,.10);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Reset any global button styles so we only see the thumb */
+.seg-tabs .seg-btn{
+  margin: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  transform: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+
+  position: relative; z-index: 2;
+  min-width: 210px;                    /* more conventional size */
+  height: calc(var(--seg-h) - 12px);   /* 6px inset on top+bottom */
+  padding: 0 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1;                      /* centers baseline vertically */
+  color: #334155;
+}
+.seg-tabs .seg-btn[aria-selected="true"]{ color:#0f172a; }
+
+/* The moving "thumb" — use inset so it’s always perfectly centered */
+.seg-tabs .seg-thumb{
+  position: absolute;
+  z-index: 1;
+  inset: 6px;                          /* equal inset on all sides */
+  width: calc(50% - 6px);              /* half track width minus one inset */
+  height: auto;                        /* derived from inset + --seg-h */
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 20px rgba(16,24,40,.12), inset 0 1px 0 rgba(255,255,255,.9);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1);
+}
+
+/* Slide the thumb */
+.seg-tabs.is-candidate .seg-thumb{ transform: translateX(100%); }
+
+/* Small screens: make the control full-width and comfy */
+@media (max-width: 640px){
+  .seg-wrap{ padding: 0 10px; }
+  .seg-tabs{ width: 100%; }
+  .seg-tabs .seg-btn{ min-width: 0; flex: 1; font-size: 16px; }
+}

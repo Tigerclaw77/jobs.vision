@@ -1,0 +1,130 @@
+/* Backdrop */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);  
+}
+
+/* Modal card */
+.job-modal {
+  position: relative;
+  width: min(820px, 94vw);
+  border-radius: 16px;
+  padding: 20px 18px 16px 56px; /* extra left for icons */
+  background: rgba(18, 22, 28, 0.86);
+  color: #e9eefc;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  backdrop-filter: blur(12px) saturate(120%);  
+}
+
+/* Title & text */
+.modal-title {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+}
+.modal-company, .modal-location, .modal-rolehours {
+  margin: 0 0 6px;
+  color: #dbe6ff;
+  text-align: center;
+}
+.modal-desc {
+  margin: 12px 0 0;
+  color: #d7def7;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Close X */
+.modal-x {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  border: none;
+  background: transparent;
+  color: #cfe0ff;
+  cursor: pointer;
+}
+
+/* Status chips — same as cards (small, no bg) */
+.status-icons {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 3;
+}
+
+.status-chip {
+  all: initial;
+  font: inherit;
+  width: 24px !important;
+  height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: rgba(255,255,255,0.45) !important;
+  user-select: none;
+}
+.status-chip svg { display: block; stroke-width: 2.2px; }
+
+.status-chip.favorite { color: rgba(255,205,72,0.45) !important; cursor: pointer; }
+.status-chip.favorite.active { color: rgba(255,205,72,0.85) !important; }
+.status-chip.favorite.active svg { fill: currentColor; }
+
+.status-chip.applied { color: rgba(87,227,137,0.45) !important; }
+.status-chip.applied.active { color: rgba(87,227,137,0.85) !important; }
+
+/* Actions */
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn-primary {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #0f6fff;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.btn-primary:hover { filter: brightness(1.05); }
+
+.btn-secondary {
+  border: 1px solid rgba(255,255,255,0.25);
+  background: transparent;
+  color: #e9eefc;
+  padding: 8px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.btn-secondary:hover { border-color: rgba(255,255,255,0.4); }
+
+.applied-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(87, 227, 137, 0.5);
+  color: rgba(87, 227, 137, 0.95);
+  background: rgba(6, 36, 20, 0.25);
+}

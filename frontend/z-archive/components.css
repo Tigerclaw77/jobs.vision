@@ -1,0 +1,130 @@
+/* components.css — job cards, modals, nav, buttons, tooltips
+
+.job-list {
+  padding: 2rem;
+  text-align: center;
+  width: 100%;
+}
+
+.job-list h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #f0f0f0;
+}
+
+.job-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  padding: 0.5rem;
+  box-sizing: border-box;
+}
+
+.job-card {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.job-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+}
+
+.job-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url("https://source.unsplash.com/random/800x600") center/cover no-repeat;
+  opacity: 0.2;
+  z-index: -1;
+  border-radius: 16px;
+}
+
+.job-card h3 {
+  font-size: 1.2rem;
+  color: #fff;
+  margin-bottom: 0.4rem;
+}
+
+.job-card p {
+  font-size: 0.95rem;
+  color: #ddd;
+  margin: 0.2rem 0;
+}
+
+.job-icon-container {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.job-icon {
+  color: #aaa;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.job-icon.favorite.active,
+.job-icon.favorite:hover {
+  color: gold;
+}
+
+.job-icon.applied.active,
+.job-icon.applied:hover {
+  color: #00c853;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: rgba(30, 30, 30, 0.95);
+  color: #fff;
+  padding: 2rem;
+  border-radius: 1rem;
+  width: 90%;
+  max-width: 600px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  font-size: 1.8rem;
+}
+
+.modal-content p {
+  margin: 0.75rem 0;
+  font-size: 1.1rem;
+}
+
+.modal-content button {
+  margin-top: 1.5rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.modal-content button:hover {
+  background: #0056b3;
+} */

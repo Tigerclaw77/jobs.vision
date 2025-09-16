@@ -1,0 +1,61 @@
+.tag-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.active-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 0.875rem;
+  color: #fff;
+  background: rgba(127, 255, 255, 0.3);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  line-height: 1;
+}
+
+.filter-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.remove-button:hover {
+  color: #ffdede;
+}
+
+.tag-input {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+  background-color: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  outline: none;
+}
+
+.tag-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}

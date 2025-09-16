@@ -1,0 +1,183 @@
+/* Header styles */
+.header {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 2px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  z-index: 1000;
+}
+
+/* Container */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Logo */
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  text-decoration: none;
+  color: #005a78;
+  margin-left: -10px;
+}
+
+/* Navigation Icons */
+.nav {
+  display: flex;
+  gap: 20px;
+}
+
+.icon {
+  font-size: 22px;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none; /* Ensure no background */
+  border: none; /* Remove any borders */
+  padding: 0; /* Prevent extra spacing */
+  transition: color 0.3s ease;
+}
+
+.icon:hover {
+  color: #0085b2; /* Vibrant blue on hover */
+}
+
+.account-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sign-in-text {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.account-link:hover .sign-in-text,
+.account-link:hover svg {
+  /* Ensures the icon and text change color together */
+  color: #0085b2;
+}
+
+/* Account Button */
+.account-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Style when logged in */
+/* Username Styling - Prevent Wrapping */
+.user-name {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap; /* ✅ Ensures the username stays on one line */
+  overflow: hidden; /* ✅ Prevents overflow issues */
+  text-overflow: ellipsis; /* ✅ Adds '...' if it's too long */
+}
+
+/* Style when logged out */
+.sign-in-text {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+/* Hover effect applies to both text & icon */
+.account-link:hover .user-name,
+.account-link:hover .sign-in-text,
+.account-link:hover svg {
+  color: #0085b2;
+}
+
+/* Account Container */
+.account-container {
+  position: relative;
+}
+
+/* Dropdown Menu */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0;
+  z-index: 1001;
+}
+
+/* Standardize both <Link> and <button> */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 15px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  text-decoration: none;
+  transition: background 0.3s ease;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+/* Remove default browser styles from buttons */
+.dropdown-item.logout button {
+  all: unset; /* Completely resets button styles */
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 15px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background: #f3f3f3;
+}
+
+.dropdown-item.logout:hover {
+  background: rgba(230, 57, 70, 0.1);
+  color: #e63946;
+}
+
+/* ! MEDIA QUERY */
+@media (max-width: 768px) {
+  .logo {
+    margin-left: -15px; /* Moves the logo even further left on small screens */
+  }
+}

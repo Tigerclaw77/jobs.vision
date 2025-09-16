@@ -1,0 +1,120 @@
+/* ✅ General Form Styles (Mobile-First) */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin: 20px auto;
+}
+
+/* ✅ Consistent Input, Textarea, and Select Styling */
+input,
+textarea,
+select {
+  width: 100%;
+  font-size: 16px;
+  padding: 12px;
+  margin: 14px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: white;
+  color: #222;
+  transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ✅ Focus Effect */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 5px rgba(0, 133, 178, 0.5);
+}
+
+/* ✅ Checkbox & Radio Button Styles */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 5px;
+  accent-color: var(--primary-color); /* Uses theme color */
+  cursor: pointer;
+}
+
+/* ✅ Fieldset (Checkbox/Radio Container) */
+fieldset {
+  background: white;
+  border: 1px solid #bbb;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+/* ✅ Legend (Title for Checkbox/Radio Groups) */
+legend {
+  font-weight: bold;
+  font-size: 1rem;
+  color: #222;
+  padding: 5px 10px;
+  background: white;
+  border-radius: 6px;
+}
+
+.field-label {
+  font-weight: bold;
+  font-size: 1rem;
+  color: white;
+  padding: 5px 10px;
+}
+
+/* ✅ Labels Inside Checkbox & Radio Groups */
+.checkbox-group label,
+fieldset label,
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+/* ✅ Ensure the Checkbox & Radio Buttons Are Properly Spaced */
+.checkbox-group,
+fieldset,
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  background: white;
+}
+
+/* ✅ Button Styling */
+button {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+  background-color: var(--accent-color);
+  transform: scale(1.03);
+}
+
+/* ✅ Disabled Button Styling */
+button:disabled {
+  background-color: #bbb;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ✅ Mobile-First: Make Forms Fit Smaller Screens */
+@media (min-width: 768px) {
+  .form {
+    max-width: 80%;
+  }
+}

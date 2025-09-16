@@ -1,0 +1,133 @@
+/* ====== Page Wrapper ====== */
+.notifications-page {
+  padding: 16px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* ====== Title ====== */
+.notifications-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+/* ====== Actions ====== */
+.notification-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.notification-actions button {
+  padding: 6px 14px;
+  font-size: 14px;
+  background-color: #035c6e;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.notification-actions button:hover {
+  background-color: #024859;
+}
+
+/* ====== List Container ====== */
+.notification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ====== Notification Item ====== */
+.notification-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 500px;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  min-height: 45px;
+}
+
+/* ====== Unread Indicator (absolutely positioned, doesn't push content) ====== */
+.notification-item.unread::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 4px;
+  background-color: #0077cc;
+  border-radius: 2px;
+}
+
+/* ====== Content ====== */
+.notification-message {
+  padding-left: 8px;
+  flex-grow: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.notif-link {
+  font-size: 13px;
+  color: #0077cc;
+  text-decoration: underline;
+}
+
+.notif-link:hover {
+  color: #005fa3;
+}
+
+/* ====== Delete Button ====== */
+.notification-delete {
+  background-color: transparent;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  color: #888;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+
+.notification-delete:hover {
+  color: #e63946;
+  background-color: transparent;
+}
+
+/* ====== Responsive (Desktop) ====== */
+@media (min-width: 768px) {
+  .notifications-title {
+    font-size: 22px;
+    text-align: left;
+  }
+
+  .notification-actions {
+    justify-content: flex-start;
+  }
+
+  .notification-item {
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+
+  .notification-delete {
+    font-size: 16px;
+  }
+}

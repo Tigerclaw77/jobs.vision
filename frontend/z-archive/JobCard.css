@@ -1,0 +1,84 @@
+/* GRID OF CARDS */
+.job-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(440px,1fr));
+  gap:16px;
+  align-items:stretch;      /* each row = equal height */
+  margin-top:10px;
+}
+
+/* CARD: icon rail + content; NO text color here (keeps your originals) */
+.job-card{
+  display:grid;
+  grid-template-columns:48px 1fr;   /* narrow fixed rail for icons */
+  column-gap:12px;
+  align-items:start;
+
+  padding:14px 16px;
+  border-radius:16px;
+  background:rgba(20,22,28,.55);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.12);
+
+  min-height:180px;                 /* consistent height */
+  height:100%;
+  box-sizing:border-box;
+  cursor:pointer;
+}
+
+/* ICON RAIL */
+.jl-icon-col{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:center;
+  justify-content:flex-start;
+  padding-top:4px;
+  width:48px;                       /* match grid col */
+}
+
+/* 🔧 hard reset to kill any pill/margins from UA/old CSS */
+.jl-icon-btn,
+.jl-icon-btn::before,
+.jl-icon-btn::after{
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  border-radius:0!important;
+  content:none!important;
+}
+
+.jl-icon-btn{
+  width:24px;
+  height:24px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:0;
+  cursor:pointer;
+}
+.jl-icon-btn svg{ display:block; pointer-events:none; }
+
+/* Subtle icon colors only (does NOT affect text) */
+.jl-star{ color:rgba(245,208,66,.85); }
+.jl-star.active{ color:rgba(245,208,66,1); filter:drop-shadow(0 0 4px rgba(245,208,66,.35)); }
+.jl-check{ color:rgba(58,200,126,.9); }
+
+/* CONTENT (inherits your site colors) */
+.job-content{ min-width:0; }
+.job-title{ margin:0 0 6px 0; line-height:1.25; word-break:break-word; }
+.job-company,.job-location,.job-meta{ margin:0; line-height:1.35; }
+
+.job-card .job-title { color: #fff !important; }
+.job-card .job-company,
+.job-card .job-location,
+.job-card .job-meta { color: rgba(255,255,255,.95) !important; }
+
+
+/* Small screens: stack */
+@media (max-width:560px){
+  .job-cards{ grid-template-columns:1fr; }
+}

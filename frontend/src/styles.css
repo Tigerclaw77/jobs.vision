@@ -1,0 +1,443 @@
+:root {
+  --heading-color: #1a1a2e;
+  --body-text-color: #2c2c2c;
+  --primary-color: #005a78;
+  --secondary-color: #0085b2;
+}
+
+/* Layout shell */
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative; /* for dimmer stacking */
+}
+
+.container {
+  width: 100%;
+  margin: 10px auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Background + typography */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  background: url('/public/images/clinicbg.png') no-repeat center center fixed;
+  background-size: cover;
+
+  position: relative;
+  color: #1a1a1a;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1rem 0 0.5rem;
+}
+
+body, p, span { color: var(--body-text-color); }
+
+h1 { font-size: 2rem; text-align: center; }
+h2 { font-size: 1.6rem; }
+h3 { font-size: 1.3rem; }
+h4 { font-size: 1.1rem; }
+h5 { font-size: 1rem; }
+h6 { font-size: 0.9rem; opacity: 0.8; }
+
+/* Glass forms */
+.glass-form {
+  background: rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 32px;
+  max-width: 700px;
+  margin: 40px auto;
+  color: white;
+  position: relative;
+  z-index: 10;
+}
+
+/* ===== IMPORTANT: tame globals to avoid breaking header ===== */
+
+/* If you use a page-level nav elsewhere, apply a class to it.
+   We keep a minimal reset here and let components style themselves. */
+nav {
+  padding: 0;                    /* was 15px 20px — removed to not fight header */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Global link style inside navs (non-header pages can still inherit) */
+nav a {
+  color: inherit;
+  text-decoration: none;
+  margin-left: 0;                /* spacing should be handled locally */
+  font-weight: 600;
+}
+nav a:hover {
+  color: #b0daf1;
+  transition: color 0.3s ease;
+}
+
+/* Buttons — remove global margins that misalign header content */
+button {
+  padding: 12px 20px;
+  margin: 0;                     /* was 20px 0 0 15px — causes alignment issues */
+  font-size: 16px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease,
+              transform 0.1s ease-in-out;
+}
+button:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Forms */
+textarea { resize: none; }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+}
+
+.page-header {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 15px;
+  color: #fff;
+}
+
+/* Dashboard */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.dashboard .dashboard-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+.dashboard .card:hover { transform: translateY(-5px); }
+
+/* Job list/cards */
+.job-list { padding: 20px; text-align: center; }
+.job-listing { padding: 15px; border-bottom: 1px solid #ddd; }
+.job-listing h3 { font-size: 22px; margin: 0; }
+
+.job-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+  gap: 20px;
+}
+.job-card {
+  background: rgba(255,255,255,0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  overflow: hidden;
+}
+.job-card:hover {
+  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  transform: translateY(-5px);
+}
+.job-card h3 { font-size: 1.4rem; margin-bottom: 10px; }
+.job-card p { font-size: 1rem; color: #fff; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: center;
+}
+.modal-content {
+  background: rgba(255,255,255,0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 20px;
+  width: 90%; max-width: 600px;
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+}
+.modal-content h2 { font-size: 1.8rem; margin-bottom: 10px; }
+.modal-content p { font-size: 1.1rem; margin: 5px 0; }
+.modal-content button {
+  background: rgba(0,123,255,0.8);
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin-top: 20px;
+  font-size: 1rem;
+  color: white;
+  transition: background 0.3s ease;
+}
+.modal-content button:hover { background: rgba(0,123,255,1); }
+
+/* Footer */
+.footer {
+  background: #0a2540;
+  color: white !important;
+  padding: 20px 0;
+  text-align: center;
+  margin-top: auto;
+}
+.footer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+.footer-brand h2 { margin: 0; font-size: 22px; }
+.footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.footer-links a { color: white !important; text-decoration: none; font-weight: bold; }
+.footer-links a:hover { text-decoration: none; }
+.footer-logo { text-decoration: none; color: white; font-weight: bold; }
+.footer-social { display: flex; gap: 15px; }
+.footer-social a {
+  color: white;
+  font-size: 24px;
+  transition: transform .2s ease-in-out;
+}
+.footer-social a:hover {
+  transform: scale(1.1);
+  color: #4da8ff;
+}
+.footer-bottom {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: 0.8;
+  color: white !important;
+}
+
+/* Force footer text to white */
+.footer, .footer p, .footer span, .footer small,
+.footer a, .footer a:visited { color: #fff !important; }
+.footer a:hover { color: #cfe4ff !important; }
+
+/* Page Dimmer */
+.bg-dimmer{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .32s ease;
+  z-index: 2;
+  background: rgba(8,10,14,.68);
+}
+.bg-dimmer::after{
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(120% 120% at 50% 0%, rgba(0,0,0,.18), transparent 60%);
+}
+body.dim-bg .bg-dimmer{ opacity: 1; }
+header, .main-content, footer { position: relative; z-index: 3; }
+
+/* Responsive footer layout */
+@media (min-width: 768px) {
+  .footer-container {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 0 50px;
+  }
+}
+
+/* Job icon badges */
+.job-icon-container {
+  position: absolute; top: 8px; left: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.job-icon { width: 18px; height: 18px; opacity: .2; cursor: pointer; transition: opacity .3s; }
+.job-icon.active { opacity: 1; }
+.favorite { color: #facc15; }
+.watchlist { color: #3b82f6; }
+.applied { color: #22c55e; }
+
+/* Info banner (blue, readable) */
+.info-banner {
+  background: #e0f2fe;           /* sky-100 */
+  color: #0c4a6e;                /* cyan-900 */
+  border: 1px solid #bae6fd;     /* sky-200 */
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+/* Magic-link CTA */
+.btn-resend {
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Keep disabled button readable */
+.btn-resend.Mui-disabled {
+  background: #dbeafe !important; /* indigo-100 */
+  color: #1e3a8a !important;      /* indigo-900 */
+  opacity: 1 !important;          /* cancel MUI's dimming */
+}
+
+/* Text turns white ONLY when page is dimmed AND the container opts in */
+body.dim-bg .text-on-dim,
+body.dim-strong .text-on-dim {
+  color: #fff !important;
+}
+body.dim-bg .text-on-dim .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiTypography-root {
+  color: #fff !important;
+}
+
+/* BUT: any Paper/Card inside that container should stay dark-on-light */
+body.dim-bg .text-on-dim .MuiPaper-root,
+body.dim-strong .text-on-dim .MuiPaper-root,
+body.dim-bg .text-on-dim .MuiCard-root,
+body.dim-strong .text-on-dim .MuiCard-root {
+  color: var(--body-text-color) !important; /* #2c2c2c from your vars */
+}
+
+/* Typography inside Paper/Card goes back to dark */
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTypography-root,
+body.dim-bg .text-on-dim .MuiCard-root .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiCard-root .MuiTypography-root {
+  color: var(--body-text-color) !important;
+}
+
+/* Table header/body inside Paper → dark text + subtle borders */
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTableCell-head,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTableCell-head {
+  color: #1f2937 !important;
+  border-color: rgba(0,0,0,0.12) !important;
+}
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTableCell-body,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTableCell-body {
+  color: #111 !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Inputs inside Paper → dark text/labels */
+body.dim-bg .text-on-dim .MuiPaper-root .MuiInputBase-input,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiInputBase-input {
+  color: #111 !important;
+}
+body.dim-bg .text-on-dim .MuiPaper-root .MuiInputLabel-root,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiInputLabel-root {
+  color: rgba(0,0,0,0.72) !important;
+}
+
+/* Neutral, readable inputs on glass */
+.glass-form input,
+.glass-form textarea,
+.glass-form select {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #111;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+/* Softer placeholder */
+.glass-form input::placeholder,
+.glass-form textarea::placeholder {
+  color: #777;
+}
+
+/* Remove any required/invalid background styles if a UA adds them */
+.glass-form input:required,
+.glass-form textarea:required {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* 🔧 Kill Chrome/Edge autofill yellow */
+.glass-form input:-webkit-autofill,
+.glass-form input:-webkit-autofill:hover,
+.glass-form input:-webkit-autofill:focus,
+.glass-form textarea:-webkit-autofill,
+.glass-form select:-webkit-autofill {
+  -webkit-text-fill-color: #111 !important;
+  caret-color: #111;
+  /* Paint our own background over the autofill */
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  transition: background-color 0s;
+  background-clip: padding-box;
+}
+
+/* === Neutralize autofill styling across browsers === */
+
+/* Base input look */
+input, textarea, select {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  color: #111;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background-clip: padding-box;
+}
+
+/* Placeholders */
+input::placeholder, textarea::placeholder { color: #777; }
+
+/* Focus */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: rgba(140, 180, 255, 0.6);
+}
+
+/* --- Chrome/Edge/Safari (new + legacy) --- */
+input:autofill,
+textarea:autofill,
+select:autofill,
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill,
+.MuiInputBase-input:-webkit-autofill {
+  -webkit-text-fill-color: #111 !important;
+  caret-color: #111 !important;
+  /* overpaint the UA fill */
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  transition: background-color 0s;
+}
+
+/* --- Firefox --- */
+input:-moz-autofill,
+textarea:-moz-autofill,
+select:-moz-autofill,
+.MuiInputBase-input:-moz-autofill {
+  /* FF ignores the box-shadow trick — set the bg directly */
+  background-color: rgba(255, 255, 255, 0.10) !important;
+  color: #111 !important;
+  /* ensure FF doesn't paint its own color on top */
+  filter: none !important;
+}
+
+/* If any UA paints required/invalid backgrounds, neutralize them */
+input:required, textarea:required { background-color: transparent !important; box-shadow: none !important; }

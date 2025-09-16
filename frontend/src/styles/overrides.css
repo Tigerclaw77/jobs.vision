@@ -1,0 +1,150 @@
+/* =========================================
+   Glass forms – load this LAST
+   ========================================= */
+
+/* 1) Base look for NON-MUI native inputs only */
+.glass-form input:not(.MuiInputBase-input),
+.glass-form textarea:not(.MuiInputBase-input),
+.glass-form select {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  color: #111 !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
+  background-clip: padding-box !important;
+}
+.glass-form input::placeholder,
+.glass-form textarea::placeholder { color: #777 !important; }
+.glass-form input:focus,
+.glass-form textarea:focus,
+.glass-form select:focus {
+  outline: none !important;
+  border-color: rgba(140, 180, 255, 0.6) !important;
+}
+
+/* 2) MUI TextField (Outlined) — single capsule owned by the wrapper */
+.glass-form .MuiOutlinedInput-root {
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  backdrop-filter: blur(10px);
+}
+.glass-form .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.30) !important;
+  border-radius: 12px !important;
+}
+.glass-form .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(140, 180, 255, 0.6) !important;
+}
+.glass-form .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(140, 180, 255, 0.8) !important;
+}
+
+/* Reset the INNER input so it doesn't draw its own box */
+.glass-form .MuiInputBase-input,
+.glass-form .MuiOutlinedInput-input {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #e9eefc !important;           /* glass ink */
+  padding: 11px 14px 13px !important;  /* keep spacing */
+}
+
+/* Adornment (eye) should not create a separate pill */
+.glass-form .MuiOutlinedInput-root .MuiInputAdornment-root {
+  background: transparent !important;
+  margin-right: 4px;
+}
+
+/* ========== Autofill overrides (single, minimal set) ========== */
+/* WebKit (Chrome/Edge/Safari) */
+.glass-form input:-webkit-autofill,
+.glass-form input:-webkit-autofill:hover,
+.glass-form input:-webkit-autofill:focus,
+.glass-form input:-webkit-autofill:active,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:hover,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:focus,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #e9eefc !important;
+  caret-color: #e9eefc !important;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  background-clip: padding-box !important;
+  border-radius: 12px !important;
+  transition: background-color 9999s ease-in-out 0s !important;
+}
+
+/* Firefox (filled + preview) */
+.glass-form input:-moz-autofill,
+.glass-form input:-moz-autofill-preview,
+.glass-form .MuiOutlinedInput-input:-moz-autofill,
+.glass-form .MuiOutlinedInput-input:-moz-autofill-preview {
+  color: #e9eefc !important;
+  caret-color: #e9eefc !important;
+  box-shadow: inset 0 0 0 1000px rgba(255,255,255,0.10) !important;
+  background-color: transparent !important;
+  background-clip: padding-box !important;
+  border-radius: 12px !important;
+}
+
+/* Some FF builds paint the first line separately */
+.glass-form input:-moz-autofill::first-line,
+.glass-form input:-moz-autofill-preview::first-line,
+.glass-form .MuiOutlinedInput-input:-moz-autofill::first-line,
+.glass-form .MuiOutlinedInput-input:-moz-autofill-preview::first-line {
+  color: #e9eefc !important;
+}
+
+/* ===== Utilities ===== */
+input::-ms-reveal,
+input::-ms-clear,
+input::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ===== Readable labels / helper text (keep) ===== */
+.glass-form { --form-ink: #111; --form-muted: #53565a; }
+.glass-form .MuiInputLabel-root,
+.glass-form .MuiFormHelperText-root { color: var(--form-ink) !important; }
+.glass-form .MuiIconButton-root,
+.glass-form .MuiInputAdornment-root { color: var(--form-ink) !important; }
+.glass-form .MuiInputBase-input::placeholder,
+.glass-form input::placeholder,
+.glass-form textarea::placeholder { color: var(--form-muted) !important; }
+
+/* Optional: label position tweak (kept because you used it) */
+.glass-form .MuiInputLabel-outlined {
+  transform: translate(14px, 15px) scale(1) !important;
+}
+.glass-form .MuiInputLabel-outlined.MuiInputLabel-shrink {
+  transform: translate(14px, -9px) scale(0.75) !important;
+}
+
+/* === Autofill text color: force BLACK ================================== */
+/* WebKit (Chrome/Edge/Safari) */
+.glass-form input:-webkit-autofill,
+.glass-form input:-webkit-autofill:hover,
+.glass-form input:-webkit-autofill:focus,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill {
+  -webkit-text-fill-color: #111 !important;
+  caret-color: #111 !important;
+}
+
+/* Firefox (filled + preview) */
+.glass-form input:-moz-autofill,
+.glass-form input:-moz-autofill-preview,
+.glass-form .MuiOutlinedInput-input:-moz-autofill,
+.glass-form .MuiOutlinedInput-input:-moz-autofill-preview {
+  color: #111 !important;
+  caret-color: #111 !important;
+}
+
+/* Some FF builds paint the first line separately */
+.glass-form input:-moz-autofill::first-line,
+.glass-form input:-moz-autofill-preview::first-line,
+.glass-form .MuiOutlinedInput-input:-moz-autofill::first-line,
+.glass-form .MuiOutlinedInput-input:-moz-autofill-preview::first-line {
+  color: #111 !important;
+}

@@ -1,0 +1,514 @@
+/* forms.css — search, filters, tag inputs, buttons */
+
+/* ---------- Job Filter Panel ---------- */
+.job-filter {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(20, 22, 28, 0.55);
+  -webkit-backdrop-filter: blur(10px); /* Safari/iOS */
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 0 auto 1rem auto;
+  width: min(980px, 92vw);
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  min-height: 360px;
+}
+
+/* Inputs (shared) */
+.job-filter input,
+.job-filter select {
+  background: rgba(17, 20, 28, 0.6);
+  -webkit-backdrop-filter: blur(8px); /* Safari/iOS */
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e9eefc;
+  padding: 10px 12px;
+  border-radius: 10px;
+  min-width: 160px;
+  font-size: 0.9rem;
+}
+.job-filter input::placeholder {
+  color: rgba(233, 238, 252, 0.55);
+  /* overflow: hidden;
+  min-height: 360px;
+  box-sizing: border-box; */
+}
+
+/* ---------- Filter header (Filters / Reset) ---------- */
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.filter-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(20, 22, 28, 0.5);
+  color: #e9eefc;
+  cursor: pointer;
+}
+.filter-title .chev {
+  opacity: 0.8;
+}
+
+.filter-actions .btn {
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.filter-actions .btn.ghost {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #e9eefc;
+}
+.filter-actions .btn.primary {
+  border: 1px solid rgba(99, 158, 255, 0.6);
+  background: rgba(99, 158, 255, 0.18);
+  color: #e9eefc;
+}
+
+/* ---------- Controls grid inside panel ---------- */
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px 14px;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-size: 0.82rem;
+  color: rgba(233, 238, 252, 0.72);
+}
+.span-2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Location row ---------- */
+/* legacy wrapper (kept) */
+.location-input-wrapper {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  width: 100%;
+}
+.location-input-wrapper input {
+  width: 100%;
+  padding: 10px 12px;
+}
+/* new class used by JobFilter.jsx */
+.location-input {
+  position: relative;
+}
+.location-input input {
+  width: 100%;
+  padding: 10px 36px 10px 12px; /* room for the icon button */
+}
+.location-icon-button,
+.geo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e9eefc;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.location-icon-button:hover,
+.geo-btn:hover {
+  transform: scale(1.06);
+  color: #d7e3ff;
+  filter: drop-shadow(0 0 2px #9df);
+}
+/* when using .geo-btn inside .location-input */
+.location-input .geo-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+/* ---------- Clear button ---------- */
+.clear-filters {
+  background: #ff5d5d;
+  color: #fff;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  width: 100%;
+}
+
+/* ---------- Legacy tags (kept for back-compat) ---------- */
+.tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+}
+.tag button.remove-tag {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+/* ---------- New TagInput (compact glass) ---------- */
+.tag-input-root {
+  display: grid;
+  gap: 8px;
+}
+.tag-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #e9eefc;
+}
+.tag-chip-label {
+  line-height: 1;
+}
+.tag-chip-x {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+  font-size: 14px;
+  opacity: 0.8;
+  color: #e9eefc;
+}
+.tag-chip-x:hover {
+  opacity: 1;
+}
+.tag-chip-clear {
+  margin-left: 6px;
+  font-size: 12px;
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
+  color: #d7e3ff;
+}
+
+/* Input + caret */
+.tag-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(20, 20, 25, 0.55);
+  -webkit-backdrop-filter: blur(10px); /* Safari/iOS */
+  backdrop-filter: blur(10px);
+}
+.tag-input-wrap.is-open {
+  border-color: rgba(140, 180, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(100, 150, 255, 0.12);
+}
+.tag-input-wrap.is-maxed {
+  opacity: 0.75;
+}
+.tag-input {
+  flex: 1;
+  padding: 10px 36px 10px 12px;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #e9eefc;
+  font-size: 14px;
+}
+.tag-caret {
+  position: absolute;
+  right: 8px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.06);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #e9eefc;
+}
+
+/* Dropdown */
+.tag-listbox-wrap {
+  position: relative;
+}
+.tag-listbox {
+  position: absolute;
+  z-index: 1000; /* above map */
+  margin-top: 6px;
+  max-height: 240px;
+  overflow: auto;
+  width: 100%;
+  list-style: none;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(17, 20, 28, 0.92);
+  -webkit-backdrop-filter: blur(10px); /* Safari/iOS */
+  backdrop-filter: blur(10px);
+}
+.tag-option {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: #e9eefc;
+}
+.tag-option.is-active {
+  background: rgba(120, 160, 255, 0.18);
+}
+.tag-empty {
+  padding: 10px;
+  opacity: 0.75;
+  text-align: left;
+  color: #cdd6f4;
+}
+.tag-match {
+  background: transparent;
+  color: #d7e3ff;
+  text-decoration: underline;
+}
+
+/* Prevent native bullets inside the panel */
+.job-filter ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* ===================================================================== */
+/* New: Traditional multiselect (checkbox dropdown) for tags             */
+/* ===================================================================== */
+
+.ms {
+  position: relative;
+}
+.ms-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #eef2ff;
+}
+.ms-panel {
+  position: absolute;
+  z-index: 1200; /* above map and panel */
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 14, 18, 0.96);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.4);
+  padding: 8px;
+}
+.ms-search {
+  width: 100%;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #eef2ff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.92rem;
+}
+.ms-list {
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding-right: 2px;
+}
+.ms-item {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 6px;
+  border-radius: 8px;
+}
+.ms-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.ms-item input {
+  width: 16px;
+  height: 16px;
+}
+.ms-text {
+  color: #e9eefc;
+  font-size: 0.92rem;
+}
+.ms-empty {
+  color: #9aa7bd;
+  font-size: 0.9rem;
+  padding: 8px;
+}
+.ms-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Turn text white only when the page is dimmed AND the container opts in */
+body.dim-bg .text-on-dim,
+body.dim-strong .text-on-dim { color: #fff !important; }
+body.dim-bg .text-on-dim .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiTypography-root { color: #fff !important; }
+
+/* ...but any Paper/Card inside that container stays dark-on-light */
+body.dim-bg .text-on-dim .MuiPaper-root,
+body.dim-strong .text-on-dim .MuiPaper-root,
+body.dim-bg .text-on-dim .MuiCard-root,
+body.dim-strong .text-on-dim .MuiCard-root { color: var(--body-text-color) !important; }
+
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTypography-root,
+body.dim-bg .text-on-dim .MuiCard-root .MuiTypography-root,
+body.dim-strong .text-on-dim .MuiCard-root .MuiTypography-root { color: var(--body-text-color) !important; }
+
+/* Tables & inputs inside Papers reset to dark as well */
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTableCell-head,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTableCell-head { color: #1f2937 !important; }
+body.dim-bg .text-on-dim .MuiPaper-root .MuiTableCell-body,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiTableCell-body { color: #111 !important; }
+body.dim-bg .text-on-dim .MuiPaper-root .MuiInputBase-input,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiInputBase-input { color: #111 !important; }
+body.dim-bg .text-on-dim .MuiPaper-root .MuiInputLabel-root,
+body.dim-strong .text-on-dim .MuiPaper-root .MuiInputLabel-root { color: rgba(0,0,0,0.72) !important; }
+
+/* ============================================================
+   GLOBAL FIX (applies to every form wrapped in .glass-form)
+   ============================================================ */
+
+/* A) Label vertical centering without breaking animation */
+.glass-form .MuiInputLabel-outlined {
+  /* not-shrunk (label inside the field) — nudge up 1px */
+  transform: translate(14px, 15px) scale(1) !important;
+}
+.glass-form .MuiInputLabel-outlined.MuiInputLabel-shrink {
+  /* shrunk (floating in notch) — keep typical values so notch aligns */
+  transform: translate(14px, -9px) scale(0.75) !important;
+}
+
+/* B) Kill Chrome's yellow autofill while keeping autocomplete */
+.glass-form input:-webkit-autofill,
+.glass-form input:-webkit-autofill:hover,
+.glass-form input:-webkit-autofill:focus,
+.glass-form input:-webkit-autofill:active,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:hover,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:focus,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:active {
+  -webkit-text-fill-color: #e9eefc !important;   /* match typed color */
+  caret-color: #e9eefc !important;
+  /* paint over Chrome's yellow */
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.10) inset !important;
+  transition: background-color 9999s ease-in-out 0s !important;
+  border-radius: 12px !important;
+}
+
+/* (Optional) If you prefer dark ink inside the fields across the app: */
+/*
+.glass-form .MuiOutlinedInput-input,
+.glass-form input,
+.glass-form textarea { color: #111 !important; -webkit-text-fill-color:#111 !important; }
+.glass-form .MuiInputLabel-root, .glass-form .MuiFormHelperText-root { color:#111 !important; }
+*/
+
+/* === FINAL autofill killer (global) === */
+/* Works for native inputs, MUI OutlinedInput's inner input, and all states */
+.glass-form input:-webkit-autofill,
+.glass-form input:-webkit-autofill:hover,
+.glass-form input:-webkit-autofill:focus,
+.glass-form input:-webkit-autofill:active,
+.glass-form textarea:-webkit-autofill,
+.glass-form textarea:-webkit-autofill:hover,
+.glass-form textarea:-webkit-autofill:focus,
+.glass-form textarea:-webkit-autofill:active,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:hover,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:focus,
+.glass-form .MuiOutlinedInput-input:-webkit-autofill:active {
+  /* paint over Chrome's yellow */
+  box-shadow: 0 0 0 1000px rgba(255,255,255,0.10) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(255,255,255,0.10) inset !important;
+
+  /* make sure the paint stays inside the capsule */
+  background-clip: padding-box !important;
+  border-radius: 12px !important;
+
+  /* keep your ink */
+  -webkit-text-fill-color: #e9eefc !important;
+  caret-color: #e9eefc !important;
+
+  /* keep Chrome from animating its own bg back in */
+  transition: background-color 9999s ease-in-out 0s !important;
+}

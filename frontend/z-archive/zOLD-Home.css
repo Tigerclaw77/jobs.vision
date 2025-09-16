@@ -1,0 +1,111 @@
+.home {
+  text-align: center;
+  padding: 20px;
+}
+
+.home-title {
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+  font-size: 24px; /* Default size for mobile */
+  color: #003366;
+}
+
+.highlight {
+  color: #ff4500;
+}
+
+.home-subtitle {
+  color: #4a4a4a;
+  margin-bottom: 20px;
+}
+
+.options-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Default: Buttons (for mobile) */
+.option-card {
+  display: block;
+  width: 80%;
+  max-width: 300px;
+  padding: 15px;
+  text-align: center;
+  background: #003366; /* Blue background */
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: #ffffff; /* White text */
+  font-size: 18px;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.option-card:hover {
+  transform: scale(1.05);
+  background: #002855;
+}
+
+.option-card img {
+  display: none;
+}
+
+/* Ensure text is visible on mobile */
+.option-card h3 {
+  margin: 0;
+  color: white; /* Keeps text white for contrast */
+}
+
+@media (min-width: 768px) {
+
+  .home-title {
+    font-size: 64px; /* Larger text on bigger screens */
+  }
+  .options-container {
+    margin-top: 60px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-start; /* Align tops of cards */
+  }
+
+  .option-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start; /* Ensure content starts at the top */
+    width: 250px;
+    height: 300px;
+    padding: 0;
+    background: #ffffff; /* Restore white background */
+    color: #333; /* Restore dark text */
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .option-card img {
+    width: 100%;
+    height: 60%; /* Ensure the image takes up space */
+    object-fit: cover;
+    border-radius: 8px 8px 0 0;
+    display: block; /* Ensures image is visible */
+  }
+
+  .option-card h3 {
+    flex-grow: 1; /* Fills remaining space */
+    display: flex;
+    align-items: center; /* Centers text vertically */
+    justify-content: center; /* Centers text horizontally */
+    text-align: center;
+    width: 100%;
+    padding: 10px;
+    color: black; /* Adjust text color for contrast */
+  }
+
+  .option-card:hover {
+    background: #ffffff;
+    transform: scale(1.05); /* Subtle hover effect */
+  }
+}
