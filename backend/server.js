@@ -1,4 +1,3 @@
-// backend/server.js
 require("dotenv").config(); // keep this first
 
 const express = require("express");
