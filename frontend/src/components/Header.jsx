@@ -11,7 +11,7 @@ import "../styles/Header.css";
 
 const Header = () => {
   // 🔐 Single source of truth for auth
-  const { session, user, profile, role, accessToken, signOut } = useAuth();
+  const { session, user, profile, role, signOut } = useAuth();
 
   // Keep using Redux for notifications (unchanged)
   const hasUnreadNotifications = useSelector(

@@ -1,6 +1,6 @@
 // frontend/src/components/Admin/StatsCards.jsx
 import React from "react";
-import { Box, Paper, Typography, Stack } from "@mui/material";
+import { Paper, Typography, Stack } from "@mui/material";
 
 export default function StatsCards({
   totalUsers = 0,
