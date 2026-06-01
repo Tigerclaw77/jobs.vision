@@ -2,6 +2,7 @@
 const express = require("express");
 const { buildInsert, buildUpdate, one, query } = require("../services/db.js");
 const { requireAuth, maybeAuth, requireRole } = require("../middleware/auth.js");
+const { getRecruiterJobLimitState } = require("../services/entitlements.js");
 
 const {
   normalizeDomain,
@@ -20,9 +21,14 @@ const PUBLIC_JOB_COLUMNS = [
   "location",
   "city",
   "state",
+  "latitude",
+  "longitude",
   "role",
   "hours",
   "type",
+  "opportunity_type",
+  "practice_type",
+  "employment_type",
   "salary",
   "tag_ids",
   "posted_at",
@@ -44,6 +50,35 @@ function canManageJob(user, job) {
   return isAdmin(user) || job?.recruiter_id === user?.id || job?.posted_by === user?.id;
 }
 
+async function enforceRecruiterCanPost(req, res, excludeJobId = null) {
+  if (isAdmin(req.user)) return false;
+
+  const limitState = await getRecruiterJobLimitState(req.user.id, excludeJobId);
+
+  if (!limitState.entitlement.active) {
+    res.status(402).json({
+      error: "Active recruiter subscription required to post jobs.",
+      code: "recruiter_subscription_required",
+      entitlement: limitState.entitlement,
+    });
+    return true;
+  }
+
+  if (!limitState.canPost) {
+    const max = limitState.maxActiveJobs;
+    res.status(402).json({
+      error: `Your ${limitState.entitlement.tier || "current"} plan allows ${max} active job${max === 1 ? "" : "s"}. Archive a job or upgrade to post more.`,
+      code: "job_limit_reached",
+      entitlement: limitState.entitlement,
+      activeJobCount: limitState.activeJobCount,
+      maxActiveJobs: limitState.maxActiveJobs,
+    });
+    return true;
+  }
+
+  return false;
+}
+
 function normalizeBrand(value) {
   if (!value) return null;
   const asKey = brandByKey(value)?.key;
@@ -56,6 +91,19 @@ function toTagIds(value) {
     return value.split(",").map((tag) => tag.trim()).filter(Boolean);
   }
   return [];
+}
+
+function toNullableNumber(value) {
+  if (value === "" || value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toNullableText(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const text = String(value).trim();
+  return text || null;
 }
 
 function stripUnverifiedBrandFromName(employerName, venueBrand, venueName) {
@@ -189,6 +237,8 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     const recruiter_id = user.id;
     const nowIso = new Date().toISOString();
 
+    if (await enforceRecruiterCanPost(req, res)) return;
+
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
     let employer_domain = normalizeDomain(req.body.employer_domain ?? req.body.company_domain ?? "");
@@ -234,9 +284,14 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       location: req.body.location ?? null,
       city: req.body.city ?? null,
       state: req.body.state ?? null,
+      latitude: toNullableNumber(req.body.latitude),
+      longitude: toNullableNumber(req.body.longitude),
       role: req.body.role ?? null,
       hours: req.body.hours ?? null,
-      type: req.body.type ?? null,
+      type: req.body.type ?? req.body.employment_type ?? null,
+      opportunity_type: toNullableText(req.body.opportunity_type),
+      practice_type: toNullableText(req.body.practice_type),
+      employment_type: toNullableText(req.body.employment_type),
       salary: req.body.salary ?? null,
       tag_ids: toTagIds(req.body.tag_ids),
       recruiter_id,
@@ -302,9 +357,14 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "location",
       "city",
       "state",
+      "latitude",
+      "longitude",
       "role",
       "hours",
       "type",
+      "opportunity_type",
+      "practice_type",
+      "employment_type",
       "salary",
       "tag_ids",
       "employer_name",
@@ -320,6 +380,12 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       if (key in req.body) updates[key] = req.body[key];
     }
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
+    if ("latitude" in updates) updates.latitude = toNullableNumber(updates.latitude);
+    if ("longitude" in updates) updates.longitude = toNullableNumber(updates.longitude);
+    if ("opportunity_type" in updates) updates.opportunity_type = toNullableText(updates.opportunity_type);
+    if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
+    if ("employment_type" in updates) updates.employment_type = toNullableText(updates.employment_type);
+    if ("employment_type" in updates && !("type" in updates)) updates.type = updates.employment_type;
 
     let employer_name =
       ("employer_name" in updates ? updates.employer_name : job.employer_name) ??
@@ -409,6 +475,7 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
       job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
 
     if (!job.is_archived && job.status === nextStatus) return res.json(job);
+    if (await enforceRecruiterCanPost(req, res, jobId)) return;
 
     const update = buildUpdate(
       "public.jobs",

@@ -4,7 +4,10 @@
 .jobs-page { width: min(1300px,96vw); margin: 0 auto; }
 .jobs-page h2 { color:#fff; margin:10px 0 12px; }
 
-:root { --top-panel-height: 360px; }
+:root {
+  --top-panel-height: 360px;
+  --map-panel-height: 260px;
+}
 .jobs-top{
   display:grid;
   grid-template-columns: minmax(560px,1.2fr) minmax(420px,.9fr);
@@ -87,13 +90,86 @@
    MAP + CARDS
    ========================= */
 .map-card{
-  height: var(--top-panel-height);
+  height: var(--map-panel-height);
   border-radius:12px;
   overflow:hidden;
   border:1px solid var(--stroke);
   background: var(--glass-strong);
 }
-.map-card .job-map-inner{ width:100%; height:100%; }
+.map-card .job-map-inner{ width:100%; height:100%; position:relative; }
+.map-canvas-layer{ width:100%; height:100%; }
+.job-map-inner.map-locked .map-canvas-layer{
+  pointer-events:none;
+  user-select:none;
+}
+.map-paywall-overlay{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(5,8,13,.58);
+  color:#eef2ff;
+  text-align:center;
+}
+.map-paywall-content{
+  width:min(92%, 430px);
+  padding:18px;
+  border-radius:12px;
+  background:rgba(10,18,30,.74);
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 18px 40px rgba(0,0,0,.28);
+}
+.map-paywall-content h3{
+  margin:0 0 8px;
+  font-size:1.18rem;
+  color:#fff;
+}
+.map-paywall-content p{
+  margin:0;
+  color:rgba(238,242,255,.86);
+  line-height:1.35;
+}
+.map-paywall-actions{
+  margin-top:14px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  justify-content:center;
+}
+.map-paywall-actions button,
+.map-paywall-actions a{
+  appearance:none;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:10px;
+  background:#0f6fff;
+  color:#fff;
+  cursor:pointer;
+  font:inherit;
+  font-weight:700;
+  padding:9px 12px;
+  text-decoration:none;
+}
+.map-paywall-actions button:nth-child(2){
+  background:#1f9d78;
+}
+.map-paywall-actions button:disabled{
+  cursor:progress;
+  opacity:.76;
+}
+.map-paywall-info{
+  margin-top:12px;
+  display:grid;
+  gap:5px;
+  color:rgba(238,242,255,.86);
+  font-size:.88rem;
+}
+.map-paywall-error{
+  margin-top:10px !important;
+  color:#ffd4d4 !important;
+  font-size:.9rem;
+}
 
 .job-cards{
   display:grid;
@@ -122,10 +198,13 @@
 .jl-icon-col{ display:flex; flex-direction:column; gap:6px; align-items:center; padding-top:2px; width:32px; }
 .jl-icon-btn, .jl-icon-btn::before, .jl-icon-btn::after{ margin:0!important; padding:0!important; border:0!important; background:transparent!important; box-shadow:none!important; border-radius:0!important; }
 .jl-icon-btn{ width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; line-height:0; cursor:pointer; }
-.jl-icon-btn svg{ display:block; pointer-events:none; }
+.jl-icon-btn svg{ display:block; pointer-events:none; fill: transparent; }
 .jl-star{ color: rgba(245,208,66,.9); }
 .jl-star.active{ color: rgba(245,208,66,1); filter: drop-shadow(0 0 4px rgba(245,208,66,.35)); }
+.jl-star.active svg{ fill: currentColor; }
 .jl-check{ color: rgba(58,200,126,.95); }
+.jl-check.active{ color: rgba(87,227,137,1); filter: drop-shadow(0 0 4px rgba(87,227,137,.28)); }
+.jl-check.active svg{ fill: rgba(87,227,137,.20); }
 
 .job-content{ min-width:0; }
 .job-title{ margin:0 0 6px 0; line-height:1.25; word-break:break-word; color:#fff !important; }
@@ -137,11 +216,15 @@
 @media (max-width:1100px){
   .jobs-top{ grid-template-columns:1fr; }
   .filters-panel{ height:auto; }
-  .map-card{ height:320px; }
+  .map-card{ height:240px; }
 }
 @media (max-width:720px){
   .job-cards{ grid-template-columns:1fr; }
-  .map-card{ height:300px; }
+  .map-card{ height:220px; }
+  .map-paywall-content{ padding:14px; }
+  .map-paywall-actions{ gap:8px; }
+  .map-paywall-actions button,
+  .map-paywall-actions a{ width:100%; }
 }
 
 /* =========================
@@ -174,6 +257,15 @@
 .modal-company,.modal-location,.modal-rolehours{
   margin: 0 0 6px; color:#dbe6ff;
 }
+.modal-job-details{
+  display:grid;
+  gap:4px;
+  margin:10px 0 0;
+}
+.modal-job-details p{
+  margin:0;
+  color:#dbe6ff;
+}
 .modal-desc{
   margin: 12px 0 0; color:#d7def7; line-height:1.55; white-space:pre-wrap;
 }
@@ -200,11 +292,13 @@
   color: rgba(255,255,255,.65) !important;
   cursor: pointer !important;
 }
-.status-chip svg{ display:block; stroke-width: 2.2px; }
+.status-chip svg{ display:block; stroke-width: 2.2px; fill: transparent; }
 .status-chip.favorite{ color: rgba(255,205,72,.85) !important; }
 .status-chip.favorite.active{ color: rgba(255,205,72,1) !important; }
+.status-chip.favorite.active svg{ fill: currentColor; }
 .status-chip.applied{ color: rgba(87,227,137,.85) !important; }
 .status-chip.applied.active{ color: rgba(87,227,137,1) !important; }
+.status-chip.applied.active svg{ fill: rgba(87,227,137,.20); }
 
 /* Actions */
 .modal-actions{

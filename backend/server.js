@@ -8,6 +8,9 @@ const helmet = require("helmet");
 
 // Initialize Stripe after dotenv
 const stripeKey = process.env.STRIPE_SECRET_KEY;
+if (stripeKey && !stripeKey.startsWith("sk_test_")) {
+  throw new Error("Only Stripe test-mode secret keys are supported in this integration pass.");
+}
 const stripe = stripeKey ? require("stripe")(stripeKey) : null;
 const stripeSkipVerify = process.env.STRIPE_SKIP_VERIFY === "true";
 
@@ -16,6 +19,14 @@ if (process.env.NODE_ENV === "production" && stripeSkipVerify) {
 }
 
 const { one, query } = require("./services/db");
+const {
+  getPlanFromSubscription,
+  normalizeStripeStatus,
+} = require("./services/stripeCatalog");
+const {
+  markSubscriptionCanceled,
+  upsertStripeEntitlement,
+} = require("./services/entitlements");
 
 // ✅ Billing engine
 const { billJobsMonthly } = require("./controllers/billingController");
@@ -28,20 +39,63 @@ console.log("BOOT database configured:", Boolean(process.env.DATABASE_URL));
 // =======================
 // Stripe Webhook
 // =======================
-const PLAN_MAP = {
-  price_RECRUITER_BASIC: {
-    table: "recruiter_entitlements",
-    values: { plan: "recruiter_basic", max_active_jobs: 1 },
-  },
-  price_RECRUITER_PRO: {
-    table: "recruiter_entitlements",
-    values: { plan: "recruiter_pro", max_active_jobs: 5 },
-  },
-  price_CANDIDATE_BASIC: {
-    table: "candidate_entitlements",
-    values: { plan: "candidate_basic", apply_cap_per_day: 10 },
-  },
-};
+async function findProfileForStripeCustomer(customerId, metadata = {}) {
+  if (customerId) {
+    const profile = await one(
+      "select id from public.profiles where stripe_customer_id = $1",
+      [customerId]
+    );
+    if (profile) return profile;
+  }
+
+  const profileId = metadata.profileId || metadata.userId;
+  if (!profileId) return null;
+
+  const profile = await one("select id from public.profiles where id = $1", [profileId]);
+  if (profile && customerId) {
+    await query("update public.profiles set stripe_customer_id = $1 where id = $2", [
+      customerId,
+      profile.id,
+    ]);
+  }
+  return profile;
+}
+
+async function retrieveSubscription(subscriptionId) {
+  if (!subscriptionId) return null;
+  if (typeof subscriptionId === "object") return subscriptionId;
+  return stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ["items.data.price"],
+  });
+}
+
+async function syncSubscriptionEntitlement(subscription, fallbackMetadata = {}) {
+  const sub = await retrieveSubscription(subscription);
+  if (!sub) {
+    console.warn("No subscription found for Stripe entitlement sync.");
+    return null;
+  }
+
+  const plan = getPlanFromSubscription(sub);
+  if (!plan) {
+    console.warn("Unmapped Stripe subscription price:", sub.id);
+    return null;
+  }
+
+  const profile = await findProfileForStripeCustomer(sub.customer, {
+    ...(fallbackMetadata || {}),
+    ...(sub.metadata || {}),
+  });
+  if (!profile) {
+    console.warn("No profile found for Stripe customer:", sub.customer);
+    return null;
+  }
+
+  const status = normalizeStripeStatus(sub.status);
+  const payload = await upsertStripeEntitlement(profile.id, plan, status, sub.id);
+  console.log(`Stripe entitlement synced for ${profile.id}`, payload);
+  return payload;
+}
 
 // Only mount webhook if Stripe is configured
 if (stripe) {
@@ -66,6 +120,58 @@ if (stripe) {
       }
 
       console.log("✅ Received:", event.type);
+
+      try {
+        switch (event.type) {
+          case "checkout.session.completed": {
+            const session = event.data.object;
+            await syncSubscriptionEntitlement(session.subscription, {
+              ...(session.metadata || {}),
+              profileId: session.metadata?.profileId || session.client_reference_id,
+            });
+            return res.json({ received: true });
+          }
+
+          case "invoice.paid": {
+            const invoice = event.data.object;
+            await syncSubscriptionEntitlement(invoice.subscription);
+            return res.json({ received: true });
+          }
+
+          case "invoice.payment_failed": {
+            const invoice = event.data.object;
+            const sub = await retrieveSubscription(invoice.subscription);
+            if (sub) {
+              sub.status = "past_due";
+              await syncSubscriptionEntitlement(sub);
+            }
+            return res.json({ received: true });
+          }
+
+          case "customer.subscription.updated": {
+            await syncSubscriptionEntitlement(event.data.object);
+            return res.json({ received: true });
+          }
+
+          case "customer.subscription.deleted": {
+            const sub = event.data.object;
+            const profile = await findProfileForStripeCustomer(sub.customer, sub.metadata);
+
+            if (profile) {
+              await markSubscriptionCanceled(profile.id, sub.id);
+            }
+
+            return res.json({ received: true });
+          }
+
+          default:
+            console.log(`Unhandled Stripe event type ${event.type}`);
+            return res.json({ received: true });
+        }
+      } catch (err) {
+        console.error("Stripe webhook handler error:", err);
+        return res.status(500).json({ error: "Stripe webhook handler failed" });
+      }
 
       switch (event.type) {
         case "checkout.session.completed": {
@@ -109,7 +215,7 @@ if (stripe) {
               break;
             }
 
-            const plan = PLAN_MAP[priceId];
+            const plan = null;
             if (!plan) {
               console.warn("⚠️ Unmapped price ID:", priceId);
               break;
@@ -262,6 +368,9 @@ app.options("*", cors());
 // JSON body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+const stripeRoutes = require("./routes/stripe");
+app.use("/api/stripe", stripeRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({

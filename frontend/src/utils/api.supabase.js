@@ -44,6 +44,9 @@ function mapJobRow(row = {}) {
     role: (row.role || "").toLowerCase(),
     hours: (row.hours || "").toString().toLowerCase(),
     type: (row.type || "").toString().toLowerCase(),
+    opportunity_type: row.opportunity_type || "",
+    practice_type: row.practice_type || "",
+    employment_type: row.employment_type || "",
     salary: row.salary,
     tags: tagsRaw.map((t) => String(t).toLowerCase()),
     latitude: row.latitude != null ? Number(row.latitude) : undefined,
@@ -55,8 +58,22 @@ function mapJobRow(row = {}) {
 }
 
 export async function fetchJobs() {
-  const data = await apiJson("/jobs");
+  const data = await apiJson("/jobs?limit=100");
   return (Array.isArray(data) ? data : []).map(mapJobRow);
+}
+
+export async function fetchFavoriteJobs() {
+  const headers = await authHeaders();
+  return apiJson("/favorites", { headers });
+}
+
+export async function removeJobFromFavorites(jobId) {
+  const headers = await authHeaders();
+  await apiJson(`/favorites/${encodeURIComponent(jobId)}`, {
+    method: "DELETE",
+    headers,
+  });
+  return { removed: true };
 }
 
 export async function addJobToFavorites(jobId) {

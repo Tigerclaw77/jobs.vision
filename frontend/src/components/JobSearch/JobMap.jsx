@@ -13,7 +13,34 @@ function getPosition(job) {
   return { lat: nLat, lng: nLng };
 }
 
-const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
+const DEFAULT_CENTER = { lat: 31.0, lng: -99.0 };
+const DEFAULT_ZOOM = 5;
+
+function getSearchCenter(center) {
+  const lat = Number(center?.lat);
+  const lng = Number(center?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function zoomForRadius(radiusMi) {
+  const radius = Number(radiusMi) || 25;
+  if (radius <= 10) return 11;
+  if (radius <= 25) return 10;
+  if (radius <= 50) return 9;
+  if (radius <= 100) return 8;
+  return 7;
+}
+
+const JobMap = ({
+  jobs = [],
+  onMarkerClick,
+  showMap = true,
+  apiKey,
+  searchCenter = null,
+  radiusMi = 25,
+  hasActiveRadius = false,
+}) => {
   const mapEl = useRef(null);
   const map = useRef(null);
   const geocoder = useRef(null);
@@ -46,8 +73,8 @@ const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
   useEffect(() => {
     if (!ready || !showMap || !mapEl.current || map.current) return;
     map.current = new window.google.maps.Map(mapEl.current, {
-      center: { lat: 30.1659, lng: -95.4613 },
-      zoom: 8,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,
@@ -59,13 +86,21 @@ const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
   // add markers (ONLY when jobs change or map becomes ready)
   useEffect(() => {
     if (!map.current || !showMap) return;
+    const activeCenter = hasActiveRadius ? getSearchCenter(searchCenter) : null;
+    const applyViewport = () => {
+      if (activeCenter) {
+        map.current.setCenter(activeCenter);
+        map.current.setZoom(zoomForRadius(radiusMi));
+        return;
+      }
+
+      map.current.setCenter(DEFAULT_CENTER);
+      map.current.setZoom(DEFAULT_ZOOM);
+    };
 
     // clear old markers
     markers.current.forEach((m) => m.setMap(null));
     markers.current = [];
-
-    const bounds = new window.google.maps.LatLngBounds();
-    let placed = 0;
 
     const addMarker = (job, pos) => {
       const m = new window.google.maps.Marker({
@@ -77,8 +112,6 @@ const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
         if (clickCbRef.current) clickCbRef.current(job);
       });
       markers.current.push(m);
-      bounds.extend(pos);
-      placed++;
     };
 
     const toGeocode = [];
@@ -100,7 +133,7 @@ const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
       let i = 0;
       const tick = () => {
         if (i >= toGeocode.length) {
-          if (placed > 0) map.current.fitBounds(bounds);
+          applyViewport();
           return;
         }
         const { job, key } = toGeocode[i++];
@@ -117,14 +150,8 @@ const JobMap = ({ jobs = [], onMarkerClick, showMap = true, apiKey }) => {
       tick();
     }
 
-    // fit for immediate markers
-    if (placed > 0) {
-      map.current.fitBounds(bounds);
-    } else {
-      map.current.setCenter({ lat: 30.1659, lng: -95.4613 });
-      map.current.setZoom(8);
-    }
-  }, [jobs, ready, showMap]); // <- NO onMarkerClick here
+    applyViewport();
+  }, [jobs, ready, showMap, searchCenter, radiusMi, hasActiveRadius]); // <- NO onMarkerClick here
 
   return (
     <div

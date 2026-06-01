@@ -2,11 +2,36 @@
 import React, { useEffect } from "react";
 import { Star, CheckCircle } from "lucide-react";
 
+const JOB_DETAIL_LABELS = {
+  opportunity_type: {
+    associate_position: "Associate Position",
+    lease_opportunity: "Lease Opportunity",
+    ownership_track: "Ownership Track",
+    buy_in_opportunity: "Buy-In Opportunity",
+  },
+  practice_type: {
+    private_practice: "Private Practice",
+    corporate: "Corporate",
+    od_md: "OD/MD",
+  },
+  employment_type: {
+    full_time: "Full-Time",
+    part_time: "Part-Time",
+    remote: "Remote",
+  },
+};
+
+function labelFor(field, value) {
+  if (!value) return "";
+  return JOB_DETAIL_LABELS[field]?.[value] || String(value).replace(/_/g, " ");
+}
+
 export default function JobModal({
   isOpen,
   job,
   isFavorite,
   isApplied,
+  savedTooltip,
   appliedTooltip,
   onFavoriteClick,
   onApply,
@@ -21,6 +46,12 @@ export default function JobModal({
 
   if (!isOpen || !job) return null;
 
+  const jobDetails = [
+    ["Opportunity Type", labelFor("opportunity_type", job.opportunity_type)],
+    ["Practice Type", labelFor("practice_type", job.practice_type)],
+    ["Employment Type", labelFor("employment_type", job.employment_type)],
+  ].filter(([, value]) => value);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -32,18 +63,27 @@ export default function JobModal({
 
         <div className="status-icons">
           <button
+            type="button"
             className={`status-chip favorite ${isFavorite ? "active" : ""}`}
-            title={isFavorite ? "Remove from favorites" : "Save to favorites"}
+            title={savedTooltip || (isFavorite ? "Remove saved job" : "Save job")}
+            aria-label={isFavorite ? "Remove saved job" : "Save job"}
+            aria-pressed={Boolean(isFavorite)}
             onClick={() => onFavoriteClick(job._id)}
           >
             <Star size={20} />
           </button>
-          <div
+          <button
+            type="button"
             className={`status-chip applied ${isApplied ? "active" : ""}`}
-            title={appliedTooltip || (isApplied ? "Applied" : "Apply for this job")}
+            title={appliedTooltip || (isApplied ? "Already applied" : "Apply to this job")}
+            aria-label={isApplied ? "Already applied" : "Apply to this job"}
+            aria-pressed={Boolean(isApplied)}
+            onClick={() => {
+              if (!isApplied) onApply(job._id);
+            }}
           >
             <CheckCircle size={20} />
-          </div>
+          </button>
         </div>
 
         <h3 className="modal-title">{job.title}</h3>
@@ -54,6 +94,16 @@ export default function JobModal({
           {job.hours ? ` • ${job.hours}` : ""}
         </p>
 
+        {jobDetails.length > 0 && (
+          <div className="modal-job-details">
+            {jobDetails.map(([label, value]) => (
+              <p key={label}>
+                <strong>{label}:</strong> {value}
+              </p>
+            ))}
+          </div>
+        )}
+
         {job.description && <p className="modal-desc">{job.description}</p>}
 
         <div className="modal-actions">
@@ -61,6 +111,7 @@ export default function JobModal({
             <button
               className="btn-primary"
               onClick={() => onApply(job._id)}
+              title="Apply to this job"
             >
               {isAuthed ? "Apply Now" : "Sign in to Apply"}
             </button>

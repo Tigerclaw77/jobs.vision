@@ -24,7 +24,9 @@ const defaultValues = {
   company: "",
   location: "",
   role_type: "optometrist",
-  employment_type: "full_time", // full_time | part_time | contract | temp | internship
+  opportunity_type: "",
+  practice_type: "",
+  employment_type: "",
   onsite_type: "onsite",        // onsite | hybrid | remote
   hours_per_week: "",
   salary_min: "",
@@ -59,7 +61,9 @@ function valuesFromJob(job = {}) {
     company: job.employer_name || job.company || "",
     location: job.location || [job.city, job.state].filter(Boolean).join(", "),
     role_type: job.role || defaultValues.role_type,
-    employment_type: job.type || defaultValues.employment_type,
+    opportunity_type: job.opportunity_type || "",
+    practice_type: job.practice_type || "",
+    employment_type: job.employment_type || job.type || "",
     hours_per_week: job.hours && !Number.isNaN(numericHours) ? String(job.hours) : "",
     salary_min: salary.salary_min,
     salary_max: salary.salary_max,
@@ -78,11 +82,22 @@ const roleOptions = [
 ];
 
 const employmentOptions = [
-  { value: "full_time", label: "Full-time" },
-  { value: "part_time", label: "Part-time" },
-  { value: "contract", label: "Contract" },
-  { value: "temp", label: "Temporary" },
-  { value: "internship", label: "Internship" },
+  { value: "full_time", label: "Full-Time" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "remote", label: "Remote" },
+];
+
+const opportunityOptions = [
+  { value: "associate_position", label: "Associate Position" },
+  { value: "lease_opportunity", label: "Lease Opportunity" },
+  { value: "ownership_track", label: "Ownership Track" },
+  { value: "buy_in_opportunity", label: "Buy-In Opportunity" },
+];
+
+const practiceOptions = [
+  { value: "private_practice", label: "Private Practice" },
+  { value: "corporate", label: "Corporate" },
+  { value: "od_md", label: "OD/MD" },
 ];
 
 const onsiteOptions = [
@@ -218,7 +233,10 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       city,
       state,
       role: values.role_type,
-      type: values.employment_type,
+      type: values.employment_type || null,
+      opportunity_type: values.opportunity_type || null,
+      practice_type: values.practice_type || null,
+      employment_type: values.employment_type || null,
       hours: values.hours_per_week ? String(Number(values.hours_per_week)) : null,
       salary,
       description: values.description.trim(),
@@ -315,7 +333,46 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
               value={values.employment_type}
               onChange={handleChange("employment_type")}
             >
+              <MenuItem value="">Optional</MenuItem>
               {employmentOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel id="opportunity-type-label">Opportunity Type</InputLabel>
+            <Select
+              labelId="opportunity-type-label"
+              label="Opportunity Type"
+              value={values.opportunity_type}
+              onChange={handleChange("opportunity_type")}
+            >
+              <MenuItem value="">Optional</MenuItem>
+              {opportunityOptions.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <FormControl fullWidth>
+            <InputLabel id="practice-type-label">Practice Type</InputLabel>
+            <Select
+              labelId="practice-type-label"
+              label="Practice Type"
+              value={values.practice_type}
+              onChange={handleChange("practice_type")}
+            >
+              <MenuItem value="">Optional</MenuItem>
+              {practiceOptions.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>

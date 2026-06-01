@@ -6,14 +6,19 @@ const PricingTiers = () => {
       <h2>Job Posting Plans</h2>
       <div style={styles.tiers}>
         <div style={styles.tier}>
-          <h3>Basic</h3>
-          <p>$50 per job (30 days)</p>
-          <p>Renewal: $25 every 30 days</p>
+          <h3>Staff</h3>
+          <p>$79 first month</p>
+          <p>$49 renewal</p>
         </div>
         <div style={styles.tier}>
-          <h3>Boost</h3>
-          <p>Increase job visibility</p>
-          <p>Price varies based on location</p>
+          <h3>Manager</h3>
+          <p>$149 first month</p>
+          <p>$99 renewal</p>
+        </div>
+        <div style={styles.tier}>
+          <h3>Doctor</h3>
+          <p>$299 first month</p>
+          <p>$149 renewal</p>
         </div>
       </div>
     </div>

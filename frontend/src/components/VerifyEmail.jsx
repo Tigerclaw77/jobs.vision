@@ -55,18 +55,30 @@ export default function VerifyEmail() {
 
       const me = await fetchMe(session.access_token);
       if (!mounted) return;
+      const role =
+        me.role ||
+        me.profile?.role ||
+        session.user?.user_metadata?.accountRole ||
+        session.user?.user_metadata?.userRole ||
+        session.user?.user_metadata?.role ||
+        "candidate";
 
       dispatch(
         loginRedux({
-          userRole: me.role,
-          user: me,
+          userRole: role,
+          user: {
+            ...me,
+            ...(session.user?.user_metadata || {}),
+            userRole: role,
+            isVerified: true,
+          },
           token: session.access_token,
         })
       );
       setPhase("success");
       setMessage("Email verified! Redirecting...");
       setTimeout(() => {
-        navigate(redirectForRole(me.role), { replace: true });
+        navigate(redirectForRole(role), { replace: true });
       }, 600);
     }
 

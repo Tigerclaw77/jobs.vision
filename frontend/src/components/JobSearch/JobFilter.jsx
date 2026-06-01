@@ -14,11 +14,20 @@ export default function JobFilter({
   onClear,
   quickTags = [],
   onRemoveQuickTag,
+  canUseMapSearch = true,
 }) {
   const [locLoading, setLocLoading] = useState(false);
   const set = (patch) => onFilterChange({ ...filters, ...patch });
+  const hasLocation =
+    Boolean(String(filters.location || "").trim()) ||
+    (Number.isFinite(Number(filters.lat)) && Number.isFinite(Number(filters.lng)));
+  const canUseRadius = canUseMapSearch && hasLocation;
 
   const useMyLocation = () => {
+    if (!canUseMapSearch) {
+      alert("Map search is available with Candidate Plus or Premium.");
+      return;
+    }
     if (!navigator.geolocation) return alert("Geolocation not supported.");
     setLocLoading(true);
     navigator.geolocation.getCurrentPosition(
@@ -82,9 +91,9 @@ export default function JobFilter({
           <button
             className="geo-btn"
             type="button"
-            title="Use my location"
+            title={canUseMapSearch ? "Use my location" : "Map search requires Plus or Premium"}
             onClick={useMyLocation}
-            disabled={locLoading}
+            disabled={locLoading || !canUseMapSearch}
           >
             <Navigation size={16} />
           </button>
@@ -93,9 +102,18 @@ export default function JobFilter({
         <div className="field field-radius">
           <label>Radius</label>
           <select
-            value={filters.radiusMi ?? 25}
+            value={canUseRadius ? filters.radiusMi ?? 25 : ""}
             onChange={(e) => set({ radiusMi: Number(e.target.value) })}
+            disabled={!canUseRadius}
+            title={
+              !canUseMapSearch
+                ? "Map search requires Plus or Premium"
+                : hasLocation
+                ? "Search radius"
+                : "Enter a location to use radius"
+            }
           >
+            {!canUseRadius && <option value="">Any distance</option>}
             {RADIUS_OPTIONS.map((r) => (
               <option key={r.value} value={r.value}>
                 {r.label}
@@ -113,10 +131,9 @@ export default function JobFilter({
           >
             <option value="">All roles</option>
             <option value="optometrist">Optometrist</option>
-            <option value="technician">Technician</option>
-            <option value="assistant">Vision Assistant</option>
-            <option value="front desk">Front Desk</option>
-            <option value="ophthalmologist">Ophthalmologist</option>
+            <option value="optician">Optician</option>
+            <option value="ophthalmic technician">Ophthalmic Technician</option>
+            <option value="practice manager">Practice Manager</option>
           </select>
         </div>
 

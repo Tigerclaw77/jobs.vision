@@ -114,6 +114,13 @@ button:hover {
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+  box-shadow: none;
+}
+
 /* Forms */
 textarea { resize: none; }
 input:focus, textarea:focus, select:focus {
@@ -129,6 +136,324 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* Dashboard */
+.dashboard-container {
+  width: min(1040px, calc(100% - 32px));
+  margin: 32px auto 48px;
+  padding: 28px;
+  box-sizing: border-box;
+  color: #102033;
+  background: rgba(248, 251, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.dashboard-container h1,
+.dashboard-container h2,
+.dashboard-container h3,
+.dashboard-container p,
+.dashboard-container li,
+.dashboard-container span,
+.dashboard-container strong,
+.dashboard-container label,
+.dashboard-container td,
+.dashboard-container th {
+  color: #102033;
+}
+
+.dashboard-container h1 {
+  margin-top: 0;
+  margin-bottom: 22px;
+}
+
+.dashboard-section,
+.upgrade-banner {
+  margin-top: 18px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(12, 74, 110, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
+.dashboard-section h2,
+.dashboard-section h3,
+.upgrade-banner p {
+  margin-top: 0;
+}
+
+.dashboard-container a {
+  color: #005a78;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.dashboard-container a:hover {
+  color: #0085b2;
+}
+
+.premium-highlight {
+  border-color: rgba(0, 133, 178, 0.32);
+  background: rgba(232, 247, 252, 0.88);
+}
+
+.upgrade-banner {
+  background: rgba(224, 242, 254, 0.90);
+}
+
+.recruiter-dashboard-container {
+  display: grid;
+  gap: 18px;
+}
+
+.recruiter-dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.recruiter-dashboard-header h1 {
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.dashboard-subtitle {
+  margin: 0;
+  font-weight: 700;
+}
+
+.recruiter-dashboard-links,
+.recruiter-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.recruiter-dashboard-links {
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.recruiter-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.recruiter-summary-card {
+  min-height: 132px;
+  padding: 18px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(12, 74, 110, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
+.recruiter-summary-card .summary-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.recruiter-summary-card strong {
+  display: block;
+  font-size: 1.65rem;
+  line-height: 1.15;
+}
+
+.recruiter-summary-card p {
+  margin: 10px 0 0;
+  color: #334155;
+}
+
+.recruiter-capacity-banner {
+  margin-top: 0;
+}
+
+.recruiter-action-row {
+  padding: 14px 0 4px;
+}
+
+.recruiter-action-row span {
+  font-weight: 700;
+}
+
+.dashboard-error {
+  margin: 0;
+  padding: 12px 14px;
+  color: #7f1d1d;
+  background: rgba(254, 226, 226, 0.9);
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.saved-capacity-card {
+  border-color: rgba(0, 90, 120, 0.22);
+}
+
+.save-slot-status {
+  margin: 0 0 12px;
+  font-weight: 700;
+}
+
+.save-slot-list {
+  display: grid;
+  gap: 10px;
+}
+
+.save-slot-row-button {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 90, 120, 0.28);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.save-slot-row-button.occupied {
+  background: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+}
+
+.save-slot-row-button.occupied:hover,
+.save-slot-row-button.occupied:focus {
+  border-color: rgba(0, 90, 120, 0.52);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.10);
+  outline: none;
+}
+
+.save-slot-row-button.empty {
+  background: rgba(255, 255, 255, 0.52);
+  color: #536477;
+  font-weight: 700;
+}
+
+.save-slot-job-text {
+  flex: 1;
+  min-width: 0;
+  color: #102033;
+  font-weight: 700;
+}
+
+.save-slot-remove {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 0.92rem;
+  border-radius: 8px;
+  color: #fff;
+  background: #005a78;
+}
+
+.save-slot-remove:hover {
+  background: #0085b2;
+}
+
+.save-slot-error {
+  color: #991b1b !important;
+  font-weight: 700;
+}
+
+.save-slot-loading,
+.save-slot-empty-note {
+  margin-bottom: 0;
+}
+
+.candidate-upgrade-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 10px 0 16px;
+}
+
+.candidate-upgrade-options > div {
+  padding: 14px;
+  border: 1px solid rgba(12, 74, 110, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.candidate-upgrade-options h3 {
+  margin-top: 0;
+}
+
+.candidate-upgrade-options ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.dashboard-container table {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.recruiter-card .job-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 10px 0;
+}
+
+.recruiter-card .job-details span {
+  color: #fff;
+}
+
+@media (max-width: 720px) {
+  .dashboard-container {
+    width: min(100% - 20px, 1040px);
+    margin: 20px auto 32px;
+    padding: 18px;
+    border-radius: 14px;
+  }
+
+  .dashboard-section,
+  .upgrade-banner {
+    padding: 16px;
+  }
+
+  .recruiter-dashboard-header {
+    flex-direction: column;
+  }
+
+  .recruiter-dashboard-links {
+    justify-content: flex-start;
+    padding-top: 0;
+  }
+
+  .recruiter-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .save-slot-row-button {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .save-slot-remove {
+    width: 100%;
+  }
+
+  .candidate-upgrade-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .dashboard {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));

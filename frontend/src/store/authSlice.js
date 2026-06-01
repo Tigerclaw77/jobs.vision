@@ -10,7 +10,13 @@ function apiBaseUrl() {
 }
 
 async function getRoleTier(_userId, metaRole, token, metaTier) {
-  if (metaRole === "admin") return { role: "admin", tier: "premium" };
+  if (metaRole === "admin") {
+    return {
+      role: "admin",
+      tier: "premium",
+      entitlements: null,
+    };
+  }
 
   try {
     const res = await fetch(`${apiBaseUrl()}/auth/me`, {
@@ -19,9 +25,15 @@ async function getRoleTier(_userId, metaRole, token, metaTier) {
     const data = await res.json().catch(() => null);
     if (res.ok) {
       const role = data?.profile?.role || data?.role || metaRole || "candidate";
+      const tier =
+        data?.tier ||
+        data?.entitlements?.tier ||
+        metaTier ||
+        (role === "recruiter" ? "staff" : "free");
       return {
         role,
-        tier: metaTier || (role === "recruiter" ? "staff" : "free"),
+        tier,
+        entitlements: data?.entitlements || null,
       };
     }
   } catch {}
@@ -29,6 +41,7 @@ async function getRoleTier(_userId, metaRole, token, metaTier) {
   return {
     role: metaRole || "candidate",
     tier: metaTier || (metaRole === "recruiter" ? "staff" : "free"),
+    entitlements: null,
   };
 }
 
@@ -78,7 +91,7 @@ export const fetchUserSession = createAsyncThunk(
         user?.user_metadata?.userRole ||
         null;
       const metaTier = user?.app_metadata?.tier || user?.user_metadata?.tier || null;
-      const { role, tier } = await getRoleTier(
+      const { role, tier, entitlements } = await getRoleTier(
         user.id,
         metaRole,
         session.access_token,
@@ -91,6 +104,7 @@ export const fetchUserSession = createAsyncThunk(
         isVerified: !!user.email_confirmed_at,
         userRole: role,   // keep this for places that read user.userRole
         tier,             // AccessGate reads this
+        entitlements,
         ...user.user_metadata, // e.g., firstName, lastName, recruiterType
       };
 

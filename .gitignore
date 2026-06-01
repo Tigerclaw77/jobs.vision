@@ -63,3 +63,4 @@ docker-data/
 
 # Crash dumps
 *.stackdump
+.vercel

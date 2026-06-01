@@ -1,7 +1,9 @@
 // src/components/JobSearch/JobList.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { Link, useSearchParams } from "react-router-dom";
 import { getNeonUser, neonAuth } from "../../utils/neonAuthClient";
+import { createStripeCheckout } from "../../utils/api";
 
 import {
   fetchJobs,
@@ -20,7 +22,9 @@ import { buildLookupFromJobs, smartParseQuery } from "../../utils/smartParseQuer
 import "../../styles/jobSearch.css";
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12;
+const FREE_SAVE_LIMIT = 5;
+let googleMapsPromise;
 
 // ---------- helpers ----------
 function haversineMi(a, b) {
@@ -32,6 +36,67 @@ function haversineMi(a, b) {
   const la2 = b.lat * Math.PI / 180;
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+function finitePoint(lat, lng) {
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return null;
+  return { lat: nLat, lng: nLng };
+}
+function locationKey(location = "") {
+  return String(location).trim().toLowerCase();
+}
+function getJobPosition(job, geocodedLocations = {}) {
+  const direct = finitePoint(job?.latitude ?? job?.lat, job?.longitude ?? job?.lng);
+  if (direct) return direct;
+
+  const key = locationKey(job?.location);
+  return key ? geocodedLocations[key] || null : null;
+}
+function loadGoogleMaps(apiKey) {
+  if (!apiKey) return Promise.reject(new Error("Google Maps API key is not configured."));
+  if (window.google?.maps) return Promise.resolve(window.google.maps);
+  if (googleMapsPromise) return googleMapsPromise;
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const id = "googleMaps";
+    const existing = document.getElementById(id);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.google.maps), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Google Maps failed to load.")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = id;
+    script.async = true;
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    script.onload = () => resolve(window.google.maps);
+    script.onerror = () => reject(new Error("Google Maps failed to load."));
+    document.body.appendChild(script);
+  });
+
+  return googleMapsPromise;
+}
+async function geocodeAddress(address, apiKey) {
+  const maps = await loadGoogleMaps(apiKey);
+  const geocoder = new maps.Geocoder();
+  return new Promise((resolve, reject) => {
+    geocoder.geocode(
+      { address, componentRestrictions: { country: "US" } },
+      (results, status) => {
+        const location = results?.[0]?.geometry?.location;
+        if (status === "OK" && location) {
+          resolve({ lat: location.lat(), lng: location.lng() });
+          return;
+        }
+        reject(new Error(`Unable to geocode location: ${status}`));
+      }
+    );
+  });
 }
 const TYPE_LABEL = {
   full_time: "Full-time",
@@ -47,6 +112,19 @@ const titleCase = (s = "") =>
     .join(" ");
 const normalizeType = (value = "") => String(value).trim().toLowerCase().replace(/-/g, "_");
 
+function hasUnlimitedCandidateSaves(user, userRole) {
+  if (String(userRole || "").toLowerCase() === "admin") return true;
+  const candidate = user?.entitlements?.candidate;
+  if (candidate?.features?.unlimitedSaves === true) return true;
+
+  const values = [user?.tier, candidate?.tier, candidate?.plan]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+  return values.some((value) =>
+    ["plus", "premium", "candidate_plus", "candidate_premium"].includes(value)
+  );
+}
+
 // ---------- filters ----------
 const DEFAULT_FILTERS = {
   q: "",
@@ -60,11 +138,29 @@ const DEFAULT_FILTERS = {
   company: "",
 };
 
+function searchParamsForFilters(filters, sort, page) {
+  const params = {};
+  Object.entries(filters || {}).forEach(([key, value]) => {
+    if (value === "" || value == null) return;
+    params[key] = String(value);
+  });
+  params.sort = sort || "newest";
+  params.page = String(page || 1);
+  return params;
+}
+
 export default function JobList() {
+  const authUser = useSelector((state) => state.auth.user);
+  const userRole = String(authUser?.userRole || "").toLowerCase();
+  const isCandidateUser = userRole === "candidate";
+  const canUseMapSearch =
+    userRole === "admin" || authUser?.entitlements?.candidate?.features?.mapSearch === true;
+
   // data
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [fetchError, setFetchError] = useState("");
+  const [jobLocationCoords, setJobLocationCoords] = useState({});
 
   // filters & query state
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -75,12 +171,17 @@ export default function JobList() {
   // interactions
   const [favorites, setFavorites] = useState(new Set());
   const [appliedJobs, setAppliedJobs] = useState(new Set());
-  const [appliedAt, setAppliedAt] = useState(new Map());
   const [isAuthed, setIsAuthed] = useState(false);
 
   // UI
   const [selectedJob, setSelectedJob] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
+  const hasUnlimitedSaves = hasUnlimitedCandidateSaves(authUser, userRole);
+  const saveSlotsRemaining = hasUnlimitedSaves
+    ? null
+    : Math.max(0, FREE_SAVE_LIMIT - favorites.size);
 
   // auth
   useEffect(() => {
@@ -132,6 +233,11 @@ export default function JobList() {
   return () => document.body.classList.remove('dim-bg');
 }, []);
 
+  const updateFilters = (nextFilters) => {
+    setFilters(nextFilters);
+    setSearchParams(searchParamsForFilters(nextFilters, sort, 1), { replace: true });
+  };
+
 
   // interactions load
   useEffect(() => {
@@ -147,6 +253,13 @@ export default function JobList() {
 
   // lookup from current jobs
   const lookup = useMemo(() => buildLookupFromJobs(jobs), [jobs]);
+  const searchCenter = useMemo(
+    () => finitePoint(filters.lat, filters.lng),
+    [filters.lat, filters.lng]
+  );
+  const canBuyCandidateMapPlan = isAuthed && isCandidateUser;
+  const hasLocationText = Boolean(String(filters.location || "").trim());
+  const hasActiveRadius = canUseMapSearch && hasLocationText && Boolean(searchCenter);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -164,6 +277,72 @@ export default function JobList() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.q, lookup]);
+
+  useEffect(() => {
+    if (!canUseMapSearch) return;
+
+    const location = String(filters.location || "").trim();
+    if (!location) {
+      if (filters.lat != null || filters.lng != null) {
+        setFilters((prev) => ({ ...prev, lat: null, lng: null }));
+      }
+      return;
+    }
+    if (finitePoint(filters.lat, filters.lng)) return;
+
+    let cancelled = false;
+    const timeout = setTimeout(async () => {
+      try {
+        const point = await geocodeAddress(location, GOOGLE_MAPS_API_KEY);
+        if (cancelled) return;
+        setFilters((prev) => {
+          if (String(prev.location || "").trim() !== location) return prev;
+          return { ...prev, lat: point.lat, lng: point.lng };
+        });
+      } catch (err) {
+        if (!cancelled) console.warn(err?.message || err);
+      }
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [canUseMapSearch, filters.location, filters.lat, filters.lng]);
+
+  useEffect(() => {
+    if (!canUseMapSearch || !hasActiveRadius) return;
+
+    const missing = (jobs || [])
+      .filter((job) => !finitePoint(job?.latitude ?? job?.lat, job?.longitude ?? job?.lng))
+      .map((job) => job?.location)
+      .map(locationKey)
+      .filter(Boolean)
+      .filter((key, index, list) => list.indexOf(key) === index)
+      .filter((key) => !jobLocationCoords[key]);
+
+    if (!missing.length) return;
+
+    let cancelled = false;
+    (async () => {
+      const next = {};
+      for (const key of missing) {
+        try {
+          next[key] = await geocodeAddress(key, GOOGLE_MAPS_API_KEY);
+        } catch (err) {
+          console.warn(err?.message || err);
+        }
+        if (cancelled) return;
+      }
+      if (!cancelled && Object.keys(next).length) {
+        setJobLocationCoords((prev) => ({ ...prev, ...next }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [jobs, canUseMapSearch, hasActiveRadius, jobLocationCoords]);
 
   // chips are derived from persistent filters (so they don't vanish while typing)
   const quickTags = useMemo(() => {
@@ -205,7 +384,9 @@ export default function JobList() {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       const { q = "", role = "", hours = "", type = "", location = "", company = "", lat, lng, radiusMi = 25 } = filters;
-      const center = lat && lng ? { lat, lng } : null;
+      const center = finitePoint(lat, lng);
+      const locationText = String(location || "").trim().toLowerCase();
+      const locationRadiusActive = canUseMapSearch && Boolean(locationText && center);
       const qLower = q.trim().toLowerCase();
       const minHours = Number(hours);
       const hasMinHours = hours !== "" && Number.isFinite(minHours);
@@ -232,13 +413,16 @@ export default function JobList() {
         const matchCompany =
           !company || (job.company || "").toLowerCase().includes(String(company).toLowerCase());
         const matchLocText =
-          !location ||
+          !locationText ||
+          locationRadiusActive ||
           (job.location || "").toLowerCase().includes(String(location).toLowerCase());
 
         let matchRadius = true;
-        if (center && job.latitude && job.longitude) {
-          const d = haversineMi(center, { lat: job.latitude, lng: job.longitude });
-          matchRadius = d <= radiusMi;
+        if (locationRadiusActive) {
+          const jobPosition = getJobPosition(job, jobLocationCoords);
+          matchRadius = jobPosition
+            ? haversineMi(center, jobPosition) <= Number(radiusMi || 25)
+            : false;
         }
 
         return matchQ && matchRole && matchHours && matchType && matchCompany && matchLocText && matchRadius;
@@ -247,7 +431,7 @@ export default function JobList() {
       setFilteredJobs(next);
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [filters, jobs]);
+  }, [filters, jobs, canUseMapSearch, jobLocationCoords]);
 
   // pagination
   const page = parseInt(searchParams.get("page") || "1", 10);
@@ -256,15 +440,17 @@ export default function JobList() {
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
 const removeQuickTag = (tag) => {
-  setFilters((prev) => {
-    const next = { ...prev };
-    if (tag.type === "company")  next.company  = "";
-    if (tag.type === "role")     next.role     = "";
-    if (tag.type === "hours")    next.hours    = "";
-    if (tag.type === "type")     next.type     = "";
-    if (tag.type === "location") next.location = "";
-    return next;
-  });
+  const next = { ...filters };
+  if (tag.type === "company")  next.company  = "";
+  if (tag.type === "role")     next.role     = "";
+  if (tag.type === "hours")    next.hours    = "";
+  if (tag.type === "type")     next.type     = "";
+  if (tag.type === "location") {
+    next.location = "";
+    next.lat = null;
+    next.lng = null;
+  }
+  updateFilters(next);
 };
 
 
@@ -273,17 +459,47 @@ const removeQuickTag = (tag) => {
     if (go) window.location.assign("/login");
   };
 
+  const savedTooltipFor = (jobId) => {
+    if (!isAuthed) return "Register or log in to save";
+    if (favorites.has(jobId)) return "Remove saved job";
+    if (hasUnlimitedSaves) return "Save job? Unlimited saves";
+    if (saveSlotsRemaining <= 0) {
+      return "Save slots full \u2014 upgrade for unlimited saves";
+    }
+    return `Save job? ${saveSlotsRemaining} slot${saveSlotsRemaining === 1 ? "" : "s"} remaining`;
+  };
+
+  const appliedTooltipFor = (jobId) => {
+    return appliedJobs.has(jobId) ? "Already applied" : "Apply to this job";
+  };
+
   const handleFavorite = async (jobId) => {
-    if (!isAuthed) return requireAuth("Please sign in to save favorites. Go to Sign In?");
+    if (!isAuthed) return requireAuth("Register or log in to save. Go to Login?");
+    const wasFavorite = favorites.has(jobId);
+    if (!wasFavorite && !hasUnlimitedSaves && saveSlotsRemaining <= 0) {
+      alert("Save slots full - upgrade for unlimited saves.");
+      return;
+    }
+
     setFavorites((prev) => {
       const next = new Set(prev);
       next.has(jobId) ? next.delete(jobId) : next.add(jobId);
       return next;
     });
     try {
-      await addJobToFavorites(jobId);
-    } catch {
-      alert("Couldn’t save this. Try again.");
+      const result = await addJobToFavorites(jobId);
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        result.added ? next.add(jobId) : next.delete(jobId);
+        return next;
+      });
+    } catch (error) {
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        wasFavorite ? next.add(jobId) : next.delete(jobId);
+        return next;
+      });
+      alert(error?.message || "Couldn't save this. Try again.");
     }
   };
 
@@ -293,9 +509,25 @@ const removeQuickTag = (tag) => {
     try {
       await applyToJob(jobId);
       setAppliedJobs((prev) => new Set(prev).add(jobId));
-      setAppliedAt((prev) => new Map(prev).set(jobId, new Date().toISOString()));
-    } catch {
+    } catch (error) {
+      if (error?.message) {
+        alert(error.message);
+        return;
+      }
       alert("We couldn’t submit your application. Please try again.");
+    }
+  };
+
+  const handleCandidateUpgrade = async (planKey) => {
+    setCheckoutError("");
+    setCheckoutLoading(planKey);
+    try {
+      const checkout = await createStripeCheckout(planKey);
+      if (!checkout?.url) throw new Error("Checkout URL was not returned.");
+      window.location.assign(checkout.url);
+    } catch (error) {
+      setCheckoutError(error?.response?.data?.error || error?.message || "Unable to open checkout.");
+      setCheckoutLoading("");
     }
   };
 
@@ -308,24 +540,83 @@ const removeQuickTag = (tag) => {
         <div className="filters-panel">
           <JobFilter
             filters={filters}
-            onFilterChange={setFilters}
-            onClear={() => setFilters(DEFAULT_FILTERS)}
+            onFilterChange={updateFilters}
+            onClear={() => updateFilters(DEFAULT_FILTERS)}
             quickTags={quickTags}
             onRemoveQuickTag={removeQuickTag}
+            canUseMapSearch={canUseMapSearch}
           />
         </div>
 
         <div className="map-card">
-          <div className="job-map-inner top">
-            <JobMap
-              jobs={filteredJobs}
-              showMap={true}
-              apiKey={GOOGLE_MAPS_API_KEY}
-              onMarkerClick={(job) => {
-                setSelectedJob(job);
-                setIsModalOpen(true);
-              }}
-            />
+          <div className={`job-map-inner top ${canUseMapSearch ? "" : "map-locked"}`}>
+            <div className="map-canvas-layer" aria-hidden={!canUseMapSearch}>
+              <JobMap
+                jobs={filteredJobs}
+                showMap={true}
+                apiKey={GOOGLE_MAPS_API_KEY}
+                searchCenter={searchCenter}
+                radiusMi={filters.radiusMi}
+                hasActiveRadius={hasActiveRadius}
+                onMarkerClick={
+                  canUseMapSearch
+                    ? (job) => {
+                        setSelectedJob(job);
+                        setIsModalOpen(true);
+                      }
+                    : undefined
+                }
+              />
+            </div>
+
+            {!canUseMapSearch && (
+              <div className="map-paywall-overlay">
+                <div className="map-paywall-content">
+                  <h3>Advanced Map Search</h3>
+                  <p>Search jobs geographically with Candidate Plus or Premium.</p>
+
+                  {canBuyCandidateMapPlan ? (
+                    <div className="map-paywall-actions">
+                      <button
+                        type="button"
+                        onClick={() => handleCandidateUpgrade("plus")}
+                        disabled={Boolean(checkoutLoading)}
+                      >
+                        {checkoutLoading === "plus"
+                          ? "Opening..."
+                          : "Upgrade to Plus ($20/mo)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCandidateUpgrade("premium")}
+                        disabled={Boolean(checkoutLoading)}
+                      >
+                        {checkoutLoading === "premium"
+                          ? "Opening..."
+                          : "Upgrade to Premium ($50/mo)"}
+                      </button>
+                    </div>
+                  ) : isAuthed ? (
+                    <div className="map-paywall-info">
+                      <span>Plus: $20/mo includes map search</span>
+                      <span>Premium: $50/mo includes map search and priority visibility</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="map-paywall-actions">
+                        <Link to="/candidate/register">Register Free Account</Link>
+                      </div>
+                      <div className="map-paywall-info">
+                        <span>Plus: $20/mo includes map search</span>
+                        <span>Premium: $50/mo includes map search and priority visibility</span>
+                      </div>
+                    </>
+                  )}
+
+                  {checkoutError && <p className="map-paywall-error">{checkoutError}</p>}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -339,12 +630,10 @@ const removeQuickTag = (tag) => {
               job={job}
               isFavorite={favorites.has(job._id)}
               isApplied={appliedJobs.has(job._id)}
-              appliedTooltip={
-                appliedAt.get(job._id)
-                  ? `Applied on ${new Date(appliedAt.get(job._id)).toLocaleDateString()}`
-                  : "Apply for this job"
-              }
+              savedTooltip={savedTooltipFor(job._id)}
+              appliedTooltip={appliedTooltipFor(job._id)}
               onFavoriteClick={handleFavorite}
+              onApplyClick={handleApply}
               onClick={() => {
                 setSelectedJob(job);
                 setIsModalOpen(true);
@@ -374,11 +663,7 @@ const removeQuickTag = (tag) => {
         currentPage={page}
         totalPages={totalPages}
         onPageChange={(newPage) =>
-          setSearchParams({
-            ...filters,
-            sort,
-            page: newPage.toString(),
-          })
+          setSearchParams(searchParamsForFilters(filters, sort, newPage))
         }
       />
 
@@ -387,6 +672,8 @@ const removeQuickTag = (tag) => {
         job={selectedJob}
         isFavorite={selectedJob && favorites.has(selectedJob._id)}
         isApplied={selectedJob && appliedJobs.has(selectedJob._id)}
+        savedTooltip={selectedJob ? savedTooltipFor(selectedJob._id) : ""}
+        appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
         onClose={() => {

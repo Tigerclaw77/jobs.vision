@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "experimentalServices": {
+    "web": {
+      "entrypoint": "frontend",
+      "routePrefix": "/",
+      "framework": "create-react-app"
+    },
+    "api": {
+      "entrypoint": "backend/server.js",
+      "routePrefix": "/api",
+      "framework": "express",
+      "maxDuration": 60
+    }
+  }
+}

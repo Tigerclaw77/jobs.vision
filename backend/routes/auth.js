@@ -2,6 +2,7 @@
 const express = require("express");
 const { requireAuth } = require("../middleware/auth.js");
 const { one } = require("../services/db.js");
+const { getUserEntitlements } = require("../services/entitlements.js");
 const { upsertProfileForAuthUser } = require("../services/profileBootstrap.js");
 
 const router = express.Router();
@@ -34,11 +35,15 @@ router.get("/me", requireAuth, async (req, res) => {
       }
     }
 
+    const entitlements = await getUserEntitlements(req.user);
+
     // Backward compatible shape + richer nested profile
     res.json({
       id: req.user.id,
       email: req.user.email || null,
       role: req.user.role || null,
+      tier: entitlements.tier || null,
+      entitlements,
       profile, // { id, email, role } or null
     });
   } catch (e) {
@@ -50,11 +55,17 @@ router.get("/me", requireAuth, async (req, res) => {
 router.post("/bootstrap-profile", requireAuth, async (req, res) => {
   try {
     const profile = await upsertProfileForAuthUser(req.user, req.body || {});
+    const entitlements = await getUserEntitlements({
+      ...req.user,
+      role: profile.role || req.user.role,
+    });
 
     res.status(201).json({
       id: req.user.id,
       email: profile.email || req.user.email || null,
       role: profile.role || null,
+      tier: entitlements.tier || null,
+      entitlements,
       profile,
     });
   } catch (e) {

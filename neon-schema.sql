@@ -52,6 +52,9 @@ create table if not exists public.jobs (
   role text,
   hours text,
   type text,
+  opportunity_type text,
+  practice_type text,
+  employment_type text,
   salary text,
   tag_ids text[] not null default '{}',
   status text not null default 'active',
@@ -291,6 +294,15 @@ create index if not exists jobs_role_idx
 
 create index if not exists jobs_type_idx
   on public.jobs (type);
+
+create index if not exists jobs_opportunity_type_idx
+  on public.jobs (opportunity_type);
+
+create index if not exists jobs_practice_type_idx
+  on public.jobs (practice_type);
+
+create index if not exists jobs_employment_type_idx
+  on public.jobs (employment_type);
 
 create index if not exists jobs_employer_brand_idx
   on public.jobs (employer_brand);

@@ -6,7 +6,9 @@ export default function JobCard({
   isFavorite,
   isApplied,
   onFavoriteClick,
+  onApplyClick,
   onClick,
+  savedTooltip,
   appliedTooltip,
 }) {
   return (
@@ -15,19 +17,25 @@ export default function JobCard({
         <button
           type="button"
           className={`jl-icon-btn jl-star ${isFavorite ? "active" : ""}`}
-          title={isFavorite ? "Remove from favorites" : "Save to favorites"}
-          aria-label="Toggle favorite"
+          title={savedTooltip || (isFavorite ? "Remove saved job" : "Save job")}
+          aria-label={isFavorite ? "Remove saved job" : "Save job"}
+          aria-pressed={Boolean(isFavorite)}
           onClick={() => onFavoriteClick(job._id)}
         >
           <Star size={18} />
         </button>
-        <div
-          className="jl-icon-btn jl-check"
-          title={appliedTooltip || (isApplied ? "Applied" : "Apply for this job")}
-          aria-label="Applied status"
+        <button
+          type="button"
+          className={`jl-icon-btn jl-check ${isApplied ? "active" : ""}`}
+          title={appliedTooltip || (isApplied ? "Already applied" : "Apply to this job")}
+          aria-label={isApplied ? "Already applied" : "Apply to this job"}
+          aria-pressed={Boolean(isApplied)}
+          onClick={() => {
+            if (!isApplied) onApplyClick?.(job._id);
+          }}
         >
           <CheckCircle size={18} />
-        </div>
+        </button>
       </div>
 
       <div className="job-content">

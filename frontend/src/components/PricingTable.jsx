@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createStripeCheckout } from "../utils/api";
 import "../styles/PricingTable.css";
 
 const RECRUITER_PLANS = [
@@ -7,8 +8,8 @@ const RECRUITER_PLANS = [
     key: "staff",
     name: "Staff",
     headline: "Solve churn without overspending.",
-    firstMonth: 99,
-    renewal: 69,
+    firstMonth: 79,
+    renewal: 49,
     bullets: [
       "Front desk, techs, assistants",
       "30-day listing, basic visibility",
@@ -19,8 +20,8 @@ const RECRUITER_PLANS = [
     key: "manager",
     name: "Manager",
     headline: "Keep your clinic organized & profitable.",
-    firstMonth: 249,
-    renewal: 149,
+    firstMonth: 149,
+    renewal: 99,
     bullets: [
       "Office/optical managers",
       "Featured placement & analytics",
@@ -31,8 +32,8 @@ const RECRUITER_PLANS = [
     key: "doctor",
     name: "Doctor",
     headline: "Protect $50k+ monthly revenue from walking out the door.",
-    firstMonth: 599,
-    renewal: 399,
+    firstMonth: 299,
+    renewal: 149,
     bullets: [
       "Highest-impact roles",
       "Top placement & full analytics",
@@ -45,29 +46,60 @@ const CANDIDATE_PLANS = [
   {
     key: "free",
     name: "Free",
-    bullets: ["Browse all jobs", "Apply to live openings", "Save up to 5 jobs"],
+    price: 0,
+    period: "month",
+    bullets: ["Browse jobs", "Apply to jobs", "Save up to 5 jobs"],
     cta: { label: "Create free account", href: "/candidate/register" },
   },
   {
     key: "plus",
     name: "Plus",
-    comingSoon: true,
-    bullets: ["Map view", "Email alerts (weekly)", "More saved jobs"],
+    price: 20,
+    period: "month",
+    bullets: ["Unlimited saves", "Map search", "Email alerts", "Weekly matching"],
+    cta: { label: "Create account", href: "/candidate/register" },
   },
   {
     key: "premium",
     name: "Premium",
-    comingSoon: true,
-    bullets: ["Map + SMS alerts", "Top profile placement", "Unlimited saves"],
+    price: 50,
+    period: "month",
+    bullets: [
+      "SMS alerts",
+      "Priority profile placement",
+      "Featured candidate badge",
+      "Unlimited saves",
+    ],
+    cta: { label: "Create account", href: "/candidate/register" },
   },
 ];
 
 const PricingTable = ({ user }) => {
   const [activeTab, setActiveTab] = useState("recruiter"); // recruiter | candidate
+  const [loadingPlan, setLoadingPlan] = useState("");
   const nav = useNavigate();
 
   const isRecruiter = activeTab === "recruiter";
   const plans = isRecruiter ? RECRUITER_PLANS : CANDIDATE_PLANS;
+
+  const startCheckout = async (plan, audience) => {
+    const registerPath = audience === "recruiter" ? "/recruiter/register" : "/candidate/register";
+    if (!user?.id) {
+      nav(registerPath);
+      return;
+    }
+
+    try {
+      setLoadingPlan(plan.key);
+      const { url } = await createStripeCheckout(plan.key);
+      if (!url) throw new Error("Stripe did not return a checkout URL.");
+      window.location.assign(url);
+    } catch (err) {
+      alert(err?.response?.data?.error || err?.message || "Unable to start Stripe checkout.");
+    } finally {
+      setLoadingPlan("");
+    }
+  };
 
   return (
     <div className="pricing-root is-glass">
@@ -165,9 +197,10 @@ const PricingTable = ({ user }) => {
                     <div className="actions">
                       <button
                         className="btn primary"
-                        onClick={() => nav("/recruiter/register")}
+                        onClick={() => startCheckout(p, "recruiter")}
+                        disabled={loadingPlan === p.key}
                       >
-                        Get started
+                        {loadingPlan === p.key ? "Starting..." : "Get started"}
                       </button>
                       <p className="fineprint">
                         30-day listing, cancel anytime. Prices shown in USD.
@@ -176,6 +209,16 @@ const PricingTable = ({ user }) => {
                   </div>
                 ) : (
                   <div className="card-body">
+                    <div className="price-block">
+                      <div className="price-line">
+                        <span className="price">
+                          <span className="currency">$</span>
+                          <span className="amount">{p.price}</span>
+                        </span>
+                        <span className="period">/{p.period}</span>
+                      </div>
+                    </div>
+
                     <ul className="bullets">
                       {p.bullets.map((b, i) => (
                         <li key={i}>{b}</li>
@@ -185,13 +228,18 @@ const PricingTable = ({ user }) => {
                     <div className="spacer" />
 
                     <div className="actions">
-                      {p.cta ? (
+                      {p.key === "free" ? (
                         <a className="btn ghost" href={p.cta.href}>
                           {p.cta.label}
                         </a>
                       ) : (
-                        <button className="btn disabled" disabled>
-                          Coming soon
+                        <button
+                          className="btn ghost"
+                          type="button"
+                          onClick={() => startCheckout(p, "candidate")}
+                          disabled={loadingPlan === p.key}
+                        >
+                          {loadingPlan === p.key ? "Starting..." : p.cta.label}
                         </button>
                       )}
                     </div>

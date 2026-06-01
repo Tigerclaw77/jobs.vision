@@ -2,6 +2,7 @@
 const express = require("express");
 const { one, query } = require("../services/db.js");
 const { requireAuth } = require("../middleware/auth.js");
+const { getCandidateSaveState } = require("../services/entitlements.js");
 
 const router = express.Router();
 
@@ -40,6 +41,28 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const { job_id } = req.body;
     if (!job_id) return res.status(400).json({ error: "job_id required" });
+
+    const existing = await one(
+      "select user_id, job_id, created_at from public.job_favorites where user_id = $1 and job_id = $2",
+      [req.user.id, job_id]
+    );
+
+    if (existing) return res.status(200).json(existing);
+
+    const role = String(req.user.role || "").toLowerCase();
+    if (role !== "admin") {
+      const saveState = await getCandidateSaveState(req.user.id);
+      if (!saveState.canSaveMore) {
+        return res.status(402).json({
+          error:
+            "Free candidates can save up to 5 jobs. Upgrade to Plus or Premium for unlimited saves.",
+          code: "save_limit_reached",
+          entitlement: saveState.entitlement,
+          savedJobCount: saveState.savedJobCount,
+          saveLimit: saveState.saveLimit,
+        });
+      }
+    }
 
     const data = await one(
       `

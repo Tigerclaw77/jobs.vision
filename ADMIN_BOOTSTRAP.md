@@ -1,20 +1,20 @@
 # Admin Bootstrap
 
-Use this only after the admin user already exists in Supabase Auth.
+Use this only after the admin user already exists in Neon Auth.
 
 ## Steps
 
-1. Sign up the intended admin user through the app or create the user in Supabase Auth.
+1. Sign up the intended admin user through the app or create the user in Neon Auth.
 2. Confirm the user's email if email confirmation is enabled.
 3. Open `admin-bootstrap.sql`.
 4. Replace `admin@example.com` with the exact admin email.
-5. Run the script in the Supabase SQL editor.
+5. Run the script against the Neon database.
 6. Confirm the result row shows `role = admin`.
 7. Have the user log out and back in so the frontend reloads `/api/auth/me` and route guards.
 
 ## Why This Is Needed
 
-Admin authorization is based on `public.profiles.role`. Supabase Auth metadata alone is not enough for the active backend admin checks.
+Admin authorization is based on `public.profiles.role`. Neon Auth metadata alone is not enough for the active backend admin checks.
 
 Relevant backend checks:
 

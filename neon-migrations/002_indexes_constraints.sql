@@ -119,6 +119,15 @@ create index if not exists jobs_role_idx
 create index if not exists jobs_type_idx
   on public.jobs (type);
 
+create index if not exists jobs_opportunity_type_idx
+  on public.jobs (opportunity_type);
+
+create index if not exists jobs_practice_type_idx
+  on public.jobs (practice_type);
+
+create index if not exists jobs_employment_type_idx
+  on public.jobs (employment_type);
+
 create index if not exists jobs_employer_brand_idx
   on public.jobs (employer_brand);
 

@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import {
+  addJobToFavorites,
+  getUserJobInteractions,
+} from "../../utils/api.supabase";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -57,6 +61,19 @@ const SearchJobs = () => {
     fetchJobs();
   }, [fetchJobs]);
 
+  useEffect(() => {
+    const loadSavedJobs = async () => {
+      try {
+        const interactions = await getUserJobInteractions();
+        const favoriteIds = new Set((interactions.favorites || []).map(String));
+        setSavedJobs((prev) => prev.filter((job) => favoriteIds.has(String(job.id))));
+      } catch {
+        // Keep local fallback state if the user is not signed in yet.
+      }
+    };
+    loadSavedJobs();
+  }, []);
+
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
       const roleOk = !filters.role || job.role === filters.role;
@@ -71,11 +88,18 @@ const SearchJobs = () => {
     });
   }, [jobs, filters]);
 
-  const handleSaveJob = (job) => {
-    const updatedSavedJobs = [...savedJobs.filter((saved) => saved.id !== job.id), job];
-    setSavedJobs(updatedSavedJobs);
-    localStorage.setItem("savedJobs", JSON.stringify(updatedSavedJobs));
-    alert("Job saved successfully!");
+  const handleSaveJob = async (job) => {
+    try {
+      const result = await addJobToFavorites(job.id);
+      const updatedSavedJobs = result.added
+        ? [...savedJobs.filter((saved) => saved.id !== job.id), job]
+        : savedJobs.filter((saved) => saved.id !== job.id);
+      setSavedJobs(updatedSavedJobs);
+      localStorage.setItem("savedJobs", JSON.stringify(updatedSavedJobs));
+      alert(result.added ? "Job saved successfully!" : "Job removed from saved jobs.");
+    } catch (err) {
+      alert(err?.message || "Unable to save this job.");
+    }
   };
 
   const handleShareJob = (job) => {
@@ -91,10 +115,8 @@ const SearchJobs = () => {
           <option value="">Select Job Role</option>
           <option value="optometrist">Optometrist</option>
           <option value="optician">Optician</option>
-          <option value="ophthalmologist">Ophthalmologist</option>
-          <option value="tech">Tech / Assistant</option>
-          <option value="manager">Manager</option>
-          <option value="front_desk">Front Desk</option>
+          <option value="ophthalmic technician">Ophthalmic Technician</option>
+          <option value="practice manager">Practice Manager</option>
         </select>
 
         <input

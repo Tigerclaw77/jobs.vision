@@ -157,4 +157,9 @@ export const fetchRecruiterApplications = async () => {
   return Array.isArray(data) ? data : data?.items || [];
 };
 
+export const createStripeCheckout = async (planKey) => {
+  const { data } = await axiosInstance.post("/stripe/checkout", { planKey });
+  return data;
+};
+
 export default axiosInstance;

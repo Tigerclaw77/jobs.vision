@@ -144,7 +144,7 @@ export default function Login() {
     const user = session?.user ?? neonUser;
     const token = session?.access_token || currentSession?.access_token;
 
-    const { role, tier } = await getRoleTier();
+    const { role, tier, entitlements } = await getRoleTier();
 
     dispatch(
       loginRedux({
@@ -154,7 +154,9 @@ export default function Login() {
           id: user?.id || null,
           email: user?.email || null,
           isVerified: !!user?.email_confirmed_at,
+          userRole: role,
           tier,
+          entitlements,
           ...(user?.user_metadata || {}),
         },
       })

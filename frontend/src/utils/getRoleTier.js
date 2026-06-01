@@ -8,7 +8,7 @@ function apiBaseUrl() {
 
 export async function getRoleTier() {
   const { user } = await getNeonUser();
-  if (!user) return { role: null, tier: null, user };
+  if (!user) return { role: null, tier: null, entitlements: null, user };
 
   const metadata = {
     ...(user.app_metadata || {}),
@@ -28,9 +28,16 @@ export async function getRoleTier() {
       const data = await res.json().catch(() => null);
       if (res.ok) {
         role = data?.profile?.role || data?.role || role;
+        tier = data?.tier || data?.entitlements?.tier || tier;
+        return {
+          role,
+          tier: tier || null,
+          entitlements: data?.entitlements || null,
+          user,
+        };
       }
     } catch {}
   }
 
-  return { role, tier: tier || null, user };
+  return { role, tier: tier || null, entitlements: null, user };
 }

@@ -1,12 +1,12 @@
 -- jobs.vision admin bootstrap
 --
 -- Purpose:
---   Promote one existing Supabase Auth user to application admin.
+--   Promote one existing Neon Auth user to application admin.
 --
 -- Usage:
 --   1. Create/sign up the admin user first.
 --   2. Replace admin@example.com below with the admin user's email.
---   3. Run this in the Supabase SQL editor.
+--   3. Run this against the Neon database.
 --   4. Log out and back in so the frontend reloads the profile role.
 
 begin;
@@ -15,8 +15,8 @@ with target_user as (
   select
     id,
     email,
-    raw_user_meta_data
-  from auth.users
+    name
+  from neon_auth."user"
   where lower(email) = lower('admin@example.com')
   limit 1
 )
@@ -33,8 +33,11 @@ select
   id,
   email,
   'admin',
-  coalesce(raw_user_meta_data->>'firstName', raw_user_meta_data->>'first_name', 'Admin'),
-  coalesce(raw_user_meta_data->>'lastName', raw_user_meta_data->>'last_name', ''),
+  coalesce(nullif(split_part(name, ' ', 1), ''), 'Admin'),
+  case
+    when position(' ' in name) > 0 then nullif(trim(substr(name, position(' ' in name) + 1)), '')
+    else ''
+  end,
   now(),
   now()
 from target_user

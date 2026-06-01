@@ -19,12 +19,17 @@ const AccessGate = ({
   fallback = null,
   children,
 }) => {
-  const user = useSelector((state) => state.auth.user);
-  const role = user?.userRole;
-  const tier = user?.tier;
+  const { user, userRole } = useSelector((state) => state.auth);
+  const role = String(user?.userRole || user?.role || user?.accountRole || userRole || "")
+    .toLowerCase();
+  const tier = String(user?.tier || "").toLowerCase();
 
-  const hasRole = allowedRoles.length === 0 || allowedRoles.includes(role);
-  const hasTier = allowedTiers.length === 0 || allowedTiers.includes(tier);
+  const hasRole =
+    allowedRoles.length === 0 ||
+    allowedRoles.map((allowedRole) => String(allowedRole).toLowerCase()).includes(role);
+  const hasTier =
+    allowedTiers.length === 0 ||
+    allowedTiers.map((allowedTier) => String(allowedTier).toLowerCase()).includes(tier);
 
   const isAllowed = orLogic ? hasRole || hasTier : hasRole && hasTier;
 
