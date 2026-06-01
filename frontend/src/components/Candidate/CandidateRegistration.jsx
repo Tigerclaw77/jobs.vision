@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Container,
   Paper,
@@ -12,8 +12,26 @@ import {
   Alert,
 } from "@mui/material";
 import GlassTextField from "../ui/GlassTextField";
-import { supabase } from "../../utils/supabaseClient";
+import { neonAuth, normalizeSessionResult } from "../../utils/neonAuthClient";
 import "../../styles/forms.css";
+
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+async function bootstrapProfile(accessToken, payload) {
+  if (!accessToken) return;
+  const res = await fetch(`${apiBaseUrl()}/auth/bootstrap-profile`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Registration succeeded, but profile setup failed.");
+}
 
 const candidateSchema = Yup.object().shape({
   firstName: Yup.string().required("First name is required."),
@@ -48,34 +66,50 @@ export default function CandidateRegistration() {
 
   const onSubmit = async (data) => {
     const email = data.email.trim().toLowerCase();
+    const profilePayload = {
+      accountRole: "candidate",
+      firstName: data.firstName,
+      lastName: data.lastName,
+    };
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const result = await neonAuth.signUp({
         email,
         password: data.password,
         options: {
           emailRedirectTo: `${base}/verify-email`,
           data: {
-            role: "candidate",
-            firstName: data.firstName,
-            lastName: data.lastName,
+            accountRole: profilePayload.accountRole,
+            firstName: profilePayload.firstName,
+            lastName: profilePayload.lastName,
           },
         },
       });
+      const { error } = result;
 
       if (error) {
         const msg = (error.message || "").toLowerCase();
         if (error.status === 400 || msg.includes("already") || msg.includes("exists")) {
-          await supabase.auth
+          await neonAuth
             .resend({
               type: "signup",
               email,
               options: { emailRedirectTo: `${base}/verify-email` },
             })
             .catch(() => {});
+        } else if (error.status === 401 && msg.includes("failed to retrieve user session")) {
+          // Some verified-email flows create the auth user but do not return a session yet.
         } else {
           throw error;
         }
+      }
+
+      const session = normalizeSessionResult(result);
+      if (session?.access_token) {
+        await bootstrapProfile(session.access_token, {
+          email,
+          ...profilePayload,
+        });
       }
 
       showToast("If that email exists, we’ve sent a verification link.", "success");
@@ -92,6 +126,15 @@ export default function CandidateRegistration() {
         <Typography variant="h4" align="center" gutterBottom>
           Candidate Registration
         </Typography>
+        <Button
+          component={RouterLink}
+          to="/"
+          variant="text"
+          fullWidth
+          sx={{ mb: 1 }}
+        >
+          Back to Home
+        </Button>
 
         {/* autofill suppression: off + honeypots */}
         <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">

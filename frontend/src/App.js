@@ -6,7 +6,6 @@ import {
   Routes,
   useLocation,
   Navigate,
-  useNavigate,
 } from "react-router-dom";
 import { useDispatch } from "react-redux";
 
@@ -23,8 +22,11 @@ import Header from "./components/Header";
 import Home from "./components/Home";
 import Notifications from "./components/Notifications";
 import AdminDashboard from "./components/Admin/AdminDashboard";
+import ManualOverrideReview from "./components/Admin/ManualOverrideReview";
 import RecruiterDashboard from "./components/Recruiter/RecruiterDashboard";
 import RecruiterRegistration from "./components/Recruiter/RecruiterRegistration";
+import RecruiterApplications from "./components/Recruiter/RecruiterApplications";
+import RecruiterDomains from "./components/Recruiter/RecruiterDomains";
 import CandidateRegistration from "./components/Candidate/CandidateRegistration";
 import CandidateProfile from "./components/Candidate/CandidateProfile";
 import RecruiterProfile from "./components/Recruiter/RecruiterProfile";
@@ -210,6 +212,7 @@ function AppShell() {
                 </PublicOnlyRoute>
               }
             />
+            <Route path="/signin" element={<Navigate to="/login" replace />} />
             <Route path="/logout" element={<Logout />} />
             <Route
               path="/email-verification"
@@ -221,11 +224,7 @@ function AppShell() {
             />
             <Route
               path="/verify-email"
-              element={
-                <PublicOnlyRoute>
-                  <VerifyEmail />
-                </PublicOnlyRoute>
-              }
+              element={<VerifyEmail />}
             />
             <Route
               path="/forgot-password"
@@ -237,11 +236,7 @@ function AppShell() {
             />
             <Route
               path="/reset-password"
-              element={
-                <PublicOnlyRoute>
-                  <ResetPassword />
-                </PublicOnlyRoute>
-              }
+              element={<ResetPassword />}
             />
 
             {/* Open job search page */}
@@ -286,6 +281,14 @@ function AppShell() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/manual-overrides"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <ManualOverrideReview />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/users"
@@ -326,6 +329,22 @@ function AppShell() {
               element={
                 <ProtectedRoute allowedUserRoles={["recruiter", "admin"]}>
                   <AddJob />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recruiter/domains"
+              element={
+                <ProtectedRoute allowedUserRoles={["recruiter", "admin"]}>
+                  <RecruiterDomains />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recruiter/applications"
+              element={
+                <ProtectedRoute allowedUserRoles={["recruiter", "admin"]}>
+                  <RecruiterApplications />
                 </ProtectedRoute>
               }
             />

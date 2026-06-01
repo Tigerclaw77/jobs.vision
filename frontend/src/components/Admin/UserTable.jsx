@@ -1,10 +1,11 @@
 // frontend/src/components/Admin/UserTable.jsx
 import React, { useMemo, useState } from "react";
 import {
-  Box, Chip, FormControl, InputLabel, MenuItem, Select,
+  Box, Button, Chip, FormControl, InputLabel, MenuItem, Select,
   Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   TextField, Typography, Paper
 } from "@mui/material";
+import axiosInstance from "../../utils/api";
 
 const FREE_DOMAINS = new Set([
   "gmail.com","yahoo.com","outlook.com","hotmail.com","aol.com",
@@ -46,6 +47,22 @@ export default function UserTable({ users = [] }) {
   console.log('UserTable users[0]', users?.[0]);
   const [role, setRole] = useState("all");
   const [q, setQ] = useState("");
+  const [resettingEmail, setResettingEmail] = useState("");
+  const [clearedEmails, setClearedEmails] = useState(() => new Set());
+
+  const resetFailedAttempts = async (email) => {
+    if (!email) return;
+    setResettingEmail(email);
+    try {
+      await axiosInstance.post("/users/reset-failed-attempts", { email });
+      setClearedEmails((prev) => new Set(prev).add(email));
+    } catch (err) {
+      console.error("Failed to reset attempts:", err);
+      alert("Failed to reset failed attempts.");
+    } finally {
+      setResettingEmail("");
+    }
+  };
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -110,14 +127,30 @@ export default function UserTable({ users = [] }) {
                 <TableCell>
                   <Chip
                     size="small"
-                    label={u.locked ? "Locked" : "Active"}
-                    color={u.locked ? "error" : "success"}
-                    variant={u.locked ? "filled" : "outlined"}
+                    label={!clearedEmails.has(u.email) && u.locked ? "Locked" : "Active"}
+                    color={!clearedEmails.has(u.email) && u.locked ? "error" : "success"}
+                    variant={!clearedEmails.has(u.email) && u.locked ? "filled" : "outlined"}
                   />
                 </TableCell>
                 <TableCell>{fmtDateFromUser(u)}</TableCell>
-                <TableCell align="right">{u.failedAttempts ?? u.failed_attempts ?? 0}</TableCell>
-                <TableCell align="right">{/* actions later */}</TableCell>
+                <TableCell align="right">
+                  {clearedEmails.has(u.email) ? 0 : (u.failedAttempts ?? u.failed_attempts ?? 0)}
+                </TableCell>
+                <TableCell align="right">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={
+                      !u.email ||
+                      resettingEmail === u.email ||
+                      (clearedEmails.has(u.email) ||
+                        (!u.locked && (u.failedAttempts ?? u.failed_attempts ?? 0) === 0))
+                    }
+                    onClick={() => resetFailedAttempts(u.email)}
+                  >
+                    {resettingEmail === u.email ? "Resetting..." : "Reset Failed"}
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {filtered.length === 0 && (

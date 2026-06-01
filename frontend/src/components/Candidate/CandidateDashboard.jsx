@@ -1,27 +1,33 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import AccessGate from "../auth/AccessGate";
 import RequireVerifiedEmail from "../auth/RequireVerifiedEmail";
 
+function isPremiumTier(tier) {
+  const value = String(tier || "").toLowerCase();
+  return ["1", "2", "3", "premium", "candidate_basic", "candidate_premium"].includes(value);
+}
+
 const CandidateDashboard = () => {
   const { user } = useSelector((state) => state.auth);
-  const { appliedJobs = [], favorites = [], tier = 0 } = useSelector((state) => state.jobs);
+  const { appliedJobs = [], favorites = [] } = useSelector((state) => state.jobs);
+  const premium = isPremiumTier(user?.tier);
 
   return (
     <AccessGate allowedRoles={["candidate"]}>
       <div className="dashboard-container">
-        <h1>Welcome, {user?.profile?.firstName || "Candidate"} 👋</h1>
+        <h1>Welcome, {user?.profile?.firstName || user?.firstName || "Candidate"}</h1>
 
-        {/* Require Verified Email */}
         <RequireVerifiedEmail>
           <section className="dashboard-section">
-            <h2>🎯 Job Application Summary</h2>
+            <h2>Job Application Summary</h2>
             <p>
-              You’ve applied to <strong>{appliedJobs.length}</strong> job
+              You have applied to <strong>{appliedJobs.length}</strong> job
               {appliedJobs.length !== 1 && "s"} so far.
             </p>
 
-            <h3>📌 Saved Jobs</h3>
+            <h3>Saved Jobs</h3>
             {favorites.length > 0 ? (
               <ul>
                 {favorites.map((jobId) => (
@@ -33,23 +39,21 @@ const CandidateDashboard = () => {
             )}
           </section>
 
-          {/* Premium Feature Block */}
-          <AccessGate allowedTiers={[3]}>
+          {premium && (
             <section className="dashboard-section premium-highlight">
-              <h2>🌟 Premium Insights</h2>
+              <h2>Premium Insights</h2>
               <p>You can now access advanced filters and resume feedback tools.</p>
-              <button>Go to Premium Tools</button>
+              <Link to="/jobs">Browse jobs</Link>
             </section>
-          </AccessGate>
+          )}
 
-          {/* Free Tier Upgrade Prompt */}
-          {tier === 0 && (
+          {!premium && (
             <section className="upgrade-banner">
               <p>
                 Upgrade to <strong>Premium</strong> to unlock job analytics, resume feedback,
                 and featured visibility.
               </p>
-              <button>Upgrade Now</button>
+              <Link to="/jobs">Browse jobs</Link>
             </section>
           )}
         </RequireVerifiedEmail>

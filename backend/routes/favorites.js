@@ -1,6 +1,6 @@
 // backend/routes/favorites.js
 const express = require("express");
-const { supa } = require("../services/supaClient.js");
+const { one, query } = require("../services/db.js");
 const { requireAuth } = require("../middleware/auth.js");
 
 const router = express.Router();
@@ -11,14 +11,21 @@ const router = express.Router();
  */
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supa
-      .from("job_favorites")
-      .select("job_id, created_at, jobs(*)")
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false });
+    const result = await query(
+      `
+        select
+          f.job_id,
+          f.created_at,
+          row_to_json(j) as jobs
+        from public.job_favorites f
+        left join public.jobs j on j.id = f.job_id
+        where f.user_id = $1
+        order by f.created_at desc
+      `,
+      [req.user.id]
+    );
 
-    if (error) throw error;
-    res.json(data);
+    res.json(result.rows);
   } catch (e) {
     console.error("List favorites error:", e);
     res.status(500).json({ error: "Failed to list favorites" });
@@ -34,14 +41,15 @@ router.post("/", requireAuth, async (req, res) => {
     const { job_id } = req.body;
     if (!job_id) return res.status(400).json({ error: "job_id required" });
 
-    const { data, error } = await supa
-      .from("job_favorites")
-      .insert({ user_id: req.user.id, job_id })
-      .select()
-      .single();
-
-    // ignore duplicate unique errors gracefully
-    if (error && error.code !== "23505") throw error;
+    const data = await one(
+      `
+        insert into public.job_favorites (user_id, job_id)
+        values ($1, $2)
+        on conflict (user_id, job_id) do nothing
+        returning *
+      `,
+      [req.user.id, job_id]
+    );
 
     res.status(201).json(data || { ok: true });
   } catch (e) {
@@ -55,14 +63,11 @@ router.post("/", requireAuth, async (req, res) => {
  */
 router.delete("/:jobId", requireAuth, async (req, res) => {
   try {
-    const jobId = req.params.jobId;
-    const { error } = await supa
-      .from("job_favorites")
-      .delete()
-      .eq("user_id", req.user.id)
-      .eq("job_id", jobId);
+    await query(
+      "delete from public.job_favorites where user_id = $1 and job_id = $2",
+      [req.user.id, req.params.jobId]
+    );
 
-    if (error) throw error;
     res.json({ ok: true });
   } catch (e) {
     console.error("Remove favorite error:", e);

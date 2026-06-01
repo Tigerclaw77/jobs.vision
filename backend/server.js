@@ -4,23 +4,26 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const cron = require("node-cron");
+const helmet = require("helmet");
 
 // Initialize Stripe after dotenv
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeKey ? require("stripe")(stripeKey) : null;
+const stripeSkipVerify = process.env.STRIPE_SKIP_VERIFY === "true";
 
-const { createClient } = require("@supabase/supabase-js");
-const supa = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+if (process.env.NODE_ENV === "production" && stripeSkipVerify) {
+  throw new Error("STRIPE_SKIP_VERIFY must not be true in production.");
+}
+
+const { one, query } = require("./services/db");
 
 // ✅ Billing engine
 const { billJobsMonthly } = require("./controllers/billingController");
 
 // Express app
 const app = express();
-console.log('BOOT SUPABASE_URL =', process.env.SUPABASE_URL);
+app.use(helmet());
+console.log("BOOT database configured:", Boolean(process.env.DATABASE_URL));
 
 // =======================
 // Stripe Webhook
@@ -51,7 +54,7 @@ if (stripe) {
       let event;
 
       try {
-        if (process.env.STRIPE_SKIP_VERIFY === "true") {
+        if (stripeSkipVerify) {
           event = JSON.parse(req.body.toString("utf8"));
           console.log("⚠️  Skipping Stripe signature verification (DEV ONLY)");
         } else {
@@ -95,13 +98,13 @@ if (stripe) {
               break;
             }
 
-            const { data: profile, error: pErr } = await supa
-              .from("profiles")
-              .select("id")
-              .eq("stripe_customer_id", customerId)
-              .single();
+            const profile = await one(
+              "select id from public.profiles where stripe_customer_id = $1",
+              [customerId]
+            );
+            const pErr = null;
 
-            if (pErr || !profile) {
+            if (!profile) {
               console.error("❌ No profile for customer:", customerId, pErr);
               break;
             }
@@ -119,9 +122,48 @@ if (stripe) {
               ...plan.values,
             };
 
-            const { error: upErr } = await supa
-              .from(plan.table)
-              .upsert(payload, { onConflict: "profile_id" });
+            let upErr = null;
+            if (plan.table === "recruiter_entitlements") {
+              await query(
+                `
+                  insert into public.recruiter_entitlements
+                    (profile_id, status, updated_at, plan, max_active_jobs)
+                  values ($1, $2, $3, $4, $5)
+                  on conflict (profile_id) do update set
+                    status = excluded.status,
+                    updated_at = excluded.updated_at,
+                    plan = excluded.plan,
+                    max_active_jobs = excluded.max_active_jobs
+                `,
+                [
+                  payload.profile_id,
+                  payload.status,
+                  payload.updated_at,
+                  payload.plan,
+                  payload.max_active_jobs,
+                ]
+              );
+            } else if (plan.table === "candidate_entitlements") {
+              await query(
+                `
+                  insert into public.candidate_entitlements
+                    (profile_id, status, updated_at, plan, apply_cap_per_day)
+                  values ($1, $2, $3, $4, $5)
+                  on conflict (profile_id) do update set
+                    status = excluded.status,
+                    updated_at = excluded.updated_at,
+                    plan = excluded.plan,
+                    apply_cap_per_day = excluded.apply_cap_per_day
+                `,
+                [
+                  payload.profile_id,
+                  payload.status,
+                  payload.updated_at,
+                  payload.plan,
+                  payload.apply_cap_per_day,
+                ]
+              );
+            }
 
             if (upErr) console.error("❌ Entitlement upsert error:", upErr);
             else
@@ -149,28 +191,23 @@ if (stripe) {
           const customerId = sub.customer;
 
           try {
-            const { data: profile } = await supa
-              .from("profiles")
-              .select("id")
-              .eq("stripe_customer_id", customerId)
-              .single();
+            const profile = await one(
+              "select id from public.profiles where stripe_customer_id = $1",
+              [customerId]
+            );
 
             if (profile) {
-              await supa
-                .from("recruiter_entitlements")
-                .update({
-                  status: "canceled",
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("profile_id", profile.id);
+              const updatedAt = new Date().toISOString();
 
-              await supa
-                .from("candidate_entitlements")
-                .update({
-                  status: "canceled",
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("profile_id", profile.id);
+              await query(
+                "update public.recruiter_entitlements set status = 'canceled', updated_at = $1 where profile_id = $2",
+                [updatedAt, profile.id]
+              );
+
+              await query(
+                "update public.candidate_entitlements set status = 'canceled', updated_at = $1 where profile_id = $2",
+                [updatedAt, profile.id]
+              );
 
               console.log(
                 "❌ Subscription canceled, entitlements marked inactive for",
@@ -226,6 +263,15 @@ app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "jobs.vision-api",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // =======================
 // Routes
 // =======================
@@ -234,6 +280,9 @@ app.use("/api/users", userRoutes);
 
 const authRoutes = require("./routes/auth");
 app.use("/api/auth", authRoutes);
+
+const profileRoutes = require("./routes/profile");
+app.use("/api/profile", profileRoutes);
 
 const jobRoutes = require("./routes/jobs");
 app.use("/api/jobs", jobRoutes);

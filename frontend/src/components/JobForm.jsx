@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -14,9 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 
-// IMPORTANT: you already have this helper in frontend/lib/apiFetch.js
-// Path from src/components/* to lib/* is two levels up:
-import apiFetch from "./apiFetch";
+import { createJob, updateJob } from "../utils/api";
 
 // Draft storage key
 const DRAFT_KEY = "jobFormDraft:v1";
@@ -34,6 +32,41 @@ const defaultValues = {
   description: "",
   tags: [],
 };
+
+function splitLocation(location = "") {
+  const parts = String(location).split(",").map((part) => part.trim()).filter(Boolean);
+  return {
+    city: parts[0] || "",
+    state: parts[1] || "",
+  };
+}
+
+function parseSalaryRange(salary) {
+  if (salary == null) return { salary_min: "", salary_max: "" };
+  const parts = String(salary).match(/\d+(?:\.\d+)?/g) || [];
+  return {
+    salary_min: parts[0] || "",
+    salary_max: parts[1] || "",
+  };
+}
+
+function valuesFromJob(job = {}) {
+  const salary = parseSalaryRange(job.salary);
+  const numericHours = Number(job.hours);
+  return {
+    ...defaultValues,
+    title: job.title || "",
+    company: job.employer_name || job.company || "",
+    location: job.location || [job.city, job.state].filter(Boolean).join(", "),
+    role_type: job.role || defaultValues.role_type,
+    employment_type: job.type || defaultValues.employment_type,
+    hours_per_week: job.hours && !Number.isNaN(numericHours) ? String(job.hours) : "",
+    salary_min: salary.salary_min,
+    salary_max: salary.salary_max,
+    description: job.description || "",
+    tags: Array.isArray(job.tag_ids) ? job.tag_ids : Array.isArray(job.tags) ? job.tags : [],
+  };
+}
 
 const roleOptions = [
   { value: "optometrist", label: "Optometrist" },
@@ -81,7 +114,9 @@ function validate(values) {
   return errors;
 }
 
-export default function JobForm({ onCreated }) {
+export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
+  const editingJobId = jobToEdit?.id || jobToEdit?._id || null;
+  const isEditing = Boolean(editingJobId);
   const [values, setValues] = useState(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -94,15 +129,22 @@ export default function JobForm({ onCreated }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    if (!jobToEdit) return;
+    setValues(valuesFromJob(jobToEdit));
+    setErrors({});
+  }, [jobToEdit]);
+
   // Autosave (debounced)
   useEffect(() => {
+    if (isEditing) return undefined;
     const id = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
       } catch {}
     }, 300);
     return () => clearTimeout(id);
-  }, [values]);
+  }, [values, isEditing]);
 
   const handleChange = (field) => (e) => {
     const v = e?.target?.value ?? e;
@@ -137,12 +179,12 @@ export default function JobForm({ onCreated }) {
   };
 
   const clearDraft = () => {
-    setValues(defaultValues);
+    setValues(jobToEdit ? valuesFromJob(jobToEdit) : defaultValues);
     setErrors({});
     try {
       localStorage.removeItem(DRAFT_KEY);
     } catch {}
-    setMessage("Cleared.");
+    setMessage(isEditing ? "Reset." : "Cleared.");
     setTimeout(() => setMessage(""), 1000);
   };
 
@@ -158,46 +200,49 @@ export default function JobForm({ onCreated }) {
     setSubmitting(true);
     setMessage("");
 
-    // Payload the backend expects (adjust if your API differs)
+    const { city, state } = splitLocation(values.location);
+    const salary =
+      values.salary_min && values.salary_max
+        ? `${Number(values.salary_min)} - ${Number(values.salary_max)}`
+        : values.salary_min
+        ? `From ${Number(values.salary_min)}`
+        : values.salary_max
+        ? `Up to ${Number(values.salary_max)}`
+        : null;
+
     const payload = {
       title: values.title.trim(),
       company: values.company.trim(),
+      employer_name: values.company.trim(),
       location: values.location.trim(),
-      role_type: values.role_type,
-      employment_type: values.employment_type,
-      onsite_type: values.onsite_type,
-      hours_per_week: values.hours_per_week ? Number(values.hours_per_week) : null,
-      salary_min: values.salary_min ? Number(values.salary_min) : null,
-      salary_max: values.salary_max ? Number(values.salary_max) : null,
+      city,
+      state,
+      role: values.role_type,
+      type: values.employment_type,
+      hours: values.hours_per_week ? String(Number(values.hours_per_week)) : null,
+      salary,
       description: values.description.trim(),
-      tags: values.tags,
-      status: "draft", // or "active" if you want immediate listing
+      tag_ids: values.tags,
     };
 
     try {
-      // Try your API first (uses your existing helper)
-      const res = await apiFetch("/jobs", {
-        method: "POST",
-        body: payload,
-      });
-
-      if (!res?.ok) {
-        // apiFetch may already throw; but if it returns ok:false, handle it:
-        throw new Error(res?.error || "Unknown API error");
-      }
+      const result = isEditing
+        ? await updateJob(editingJobId, payload)
+        : await createJob(payload);
+      const savedJob = result?.job || result;
 
       // Success
-      setMessage("Job saved!");
+      setMessage(isEditing ? "Job updated!" : "Job saved!");
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch {}
-      if (onCreated) onCreated(res.data || null);
-      setValues(defaultValues);
+      if (onCreated) onCreated(savedJob || null);
+      if (onSuccess) onSuccess(savedJob || null);
+      if (!isEditing) setValues(defaultValues);
       setErrors({});
     } catch (err) {
-      // Graceful fallback when backend/env is not ready
       console.error("Submit failed:", err);
-      setMessage("API not available. Draft kept locally.");
+      setMessage(err?.message || "Failed to save job.");
     } finally {
       setSubmitting(false);
       setTimeout(() => setMessage(""), 2000);
@@ -206,7 +251,7 @@ export default function JobForm({ onCreated }) {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 980, mx: "auto", p: 2 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>Add a Job</Typography>
+      <Typography variant="h5" sx={{ mb: 2 }}>{isEditing ? "Edit Job" : "Add a Job"}</Typography>
 
       <Grid container spacing={2}>
         <Grid item xs={12} md={8}>
@@ -362,15 +407,17 @@ export default function JobForm({ onCreated }) {
 
         <Grid item xs={12}>
           <Stack direction="row" spacing={1}>
-            <Button type="button" variant="outlined" onClick={saveDraft}>
-              Save Draft (Local)
-            </Button>
+            {!isEditing && (
+              <Button type="button" variant="outlined" onClick={saveDraft}>
+                Save Draft (Local)
+              </Button>
+            )}
             <Button type="button" variant="text" color="warning" onClick={clearDraft}>
-              Clear
+              {isEditing ? "Reset" : "Clear"}
             </Button>
             <Box sx={{ flexGrow: 1 }} />
             <Button type="submit" variant="contained" disabled={submitting}>
-              {submitting ? "Submitting…" : "Submit"}
+              {submitting ? "Submitting…" : isEditing ? "Update" : "Submit"}
             </Button>
           </Stack>
         </Grid>

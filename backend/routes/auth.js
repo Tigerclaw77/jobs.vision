@@ -1,7 +1,8 @@
 // backend/routes/auth.js
 const express = require("express");
 const { requireAuth } = require("../middleware/auth.js");
-const { supa } = require("../services/supaClient.js");
+const { one } = require("../services/db.js");
+const { upsertProfileForAuthUser } = require("../services/profileBootstrap.js");
 
 const router = express.Router();
 
@@ -16,13 +17,12 @@ router.get("/me", requireAuth, async (req, res) => {
     let profile = null;
 
     // Pull canonical role/email from profiles so callers can rely on it
-    const { data, error } = await supa
-      .from("profiles")
-      .select("id,email,role")
-      .eq("id", req.user.id)
-      .single();
+    const data = await one(
+      "select id, email, role from public.profiles where id = $1",
+      [req.user.id]
+    );
 
-    if (!error && data) {
+    if (data) {
       profile = data;
       // Keep flat role in sync if DB has it
       if (data.role && data.role !== req.user.role) {
@@ -44,6 +44,22 @@ router.get("/me", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("Auth me error:", e);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/bootstrap-profile", requireAuth, async (req, res) => {
+  try {
+    const profile = await upsertProfileForAuthUser(req.user, req.body || {});
+
+    res.status(201).json({
+      id: req.user.id,
+      email: profile.email || req.user.email || null,
+      role: profile.role || null,
+      profile,
+    });
+  } catch (e) {
+    console.error("Bootstrap profile error:", e);
+    res.status(500).json({ error: "Failed to bootstrap profile" });
   }
 });
 

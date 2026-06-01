@@ -12,6 +12,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@mui/icons-material": "^6.4.6",
     "@mui/material": "^6.4.6",
+    "@neondatabase/auth": "^0.4.1-beta",
     "@radix-ui/react-slot": "^1.1.2",
     "@react-google-maps/api": "^2.20.6",
     "@reduxjs/toolkit": "^2.5.0",

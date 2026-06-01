@@ -3,11 +3,12 @@ const fetch = require('node-fetch');
 
 async function verifyHCaptcha(token, secret, remoteip) {
   if (!token) return { success: false, 'error-codes': ['missing-input-response'] };
+  if (!secret) return { success: false, 'error-codes': ['missing-input-secret'] };
 
   const params = new URLSearchParams();
   params.append('response', token);
   params.append('secret', secret);
-  if (remoteip) params.append('sitekeyremoteip', remoteip);
+  if (remoteip) params.append('remoteip', remoteip);
 
   const res = await fetch('https://hcaptcha.com/siteverify', {
     method: 'POST',

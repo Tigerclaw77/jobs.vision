@@ -1,12 +1,12 @@
 // src/ProtectedRoute.jsx
 import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { supabase } from "./utils/supabaseClient";
+import { getNeonSession, neonAuth } from "./utils/neonAuthClient";
 import { getRoleTier } from "./utils/getRoleTier";
 
 /**
  * Minimal route guard:
- * - Reads session from Supabase directly.
+ * - Reads session from Neon Auth directly.
  * - Resolves role (and optionally tier) via getRoleTier().
  * - Admin bypass.
  * - Preserves ?next= on redirect.
@@ -30,10 +30,10 @@ export default function ProtectedRoute({
 
     async function load() {
       // 1) Session
-      const { data } = await supabase.auth.getSession();
+      const { session } = await getNeonSession();
       if (!alive) return;
 
-      if (!data?.session) {
+      if (!session) {
         setAuthed(false);
         setReady(true);
         return;
@@ -58,7 +58,7 @@ export default function ProtectedRoute({
     }
 
     load();
-    const sub = supabase.auth.onAuthStateChange((_evt, session) => {
+    const sub = neonAuth.onAuthStateChange((_evt, session) => {
       if (!alive) return;
       if (!session) {
         setAuthed(false);

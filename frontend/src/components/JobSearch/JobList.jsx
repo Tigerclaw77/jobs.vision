@@ -1,7 +1,7 @@
 // src/components/JobSearch/JobList.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "../../utils/supabaseClient";
+import { getNeonUser, neonAuth } from "../../utils/neonAuthClient";
 
 import {
   fetchJobs,
@@ -33,12 +33,19 @@ function haversineMi(a, b) {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
-const HOURS_LABEL = { "full-time": "Full-time", "part-time": "Part-time", prn: "PRN" };
+const TYPE_LABEL = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contract: "Contract",
+  temp: "Temporary",
+  internship: "Internship",
+};
 const titleCase = (s = "") =>
   String(s)
     .split(" ")
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
     .join(" ");
+const normalizeType = (value = "") => String(value).trim().toLowerCase().replace(/-/g, "_");
 
 // ---------- filters ----------
 const DEFAULT_FILTERS = {
@@ -49,6 +56,7 @@ const DEFAULT_FILTERS = {
   radiusMi: 25,
   role: "",
   hours: "",
+  type: "",
   company: "",
 };
 
@@ -78,9 +86,9 @@ export default function JobList() {
   useEffect(() => {
     let unsub;
     (async () => {
-      const { data } = await supabase.auth.getUser();
-      setIsAuthed(!!data?.user);
-      const sub = supabase.auth.onAuthStateChange((_e, session) =>
+      const { user } = await getNeonUser();
+      setIsAuthed(!!user);
+      const sub = neonAuth.onAuthStateChange((_e, session) =>
         setIsAuthed(!!session?.user)
       );
       unsub = sub?.data?.subscription?.unsubscribe;
@@ -147,7 +155,7 @@ export default function JobList() {
     setFilters((prev) => {
       const next = { ...prev };
       if (!prev.role && result.role) next.role = result.role;
-      if (!prev.hours && result.hours) next.hours = result.hours;
+      if (!prev.type && result.hours) next.type = normalizeType(result.hours);
       if (!prev.company && result.company) next.company = result.company;
       if (!prev.location && result.location) next.location = result.location;
       // keep only leftovers in the search box
@@ -172,7 +180,14 @@ export default function JobList() {
       tags.push({
         type: "hours",
         value: filters.hours,
-        label: HOURS_LABEL[filters.hours] || titleCase(filters.hours),
+        label: `${filters.hours}+ hrs/wk`,
+      });
+    }
+    if (filters.type) {
+      tags.push({
+        type: "type",
+        value: filters.type,
+        label: TYPE_LABEL[normalizeType(filters.type)] || titleCase(filters.type),
       });
     }
     if (filters.location) {
@@ -189,9 +204,11 @@ export default function JobList() {
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const { q = "", role = "", hours = "", location = "", company = "", lat, lng, radiusMi = 25 } = filters;
+      const { q = "", role = "", hours = "", type = "", location = "", company = "", lat, lng, radiusMi = 25 } = filters;
       const center = lat && lng ? { lat, lng } : null;
       const qLower = q.trim().toLowerCase();
+      const minHours = Number(hours);
+      const hasMinHours = hours !== "" && Number.isFinite(minHours);
 
       const next = (jobs || []).filter((job) => {
         const hay = [
@@ -200,6 +217,7 @@ export default function JobList() {
           job.description,
           job.role,
           job.hours,
+          job.type,
           job.location,
         ]
           .filter(Boolean)
@@ -208,7 +226,9 @@ export default function JobList() {
 
         const matchQ = !qLower || hay.includes(qLower);
         const matchRole = !role || (job.role || "").toLowerCase() === role.toLowerCase();
-        const matchHours = !hours || (job.hours || "").toLowerCase() === hours.toLowerCase();
+        const jobHours = Number(job.hours);
+        const matchHours = !hasMinHours || (Number.isFinite(jobHours) && jobHours >= minHours);
+        const matchType = !type || normalizeType(job.type) === normalizeType(type);
         const matchCompany =
           !company || (job.company || "").toLowerCase().includes(String(company).toLowerCase());
         const matchLocText =
@@ -221,7 +241,7 @@ export default function JobList() {
           matchRadius = d <= radiusMi;
         }
 
-        return matchQ && matchRole && matchHours && matchCompany && matchLocText && matchRadius;
+        return matchQ && matchRole && matchHours && matchType && matchCompany && matchLocText && matchRadius;
       });
 
       setFilteredJobs(next);
@@ -241,6 +261,7 @@ const removeQuickTag = (tag) => {
     if (tag.type === "company")  next.company  = "";
     if (tag.type === "role")     next.role     = "";
     if (tag.type === "hours")    next.hours    = "";
+    if (tag.type === "type")     next.type     = "";
     if (tag.type === "location") next.location = "";
     return next;
   });
@@ -249,7 +270,7 @@ const removeQuickTag = (tag) => {
 
   const requireAuth = (message) => {
     const go = window.confirm(message || "Please sign in to continue. Go to Sign In?");
-    if (go) window.location.assign("/signin");
+    if (go) window.location.assign("/login");
   };
 
   const handleFavorite = async (jobId) => {
@@ -340,7 +361,11 @@ const removeQuickTag = (tag) => {
               color: "#cdd6f4",
             }}
           >
-            {fetchError ? `Failed to load jobs: ${fetchError}` : "No jobs match your filters."}
+            {fetchError
+              ? `Failed to load jobs: ${fetchError}`
+              : jobs.length === 0
+              ? "No jobs available."
+              : "No jobs match your filters."}
           </div>
         )}
       </div>

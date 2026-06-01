@@ -5,21 +5,30 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate } from "react-router-dom";
 import { Button, Paper, Container, Typography, CircularProgress, Alert } from "@mui/material";
-import { supabase } from "../utils/supabaseClient";
+import { neonAuth, resetNeonPassword } from "../utils/neonAuthClient";
 import GlassTextField from "./ui/GlassTextField";
 import "../styles/forms.css";
 
 const schema = Yup.object({
-  newPassword: Yup.string().min(6, "Password must be at least 6 characters.").required("New password is required."),
+  newPassword: Yup.string()
+    .min(6, "Password must be at least 6 characters.")
+    .required("New password is required."),
   confirmPassword: Yup.string()
     .oneOf([Yup.ref("newPassword")], "Passwords must match.")
     .required("Please confirm your new password."),
 });
 
+function getParam(name) {
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  return search.get(name) || hash.get(name);
+}
+
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("loading"); // "loading" | "form" | "done" | "error"
-  const [banner, setBanner] = useState(null);     // { severity, message }
+  const [banner, setBanner] = useState(null);
+  const resetContext = useRef({ token: null, email: null, otp: null });
   const redirectTimer = useRef(null);
 
   const {
@@ -30,66 +39,50 @@ export default function ResetPassword() {
   } = useForm({ resolver: yupResolver(schema) });
 
   useEffect(() => {
-    // Clean up any pending timers
     return () => {
       if (redirectTimer.current) clearTimeout(redirectTimer.current);
     };
   }, []);
 
   useEffect(() => {
-    // Handle password-recovery tokens from hash
-    // Example hash: #access_token=...&refresh_token=...&type=recovery
-    const hash = window.location.hash?.replace(/^#/, "") || "";
-    const params = new URLSearchParams(hash);
-    const access_token = params.get("access_token");
-    const refresh_token = params.get("refresh_token");
-    const type = params.get("type");
+    const token = getParam("token") || getParam("reset_token") || getParam("code");
+    const email = getParam("email");
+    const otp = getParam("otp");
 
-    (async () => {
-      try {
-        if (access_token && refresh_token && type === "recovery") {
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          if (error) throw error;
-          setBanner({ severity: "info", message: "Enter a new password below." });
-          setPhase("form");
-          return;
-        }
+    if (token || (email && otp)) {
+      resetContext.current = { token, email, otp };
+      setBanner({ severity: "info", message: "Enter a new password below." });
+      setPhase("form");
+      return;
+    }
 
-        // Fallback: if user already has a valid session, allow reset anyway
-        const { data } = await supabase.auth.getSession();
-        if (data?.session) {
-          setBanner({ severity: "info", message: "Enter a new password below." });
-          setPhase("form");
-          return;
-        }
-
-        // Otherwise tokens are missing/invalid
-        setBanner({
-          severity: "error",
-          message: "This reset link is invalid or expired. Please request a new password reset email.",
-        });
-        setPhase("error");
-      } catch (err) {
-        setBanner({ severity: "error", message: err?.message || "Could not validate reset link." });
-        setPhase("error");
-      }
-    })();
+    setBanner({
+      severity: "error",
+      message: "This reset link is invalid or expired. Please request a new password reset email.",
+    });
+    setPhase("error");
   }, []);
 
   const onSubmit = async ({ newPassword }) => {
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await resetNeonPassword({
+        newPassword,
+        ...resetContext.current,
+      });
       if (error) throw error;
 
-      await supabase.auth.signOut(); // end the temporary recovery session
+      await neonAuth.signOut();
       reset();
-      setBanner({ severity: "success", message: "Password updated successfully. Redirecting to login..." });
+      setBanner({
+        severity: "success",
+        message: "Password updated successfully. Redirecting to login...",
+      });
       setPhase("done");
 
       redirectTimer.current = setTimeout(() => navigate("/login"), 2000);
     } catch (err) {
       setBanner({ severity: "error", message: err?.message || "Password reset failed." });
-      setPhase("error");
+      setPhase("form");
     }
   };
 
@@ -140,7 +133,13 @@ export default function ResetPassword() {
               margin="normal"
             />
 
-            <Button type="submit" variant="contained" className="glass-button" fullWidth disabled={isSubmitting}>
+            <Button
+              type="submit"
+              variant="contained"
+              className="glass-button"
+              fullWidth
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Resetting..." : "Reset Password"}
             </Button>
           </form>

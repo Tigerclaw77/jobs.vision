@@ -7,8 +7,12 @@ import {
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 
-const API_BASE =
-  process.env.REACT_APP_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+const API_BASE = apiBaseUrl();
 
 // Normalize token retrieval
 function getAuthToken() {
@@ -107,7 +111,7 @@ export default function Users() {
       const token = getAuthToken();
       if (!token) throw new Error("No token found. Please log in.");
 
-      const url = new URL(`${API_BASE}/api/users`);
+      const url = `${API_BASE}/users`;
       // If you want server-side filters later:
       // if (role !== "all") url.searchParams.set("role", role);
       // if (query.trim()) url.searchParams.set("search", query.trim());

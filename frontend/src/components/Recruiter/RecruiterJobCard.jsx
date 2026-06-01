@@ -1,6 +1,6 @@
 import React from "react";
 
-const RecruiterJobCard = ({ job, onEdit, onArchive }) => {
+const RecruiterJobCard = ({ job, onEdit, onArchive, onUnarchive }) => {
   const handleEdit = () => {
     if (onEdit) onEdit(job);
   };
@@ -9,7 +9,16 @@ const RecruiterJobCard = ({ job, onEdit, onArchive }) => {
     if (onArchive) {
       const confirmed = window.confirm(`Archive job "${job.title}"?`);
       if (confirmed) {
-        await onArchive(job._id);
+        await onArchive(job.id || job._id);
+      }
+    }
+  };
+
+  const handleUnarchive = async () => {
+    if (onUnarchive) {
+      const confirmed = window.confirm(`Unarchive job "${job.title}"?`);
+      if (confirmed) {
+        await onUnarchive(job.id || job._id);
       }
     }
   };
@@ -33,6 +42,9 @@ const RecruiterJobCard = ({ job, onEdit, onArchive }) => {
         <button onClick={handleEdit}>Edit</button>
         {onArchive && (
           <button onClick={handleArchive} className="danger">Archive</button>
+        )}
+        {onUnarchive && (
+          <button onClick={handleUnarchive}>Unarchive</button>
         )}
       </div>
     </div>

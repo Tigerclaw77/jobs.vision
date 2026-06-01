@@ -19,7 +19,13 @@ import {
   Stack,
   Alert,
 } from "@mui/material";
-import { supabase, setAuthPersistence } from "../utils/supabaseClient";
+import {
+  getNeonSession,
+  getNeonUser,
+  neonAuth,
+  normalizeSessionResult,
+  setNeonAuthPersistence,
+} from "../utils/neonAuthClient";
 import "../styles/forms.css";
 
 // Validation
@@ -106,9 +112,9 @@ export default function Login() {
     let mounted = true;
 
     const redirectIfAuthed = async () => {
-      const { data } = await supabase.auth.getSession();
+      const { session } = await getNeonSession();
       if (!mounted) return;
-      if (data?.session) {
+      if (session) {
         const { role } = await getRoleTier();
         navigate(chooseDest(role, nextPath), { replace: true });
         return;
@@ -118,7 +124,7 @@ export default function Login() {
 
     redirectIfAuthed();
 
-    const sub = supabase.auth.onAuthStateChange((_event, session) => {
+    const sub = neonAuth.onAuthStateChange((_event, session) => {
       if (session) redirectIfAuthed();
     });
 
@@ -133,9 +139,10 @@ export default function Login() {
   }, [navigate, nextPath]);
 
   const bootstrapReduxAfterSignIn = async (session) => {
-    const user = session?.user ?? (await supabase.auth.getUser()).data?.user;
-    const token =
-      session?.access_token || (await supabase.auth.getSession()).data?.session?.access_token;
+    const { user: neonUser } = await getNeonUser();
+    const { session: currentSession } = await getNeonSession();
+    const user = session?.user ?? neonUser;
+    const token = session?.access_token || currentSession?.access_token;
 
     const { role, tier } = await getRoleTier();
 
@@ -174,15 +181,15 @@ export default function Login() {
     setSigningIn(true);
     try {
       // set persistence BEFORE sign-in (Remember Me)
-      setAuthPersistence(rememberMe ? "local" : "none");
+      setNeonAuthPersistence(rememberMe ? "local" : "session");
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await neonAuth.signInWithPassword({
         email: String(email).trim().toLowerCase(),
         password,
       });
       if (error) throw error;
 
-      await bootstrapReduxAfterSignIn(data.session);
+      await bootstrapReduxAfterSignIn(data?.session || normalizeSessionResult({ data }));
     } catch (err) {
       const msg = err?.message || "Login failed. Please try again.";
       if (/confirm|verified|not confirmed/i.test(msg)) setCanResendVerify(true);
@@ -241,9 +248,9 @@ export default function Login() {
     setSendingMagic(true);
     try {
       // respect Remember Me for OTP return
-      setAuthPersistence(rememberMe ? "local" : "none");
+      setNeonAuthPersistence(rememberMe ? "local" : "session");
 
-      const { error } = await supabase.auth.signInWithOtp({
+      const { error } = await neonAuth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
           emailRedirectTo: `${base}/verify-email`,
@@ -266,8 +273,8 @@ export default function Login() {
   const resendMagicLink = async () => {
     if (!isValidEmail(email) || resendCooldown > 0) return;
     try {
-      setAuthPersistence(rememberMe ? "local" : "none");
-      const { error } = await supabase.auth.signInWithOtp({
+      setNeonAuthPersistence(rememberMe ? "local" : "session");
+      const { error } = await neonAuth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
           emailRedirectTo: `${base}/verify-email`,
@@ -282,7 +289,7 @@ export default function Login() {
 
   const resendVerification = async () => {
     try {
-      const { error } = await supabase.auth.resend({
+      const { error } = await neonAuth.resend({
         type: "signup",
         email: String(email).trim().toLowerCase(),
         options: { emailRedirectTo: `${base}/verify-email` },

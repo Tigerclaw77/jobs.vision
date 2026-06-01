@@ -53,15 +53,24 @@ const AdminDashboard = () => {
           Admin Dashboard
         </Typography>
 
-        {/* Admin can post jobs */}
-        <Button
-          component={RouterLink}
-          to="/admin/addjob"                 // alias route for the same AddJob form
-          variant="contained"
-          className="glass-button"
-        >
-          Post a Job
-        </Button>
+        <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+          <Button
+            component={RouterLink}
+            to="/admin/manual-overrides"
+            variant="outlined"
+            className="glass-button"
+          >
+            Manual Overrides
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/admin/addjob"
+            variant="contained"
+            className="glass-button"
+          >
+            Post a Job
+          </Button>
+        </Stack>
       </Stack>
 
       <StatsCards totalUsers={totalUsers} lockedUsers={lockedUsers.length} income={income} />

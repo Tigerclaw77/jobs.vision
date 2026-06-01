@@ -1,32 +1,30 @@
 const express = require("express");
 const crypto = require("crypto");
-const { supa } = require("../services/supaClient");
-const { requireAuth } = require("../middleware/auth");
+const { one, query } = require("../services/db");
+const { requireAuth, requireRole } = require("../middleware/auth");
+const { sendEmail } = require("../services/email");
 
 const router = express.Router();
 
-const APP_URL = process.env.APP_URL || "http://localhost:3000";
-const API_URL = process.env.PUBLIC_API_URL || "http://localhost:5000";
-
-/** You can replace this with your mailer */
-async function sendEmail(to, subject, text) {
-  console.log("[mail] to:", to, "| subject:", subject, "| body:", text);
-  // TODO: wire up real email (Resend, SES, Mailgun, etc.)
-}
+const APP_URL = (process.env.APP_URL || process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
+const API_URL = (process.env.PUBLIC_API_URL || "http://localhost:5000").replace(/\/+$/, "").replace(/\/api$/, "");
 
 /**
  * GET /api/recruiter/domains
  * List my domains
  */
-router.get("/recruiter/domains", requireAuth, async (req, res) => {
+router.get("/recruiter/domains", requireAuth, requireRole(["recruiter", "admin"]), async (req, res) => {
   try {
-    const { data, error } = await supa
-      .from("recruiter_domains")
-      .select("id,domain,status,verified_at,created_at")
-      .eq("user_id", req.user.id)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    res.json({ items: data || [] });
+    const result = await query(
+      `
+        select id, domain, status, verified_at, created_at
+        from public.recruiter_domains
+        where user_id = $1
+        order by created_at desc
+      `,
+      [req.user.id]
+    );
+    res.json({ items: result.rows });
   } catch (e) {
     console.error("List domains error:", e);
     res.status(500).json({ error: "Failed to list domains" });
@@ -36,9 +34,8 @@ router.get("/recruiter/domains", requireAuth, async (req, res) => {
 /**
  * POST /api/recruiter/domains/request
  * body: { domain: "walmart.com", sendTo: "someone@walmart.com" }
- * Sends a verification link to an address at that domain.
  */
-router.post("/recruiter/domains/request", requireAuth, async (req, res) => {
+router.post("/recruiter/domains/request", requireAuth, requireRole(["recruiter", "admin"]), async (req, res) => {
   try {
     const userId = req.user.id;
     const rawDomain = String(req.body?.domain || "");
@@ -56,28 +53,37 @@ router.post("/recruiter/domains/request", requireAuth, async (req, res) => {
     }
 
     const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
 
-    const { data, error } = await supa
-      .from("recruiter_domains")
-      .upsert(
-        {
-          user_id: userId,
+    const data = await one(
+      `
+        insert into public.recruiter_domains (
+          user_id,
           domain,
-          status: "pending",
-          verification_token: token,
-          token_expires_at: expiresAt.toISOString(),
-        },
-        { onConflict: "user_id,domain" }
-      )
-      .select("id,domain,status")
-      .maybeSingle();
-    if (error) throw error;
+          status,
+          verification_token,
+          token_expires_at
+        )
+        values ($1, $2, 'pending', $3, $4)
+        on conflict (user_id, domain) do update
+          set status = excluded.status,
+              verification_token = excluded.verification_token,
+              token_expires_at = excluded.token_expires_at,
+              updated_at = now()
+        returning id, domain, status
+      `,
+      [userId, domain, token, expiresAt.toISOString()]
+    );
 
     const link = `${API_URL}/api/verify-domain?token=${token}`;
-    await sendEmail(sendTo, `Verify ${domain}`, `Click to verify: ${link}`);
+    const mail = await sendEmail({
+      to: sendTo,
+      subject: `Verify ${domain}`,
+      text: `Click to verify your jobs.vision recruiter domain: ${link}`,
+      html: `<p>Click to verify your jobs.vision recruiter domain:</p><p><a href="${link}">${link}</a></p>`,
+    });
 
-    res.json({ ok: true, domain, status: "pending" });
+    res.json({ ok: true, domain: data?.domain || domain, status: "pending", emailSent: !!mail.sent });
   } catch (e) {
     console.error("Request domain verify error:", e);
     res.status(500).json({ error: "Failed to request verification" });
@@ -93,29 +99,29 @@ router.get("/verify-domain", async (req, res) => {
     const token = String(req.query.token || "");
     if (!token) return res.status(400).send("Missing token");
 
-    const { data: rec, error } = await supa
-      .from("recruiter_domains")
-      .select("*")
-      .eq("verification_token", token)
-      .maybeSingle();
-    if (error || !rec) return res.status(400).send("Invalid token");
+    const rec = await one(
+      "select * from public.recruiter_domains where verification_token = $1",
+      [token]
+    );
+    if (!rec) return res.status(400).send("Invalid token");
 
     if (!rec.token_expires_at || new Date(rec.token_expires_at) < new Date()) {
       return res.status(400).send("Token expired");
     }
 
-    const { error: upErr } = await supa
-      .from("recruiter_domains")
-      .update({
-        status: "verified",
-        verified_at: new Date().toISOString(),
-        verification_token: null,
-        token_expires_at: null,
-      })
-      .eq("id", rec.id);
-    if (upErr) return res.status(500).send("Failed to verify");
+    await query(
+      `
+        update public.recruiter_domains
+        set status = 'verified',
+            verified_at = now(),
+            verification_token = null,
+            token_expires_at = null,
+            updated_at = now()
+        where id = $1
+      `,
+      [rec.id]
+    );
 
-    // Redirect back to app
     const appRedirect = `${APP_URL}/recruiter/domains?verified=${encodeURIComponent(rec.domain)}`;
     res.redirect(appRedirect);
   } catch (e) {

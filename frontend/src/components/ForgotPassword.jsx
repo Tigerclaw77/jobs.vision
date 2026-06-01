@@ -5,7 +5,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
 import { useNavigate } from "react-router-dom";
 import { Button, Paper, Container, Typography, Alert } from "@mui/material";
-import { supabase } from "../utils/supabaseClient";
+import { neonAuth } from "../utils/neonAuthClient";
 import "../styles/forms.css";
 import GlassTextField from "./ui/GlassTextField";
 
@@ -35,7 +35,7 @@ export default function ForgotPassword() {
   const onSubmit = async ({ email }) => {
     const normalized = email.trim().toLowerCase();
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(normalized, {
+      const { error } = await neonAuth.resetPasswordForEmail(normalized, {
         redirectTo: `${base}/reset-password`,
       });
 

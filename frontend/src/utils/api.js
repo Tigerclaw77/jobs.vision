@@ -1,8 +1,13 @@
 import axios from "axios";
 
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
 // ✅ Base Axios instance (adjust baseURL as needed)
 const axiosInstance = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: apiBaseUrl(),
 });
 
 // ✅ Attach token to every request (if applicable)
@@ -73,6 +78,11 @@ export const updateUserProfile = async (profileUpdates) => {
   return data;
 };
 
+export const fetchUserProfile = async () => {
+  const { data } = await axiosInstance.get("/profile");
+  return data;
+};
+
 // =============================
 // ✅ NOTIFICATIONS
 // =============================
@@ -89,6 +99,16 @@ export const fetchAdminDashboard = async () => {
   return data;
 };
 
+export const fetchManualOverrides = async (status = "pending") => {
+  const { data } = await axiosInstance.get("/manual-overrides", { params: { status } });
+  return data?.items || [];
+};
+
+export const decideManualOverride = async (id, decision) => {
+  const { data } = await axiosInstance.post(`/manual-overrides/${id}/decision`, { decision });
+  return data;
+};
+
 // =============================
 // ✅ RECRUITER: Jobs CRUD (Axios)
 // =============================
@@ -97,24 +117,44 @@ export const fetchRecruiterJobs = async () => {
   return data?.data ?? data;
 };
 
+export const fetchJobById = async (jobId) => {
+  const { data } = await axiosInstance.get(`/jobs/${jobId}`);
+  return data;
+};
+
 export const createJob = async (jobData) => {
   const { data } = await axiosInstance.post("/jobs", jobData);
   return data;
 };
 
 export const updateJob = async (jobId, jobData) => {
-  const { data } = await axiosInstance.put(`/jobs/${jobId}`, jobData);
+  const { data } = await axiosInstance.patch(`/jobs/${jobId}`, jobData);
   return data;
 };
 
 export const archiveJob = async (jobId) => {
-  const { data } = await axiosInstance.put(`/jobs/${jobId}/archive`);
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/archive`);
   return data;
 };
 
-export const migrateRecruiterJobTemplates = async () => {
-  const { data } = await axiosInstance.post("/recruiters/migrate-job-templates");
+export const unarchiveJob = async (jobId) => {
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/unarchive`);
   return data;
+};
+
+export const fetchRecruiterDomains = async () => {
+  const { data } = await axiosInstance.get("/recruiter/domains");
+  return data?.items || [];
+};
+
+export const requestRecruiterDomainVerification = async ({ domain, sendTo }) => {
+  const { data } = await axiosInstance.post("/recruiter/domains/request", { domain, sendTo });
+  return data;
+};
+
+export const fetchRecruiterApplications = async () => {
+  const { data } = await axiosInstance.get("/applications/for-my-jobs");
+  return Array.isArray(data) ? data : data?.items || [];
 };
 
 export default axiosInstance;

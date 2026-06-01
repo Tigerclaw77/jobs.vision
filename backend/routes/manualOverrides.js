@@ -4,9 +4,13 @@ const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const { supa } = require('../services/supaClient.js');
+const { one, query } = require('../services/db.js');
 const { verifyHCaptcha } = require('../services/hcaptcha.js');
+const requireAdmin = require('../middleware/requireAdmin');
+const { sendEmail } = require('../services/email');
 
 const router = express.Router();
+const adminOnly = requireAdmin();
 
 // 🔒 Simple per-IP limiter: 10 create attempts/hour
 const createLimiter = rateLimit({
@@ -24,6 +28,10 @@ const upload = multer({
 
 // Utility: upload file buffer to Supabase storage
 async function uploadProofBufferToSupabase(file, overrideId) {
+  if (!supa) {
+    throw new Error('Supabase storage is not configured.');
+  }
+
   // Bucket must exist: override_docs
   const ext = path.extname(file.originalname || '') || '.bin';
   const key = `${overrideId}/${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
@@ -100,26 +108,35 @@ router.post(
       }
 
       // Create placeholder row to get ID (for file paths)
-      const { data: row, error: insertErr } = await supa
-        .from('manual_overrides')
-        .insert({
-          email: normEmail,
-          name: name.trim(),
-          role: role?.trim() || null,
-          company: company.trim(),
-          company_website: companyWebsite?.trim() || null,
-          justification: justification?.trim() || null,
-          proof_urls: proofUrlsArr,
-          status: 'pending',
-          requester_ip: remoteip ? remoteip : null,
-          captcha_score: hc?.score ?? null
-        })
-        .select('*')
-        .single();
-
-      if (insertErr) {
-        return res.status(500).json({ error: 'Failed to create override request.', details: insertErr });
-      }
+      const row = await one(
+        `
+          insert into public.manual_overrides (
+            email,
+            name,
+            role,
+            company,
+            company_website,
+            justification,
+            proof_urls,
+            status,
+            requester_ip,
+            captcha_score
+          )
+          values ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
+          returning *
+        `,
+        [
+          normEmail,
+          name.trim(),
+          role?.trim() || null,
+          company.trim(),
+          companyWebsite?.trim() || null,
+          justification?.trim() || null,
+          proofUrlsArr,
+          remoteip ? remoteip : null,
+          hc?.score ?? null,
+        ]
+      );
 
       // Optional: upload any attachments to Supabase storage and append signed URLs
       const files = req.files || [];
@@ -135,14 +152,10 @@ router.post(
       }
 
       if (uploadedUrls.length) {
-        const { error: updateErr } = await supa
-          .from('manual_overrides')
-          .update({ proof_urls: (row.proof_urls || []).concat(uploadedUrls) })
-          .eq('id', row.id);
-
-        if (updateErr) {
-          console.error('Failed to attach uploaded URLs:', updateErr);
-        }
+        await query(
+          "update public.manual_overrides set proof_urls = $1, updated_at = now() where id = $2",
+          [(row.proof_urls || []).concat(uploadedUrls), row.id]
+        );
       }
 
       return res.json({ ok: true, id: row.id });
@@ -156,17 +169,24 @@ router.post(
 /**
  * GET /api/manual-overrides?status=pending
  */
-router.get('/', async (req, res) => {
+router.get('/', adminOnly, async (req, res) => {
   try {
     const status = (req.query.status || 'pending').toLowerCase();
-    const { data, error } = await supa
-      .from('manual_overrides')
-      .select('*')
-      .eq('status', status)
-      .order('created_at', { ascending: false });
+    if (!['pending', 'approved', 'denied'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status filter.' });
+    }
 
-    if (error) return res.status(500).json({ error: 'Failed to fetch.', details: error });
-    return res.json({ items: data || [] });
+    const result = await query(
+      `
+        select id,email,name,role,company,company_website,justification,proof_urls,status,created_at,reviewed_by,reviewed_at
+        from public.manual_overrides
+        where status = $1
+        order by created_at desc
+      `,
+      [status]
+    );
+
+    return res.json({ items: result.rows || [] });
   } catch (err) {
     console.error('manual-overrides GET error', err);
     return res.status(500).json({ error: 'Server error.' });
@@ -177,26 +197,48 @@ router.get('/', async (req, res) => {
  * POST /api/manual-overrides/:id/decision
  * Body: { decision: 'approve' | 'deny', reviewedBy: 'admin@...' }
  */
-router.post('/:id/decision', async (req, res) => {
+router.post('/:id/decision', adminOnly, async (req, res) => {
   try {
     const id = req.params.id;
-    const { decision, reviewedBy } = req.body || {};
+    const { decision } = req.body || {};
     if (!['approve', 'deny'].includes(decision)) {
       return res.status(400).json({ error: 'Invalid decision.' });
     }
 
     const status = decision === 'approve' ? 'approved' : 'denied';
-    const { error } = await supa
-      .from('manual_overrides')
-      .update({
-        status,
-        reviewed_by: reviewedBy || 'admin',
-        reviewed_at: new Date().toISOString()
-      })
-      .eq('id', id);
+    const reviewedBy = req.profile?.email || req.user?.email || req.user?.id || 'admin';
+    const data = await one(
+      `
+        update public.manual_overrides
+        set status = $1,
+            reviewed_by = $2,
+            reviewed_at = $3,
+            updated_at = now()
+        where id = $4 and status = 'pending'
+        returning id,email,name,company,status,reviewed_at
+      `,
+      [status, reviewedBy, new Date().toISOString(), id]
+    );
 
-    if (error) return res.status(500).json({ error: 'Failed to update.', details: error });
-    return res.json({ ok: true });
+    if (!data) return res.status(404).json({ error: 'Pending override not found.' });
+
+    const approved = status === 'approved';
+    const subject = approved
+      ? 'Your jobs.vision manual verification was approved'
+      : 'Your jobs.vision manual verification was denied';
+    const text = approved
+      ? `Hi ${data.name || 'there'},\n\nYour manual recruiter verification for ${data.company} was approved. You can continue using jobs.vision.\n\njobs.vision`
+      : `Hi ${data.name || 'there'},\n\nYour manual recruiter verification for ${data.company} was denied. If you believe this was a mistake, please submit a new request with additional proof.\n\njobs.vision`;
+
+    let emailSent = false;
+    try {
+      const mail = await sendEmail({ to: data.email, subject, text });
+      emailSent = !!mail.sent;
+    } catch (mailErr) {
+      console.error('manual-overrides decision email error', mailErr);
+    }
+
+    return res.json({ ok: true, item: data, emailSent });
   } catch (err) {
     console.error('manual-overrides decision error', err);
     return res.status(500).json({ error: 'Server error.' });

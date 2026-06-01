@@ -104,7 +104,7 @@ export default function JobFilter({
           </select>
         </div>
 
-        {/* Role + Hours */}
+        {/* Role + Type */}
         <div className="field field-role">
           <label>Role</label>
           <select
@@ -120,17 +120,30 @@ export default function JobFilter({
           </select>
         </div>
 
-        <div className="field field-hours">
-          <label>Hours</label>
+        <div className="field field-type">
+          <label>Type</label>
           <select
+            value={filters.type || ""}
+            onChange={(e) => set({ type: e.target.value })}
+          >
+            <option value="">All types</option>
+            <option value="full_time">Full-time</option>
+            <option value="part_time">Part-time</option>
+            <option value="contract">Contract</option>
+            <option value="temp">Temporary</option>
+            <option value="internship">Internship</option>
+          </select>
+        </div>
+
+        <div className="field field-hours">
+          <label>Min hours/week</label>
+          <input
+            type="number"
+            min="0"
+            placeholder="Any"
             value={filters.hours || ""}
             onChange={(e) => set({ hours: e.target.value })}
-          >
-            <option value="">All hours</option>
-            <option value="full-time">Full-time</option>
-            <option value="part-time">Part-time</option>
-            <option value="prn">PRN</option>
-          </select>
+          />
         </div>
 
         {/* Reset */}

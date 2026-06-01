@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { logout as logoutAction } from "../store/authSlice";
-import { supabase, clearAuthPersistence } from "../utils/supabaseClient";
+import { clearNeonAuthPersistence, neonAuth } from "../utils/neonAuthClient";
 
 export default function Logout() {
   const dispatch = useDispatch();
@@ -11,24 +11,13 @@ export default function Logout() {
 
     (async () => {
       try {
-        // Supabase sign-out (both scopes if supported)
-        try {
-          await supabase.auth.signOut({ scope: "local" });
-        } catch {
-          await supabase.auth.signOut();
-        }
-        try {
-          await supabase.auth.signOut({ scope: "global" });
-        } catch {
-          /* ignore if not supported */
-        }
+        await neonAuth.signOut();
       } catch {
         /* ignore */
       }
 
-      // Reset persistence + scrub any sb-* keys from both storages
       try {
-        clearAuthPersistence();
+        clearNeonAuthPersistence();
       } catch {
         /* ignore */
       }

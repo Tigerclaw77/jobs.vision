@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import RecruiterJobCard from "./RecruiterJobCard";
 
-const JobTabs = ({ jobsByStatus, onEdit, onArchive }) => {
+const JobTabs = ({ jobsByStatus, onEdit, onArchive, onUnarchive }) => {
   const [activeTab, setActiveTab] = useState("active");
 
   const tabLabels = {
     active: "Active",
+    pending: "Pending Verification",
     archived: "Archived",
     featured: "Featured",
     expired: "Expired",
@@ -35,10 +36,11 @@ const JobTabs = ({ jobsByStatus, onEdit, onArchive }) => {
         {jobsByStatus[activeTab] && jobsByStatus[activeTab].length > 0 ? (
           jobsByStatus[activeTab].map((job) => (
             <RecruiterJobCard
-              key={job._id}
+              key={job.id || job._id}
               job={job}
               onEdit={onEdit}
               onArchive={activeTab !== "archived" ? onArchive : null}
+              onUnarchive={activeTab === "archived" ? onUnarchive : null}
             />
           ))
         ) : (

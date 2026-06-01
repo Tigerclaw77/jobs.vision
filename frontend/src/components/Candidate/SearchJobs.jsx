@@ -1,80 +1,83 @@
-// // import React, { useState, useEffect } from "react";
-// // import axios from "axios";
-
-// // const SearchJobs = () => {
-// //   const [jobs, setJobs] = useState([]);
-
-// //   useEffect(() => {
-// //     const fetchJobs = async () => {
-// //       try {
-// //         const response = await axios.get("http://localhost:5000/jobs");
-// //         setJobs(response.data);
-// //       } catch (error) {
-// //         console.error("Error fetching jobs:", error);
-// //       }
-// //     };
-// //     fetchJobs();
-// //   }, []);
-
-// //   return (
-// //     <div>
-// //       <h2>Search Jobs</h2>
-// //       {jobs.map((job) => (
-// //         <div key={job._id}>
-// //           <h3>{job.title}</h3>
-// //           <p>{job.description}</p>
-// //         </div>
-// //       ))}
-// //     </div>
-// //   );
-// // };
-
-// // export default SearchJobs;
-
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+function mapJob(row = {}) {
+  return {
+    id: row.id || row._id,
+    title: row.title || "",
+    company: row.employer_name || row.company || row.venue_name || "",
+    description: row.description || "",
+    hours: row.hours || row.type || "",
+    role: row.role || "",
+    type: row.type || "",
+    location: row.location || [row.city, row.state].filter(Boolean).join(", "),
+  };
+}
 
 const SearchJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [filters, setFilters] = useState({
-    jobRole: "",
+    role: "",
     hours: "",
-    practiceMode: "",
-    corporation: "",
+    type: "",
+    company: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [savedJobs, setSavedJobs] = useState(() => {
-    return JSON.parse(localStorage.getItem("savedJobs")) || [];
+    try {
+      return JSON.parse(localStorage.getItem("savedJobs")) || [];
+    } catch {
+      return [];
+    }
   });
 
-  useEffect(() => {
-    fetchJobs();
-  }, []);
-
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await axios.get("http://localhost:5000/jobs", { params: filters });
-      setJobs(response.data);
-    } catch (error) {
+      const response = await axios.get(`${apiBaseUrl()}/jobs`, {
+        params: { limit: 100 },
+      });
+      setJobs((response.data || []).map(mapJob));
+    } catch (err) {
       setError("Error fetching jobs. Please try again.");
-      console.error("Error fetching jobs:", error);
+      console.error("Error fetching jobs:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // ✅ Save Job Function
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
+
+  const filteredJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      const roleOk = !filters.role || job.role === filters.role;
+      const hoursOk =
+        !filters.hours ||
+        (Number.isFinite(Number(job.hours)) && Number(job.hours) >= Number(filters.hours));
+      const typeOk = !filters.type || job.type === filters.type;
+      const companyOk =
+        !filters.company ||
+        job.company.toLowerCase().includes(filters.company.toLowerCase());
+      return roleOk && hoursOk && typeOk && companyOk;
+    });
+  }, [jobs, filters]);
+
   const handleSaveJob = (job) => {
-    const updatedSavedJobs = [...savedJobs, job];
+    const updatedSavedJobs = [...savedJobs.filter((saved) => saved.id !== job.id), job];
     setSavedJobs(updatedSavedJobs);
-    localStorage.setItem("savedJobs", JSON.stringify(updatedSavedJobs)); // ✅ Temporary Storage (Replace with API later)
+    localStorage.setItem("savedJobs", JSON.stringify(updatedSavedJobs));
     alert("Job saved successfully!");
   };
 
-  // ✅ Share Job Placeholder (Expand later)
   const handleShareJob = (job) => {
     alert(`Share functionality for "${job.title}" coming soon!`);
   };
@@ -83,57 +86,57 @@ const SearchJobs = () => {
     <div style={styles.container}>
       <h2>Search Jobs</h2>
 
-      {/* ✅ Job Filters */}
       <div style={styles.filterContainer}>
-        <select onChange={(e) => setFilters({ ...filters, jobRole: e.target.value })}>
+        <select onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
           <option value="">Select Job Role</option>
-          <option value="Optometrist">Optometrist</option>
-          <option value="Optician">Optician</option>
-          <option value="Ophthalmologist">Ophthalmologist</option>
+          <option value="optometrist">Optometrist</option>
+          <option value="optician">Optician</option>
+          <option value="ophthalmologist">Ophthalmologist</option>
+          <option value="tech">Tech / Assistant</option>
+          <option value="manager">Manager</option>
+          <option value="front_desk">Front Desk</option>
         </select>
 
-        <select onChange={(e) => setFilters({ ...filters, hours: e.target.value })}>
-          <option value="">Select Hours</option>
-          <option value="full-time">Full-Time</option>
-          <option value="part-time">Part-Time</option>
-          <option value="per diem">Per Diem</option>
-        </select>
+        <input
+          type="number"
+          min="0"
+          placeholder="Minimum hours/week"
+          value={filters.hours}
+          onChange={(e) => setFilters({ ...filters, hours: e.target.value })}
+        />
 
-        <select onChange={(e) => setFilters({ ...filters, practiceMode: e.target.value })}>
-          <option value="">Select Practice Mode</option>
-          <option value="employed">Employed</option>
+        <select onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
+          <option value="">Select Type</option>
+          <option value="full_time">Full-time</option>
+          <option value="part_time">Part-time</option>
           <option value="contract">Contract</option>
-          <option value="lease">Lease</option>
-          <option value="associate">Associate</option>
+          <option value="temp">Temporary</option>
+          <option value="internship">Internship</option>
         </select>
 
-        <select onChange={(e) => setFilters({ ...filters, corporation: e.target.value })}>
-          <option value="">Select Corporation</option>
-          <option value="Luxottica">Luxottica</option>
-          <option value="Walmart">Walmart</option>
-        </select>
+        <input
+          placeholder="Company"
+          value={filters.company}
+          onChange={(e) => setFilters({ ...filters, company: e.target.value })}
+        />
 
-        <button onClick={fetchJobs} style={styles.button}>Search</button>
+        <button onClick={fetchJobs} style={styles.button}>Refresh</button>
       </div>
 
-      {/* ✅ Show Loading State */}
       {loading && <p>Loading jobs...</p>}
-
-      {/* ✅ Show Error Message */}
       {error && <p style={styles.error}>{error}</p>}
 
-      {/* ✅ Display Jobs */}
       <div>
-        {jobs.length === 0 && !loading ? <p>No jobs found.</p> : (
-          jobs.map((job) => (
-            <div key={job._id} style={styles.jobCard}>
-              <h3>{job.title} at {job.company}</h3>
+        {filteredJobs.length === 0 && !loading ? <p>No jobs found.</p> : (
+          filteredJobs.map((job) => (
+            <div key={job.id} style={styles.jobCard}>
+              <h3>{job.title} at {job.company || "Unknown employer"}</h3>
+              {job.location && <p><strong>Location:</strong> {job.location}</p>}
               <p><strong>Description:</strong> {job.description}</p>
-              <p><strong>Hours:</strong> {job.hours}</p>
-              <p><strong>Job Role:</strong> {job.jobRole}</p>
-              <p><strong>Practice Mode:</strong> {job.practiceMode}</p>
+              <p><strong>Hours:</strong> {job.hours || "Not listed"}</p>
+              <p><strong>Role:</strong> {job.role || "Not listed"}</p>
+              <p><strong>Type:</strong> {job.type || "Not listed"}</p>
 
-              {/* ✅ Save & Share Job Buttons */}
               <button style={styles.saveButton} onClick={() => handleSaveJob(job)}>Save Job</button>
               <button style={styles.shareButton} onClick={() => handleShareJob(job)}>Share Job</button>
             </div>
@@ -144,7 +147,6 @@ const SearchJobs = () => {
   );
 };
 
-// ✅ Inline Styles
 const styles = {
   container: {
     width: "80%",
@@ -156,6 +158,7 @@ const styles = {
     gap: "10px",
     justifyContent: "center",
     marginBottom: "15px",
+    flexWrap: "wrap",
   },
   button: {
     padding: "10px",

@@ -1,24 +1,82 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
-import { updateUserProfile } from "../../utils/api";
+import { fetchUserProfile, updateUserProfile } from "../../utils/api";
 import { login } from "../../store/authSlice";
 
 const CandidateProfile = () => {
-  const user = useSelector((state) => state.auth.user);
+  const { user, token, userRole } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: user?.profile?.firstName || "",
-    lastName: user?.profile?.lastName || "",
+    firstName: user?.profile?.firstName || user?.firstName || "",
+    lastName: user?.profile?.lastName || user?.lastName || "",
     email: user?.email || "",
   });
 
   const [errors, setErrors] = useState({});
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const loadedUserIdRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      if (!user) {
+        setLoadingProfile(false);
+        return;
+      }
+      if (loadedUserIdRef.current === user.id) {
+        setLoadingProfile(false);
+        return;
+      }
+      loadedUserIdRef.current = user.id;
+
+      try {
+        const res = await fetchUserProfile();
+        if (!mounted) return;
+
+        const profile = res.profile || {};
+        setFormData({
+          firstName: profile.firstName || user?.firstName || "",
+          lastName: profile.lastName || user?.lastName || "",
+          email: res.email || user?.email || "",
+        });
+
+        dispatch(
+          login({
+            token,
+            userRole: userRole || res.userRole || res.role || user?.userRole,
+            user: {
+              ...user,
+              email: res.email || user.email,
+              userRole: res.userRole || res.role || user.userRole,
+              profile,
+              firstName: profile.firstName || user.firstName,
+              lastName: profile.lastName || user.lastName,
+            },
+          })
+        );
+      } catch (err) {
+        console.error("Error loading profile:", err);
+      } finally {
+        if (mounted) setLoadingProfile(false);
+      }
+    }
+
+    loadProfile();
+    return () => {
+      mounted = false;
+    };
+  }, [dispatch, token, user, userRole]);
 
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  if (loadingProfile) {
+    return <p>Loading profile...</p>;
   }
 
   const handleChange = (e) => {
@@ -49,10 +107,13 @@ const CandidateProfile = () => {
 
       dispatch(
         login({
-          ...user,
+          token,
+          userRole: userRole || user?.userRole,
           user: {
             ...user,
             profile: res.profile,
+            firstName: res.profile?.firstName || user?.firstName,
+            lastName: res.profile?.lastName || user?.lastName,
           },
         })
       );
@@ -107,8 +168,8 @@ const CandidateProfile = () => {
         </div>
       ) : (
         <div>
-          <p><strong>First Name:</strong> {user.profile?.firstName || "N/A"}</p>
-          <p><strong>Last Name:</strong> {user.profile?.lastName || "N/A"}</p>
+          <p><strong>First Name:</strong> {formData.firstName || "N/A"}</p>
+          <p><strong>Last Name:</strong> {formData.lastName || "N/A"}</p>
           <p><strong>Email:</strong> {user.email}</p>
           <button onClick={() => setIsEditing(true)}>Edit Profile</button>
         </div>

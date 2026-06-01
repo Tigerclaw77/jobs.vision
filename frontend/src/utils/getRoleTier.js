@@ -1,38 +1,36 @@
 // src/utils/getRoleTier.js
-import { supabase } from "./supabaseClient";
+import { getNeonSession, getNeonUser } from "./neonAuthClient";
 
-/**
- * Try metadata first, then profiles by id, then by email.
- * Do NOT silently default to "candidate" if we can't read yet.
- */
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
 export async function getRoleTier() {
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user || null;
+  const { user } = await getNeonUser();
   if (!user) return { role: null, tier: null, user };
 
-  let role = user.user_metadata?.role || null;
-  let tier = user.user_metadata?.tier || null;
+  const metadata = {
+    ...(user.app_metadata || {}),
+    ...(user.user_metadata || {}),
+  };
+  let role = metadata.role || metadata.accountRole || metadata.userRole || null;
+  let tier = metadata.tier || null;
 
-  // profiles by id (preferred)
-  if (!role) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (!error && data?.role) role = data.role;
+  const { session } = await getNeonSession();
+  const token = session?.access_token;
+
+  if (token) {
+    try {
+      const res = await fetch(`${apiBaseUrl()}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok) {
+        role = data?.profile?.role || data?.role || role;
+      }
+    } catch {}
   }
 
-  // fallback: profiles by email if id select didn’t return
-  if (!role) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("email", user.email)
-      .single();
-    if (!error && data?.role) role = data.role;
-  }
-
-  // DON'T force "candidate" here; let caller decide
   return { role, tier: tier || null, user };
 }

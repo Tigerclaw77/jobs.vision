@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
-// import HCaptcha from '@hcaptcha/react-hcaptcha';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 
-const API_BASE = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/$/, '');
-// const SITE_KEY = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_HCAPTCHA_SITE_KEY) ||
-//   process.env.REACT_APP_HCAPTCHA_SITE_KEY || '10000000-ffff-ffff-ffff-000000000001';
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/+$/, '');
+  return raw.endsWith('/api') ? raw : `${raw}/api`;
+}
+const SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY || '';
 
 export default function ManualOverride() {
   const [form, setForm] = useState({
@@ -17,7 +19,7 @@ export default function ManualOverride() {
   });
   const [proofUrls, setProofUrls] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [captchaToken, setCaptchaToken] = useState('dev-bypass');
+  const [captchaToken, setCaptchaToken] = useState('');
   const [captchaError, setCaptchaError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
@@ -41,12 +43,15 @@ export default function ManualOverride() {
     setResult(null);
     setCaptchaError('');
 
-    // if (!captchaToken) {
-    //   // Kick the widget to prompt the user
-    //   captchaRef.current?.execute?.();
-    //   setCaptchaError('Please complete the captcha.');
-    //   return;
-    // }
+    if (!SITE_KEY) {
+      setCaptchaError('hCaptcha is not configured.');
+      return;
+    }
+
+    if (!captchaToken) {
+      setCaptchaError('Please complete the captcha.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -62,7 +67,7 @@ export default function ManualOverride() {
       fd.append('hcaptchaToken', captchaToken);
       attachments.forEach((f) => fd.append('attachments', f, f.name));
 
-      const res = await fetch(`${API_BASE}/api/manual-overrides`, { method: 'POST', body: fd });
+      const res = await fetch(`${apiBaseUrl()}/manual-overrides`, { method: 'POST', body: fd });
       const data = await res.json();
 
       if (!res.ok) {
@@ -188,7 +193,7 @@ export default function ManualOverride() {
               <input type="file" onChange={onFiles} accept=".pdf,image/*" multiple />
             </div>
 
-            {/* <div className="row">
+            <div className="row">
               <HCaptcha
                 sitekey={SITE_KEY}
                 ref={captchaRef}
@@ -204,7 +209,7 @@ export default function ManualOverride() {
                   {captchaError}
                 </div>
               )}
-            </div> */}
+            </div>
 
             <div className="row">
               <button type="submit" disabled={submitting}>

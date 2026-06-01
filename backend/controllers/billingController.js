@@ -1,19 +1,16 @@
 // backend/controllers/billingController.js
-const { supa } = require("../services/supaClient.js");
+const { query } = require("../services/db.js");
 
 /**
  * Bill jobs monthly (placeholder implementation).
- * For now it summarizes active jobs per recruiter using Supabase,
+ * For now it summarizes active jobs per recruiter using Postgres,
  * so the cron can run without Mongo models.
  */
 async function billJobsMonthly(req, res) {
   try {
     // Pull all jobs (min fields) and summarize in JS
-    const { data: jobs, error } = await supa
-      .from("jobs")
-      .select("id,recruiter_id,is_archived");
-
-    if (error) throw error;
+    const result = await query("select id, recruiter_id, is_archived from public.jobs");
+    const jobs = result.rows;
 
     const byRecruiter = {};
     let activeCount = 0;

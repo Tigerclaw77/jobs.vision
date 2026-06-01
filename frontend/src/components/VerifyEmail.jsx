@@ -3,14 +3,37 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Container, Paper, Typography, Button, CircularProgress } from "@mui/material";
 import { useDispatch } from "react-redux";
-import { supabase } from "../utils/supabaseClient";
-import api from "../utils/api";
+import {
+  getNeonSession,
+  neonAuth,
+  normalizeSessionResult,
+  verifyNeonEmailToken,
+} from "../utils/neonAuthClient";
 import { login as loginRedux } from "../store/authSlice";
+
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
 
 function redirectForRole(role) {
   if (role === "admin") return "/admin";
   if (role === "recruiter") return "/recruiter/dashboard";
   return "/candidate/dashboard";
+}
+
+async function fetchMe(accessToken) {
+  const res = await fetch(`${apiBaseUrl()}/auth/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error("Profile lookup failed");
+  return res.json();
+}
+
+function getParam(name) {
+  const search = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+  return search.get(name) || hash.get(name);
 }
 
 export default function VerifyEmail() {
@@ -21,66 +44,95 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      const url = new URL(window.location.href);
-      const code = url.searchParams.get("code");
 
-      if (!code) {
-        // If already signed in, just hydrate and go
-        const { data: sessionData } = await supabase.auth.getSession();
-        if (sessionData?.session?.user) {
-          try {
-            const me = await api.get("/auth/me");
-            if (!mounted) return;
-            dispatch(loginRedux({ userRole: me.data.role, user: me.data, token: null }));
-            navigate(redirectForRole(me.data.role), { replace: true });
-            return;
-          } catch {
-            // fall through to “nocode”
-          }
+    async function hydrateAndRedirect(session, fallbackMessage) {
+      if (!session?.access_token) {
+        if (!mounted) return;
+        setPhase("success");
+        setMessage(fallbackMessage || "Email verified. You can log in now.");
+        return;
+      }
+
+      const me = await fetchMe(session.access_token);
+      if (!mounted) return;
+
+      dispatch(
+        loginRedux({
+          userRole: me.role,
+          user: me,
+          token: session.access_token,
+        })
+      );
+      setPhase("success");
+      setMessage("Email verified! Redirecting...");
+      setTimeout(() => {
+        navigate(redirectForRole(me.role), { replace: true });
+      }, 600);
+    }
+
+    (async () => {
+      const errorDescription =
+        getParam("error_description") || getParam("error") || getParam("message");
+      if (errorDescription) {
+        if (!mounted) return;
+        setPhase("error");
+        setMessage(errorDescription);
+        return;
+      }
+
+      const verificationToken =
+        getParam("token") || getParam("token_hash") || getParam("verification_token");
+      const code = getParam("code");
+
+      try {
+        if (verificationToken) {
+          const { session, error } = await verifyNeonEmailToken(
+            verificationToken,
+            `${window.location.origin}/login`
+          );
+          if (error) throw error;
+          await hydrateAndRedirect(session, "Email verified. You can log in now.");
+          return;
         }
+
+        if (code) {
+          const result = await neonAuth.exchangeCodeForSession(window.location.href);
+          const session = normalizeSessionResult(result);
+          if (result?.error) throw result.error;
+          await hydrateAndRedirect(session, "Email verified. You can log in now.");
+          return;
+        }
+
+        const { session } = await getNeonSession({ forceFetch: true });
+        if (session?.user) {
+          await hydrateAndRedirect(session);
+          return;
+        }
+
         if (!mounted) return;
         setPhase("nocode");
         setMessage("This page expects a verification link. Please check your email or log in.");
-        return;
-      }
-
-      // Exchange code -> session
-      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-      if (error) {
+      } catch (err) {
         if (!mounted) return;
         setPhase("error");
         setMessage(
-          error.message ||
+          err?.message ||
             "This verification link is invalid or has expired. If you've already confirmed, try logging in."
         );
-        return;
-      }
-
-      // Hydrate from backend
-      try {
-        const me = await api.get("/auth/me");
-        if (!mounted) return;
-        dispatch(loginRedux({ userRole: me.data.role, user: me.data, token: null }));
-        setPhase("success");
-        setMessage("Email verified! Redirecting…");
-        setTimeout(() => {
-          navigate(redirectForRole(me.data.role), { replace: true });
-        }, 600);
-      } catch (e) {
-        if (!mounted) return;
-        setPhase("error");
-        setMessage("Verification succeeded, but we couldn't fetch your profile. Please try logging in.");
       }
     })();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [dispatch, navigate]);
 
   return (
     <Container maxWidth="sm">
       <Paper elevation={5} className="glass-form" style={{ textAlign: "center" }}>
-        <Typography variant="h4" gutterBottom>Email Verification</Typography>
+        <Typography variant="h4" gutterBottom>
+          Email Verification
+        </Typography>
 
         {phase === "loading" && (
           <Typography sx={{ my: 2 }}>

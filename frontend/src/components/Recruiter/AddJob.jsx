@@ -574,6 +574,6 @@
 import React from "react";
 import JobForm from "../JobForm"; // adjust path if needed
 
-export default function AddJobPage() {
-  return <JobForm />;
+export default function AddJobPage(props) {
+  return <JobForm {...props} />;
 }

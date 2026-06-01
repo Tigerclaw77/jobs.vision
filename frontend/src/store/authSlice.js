@@ -1,31 +1,35 @@
 // frontend/src/store/authSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { supabase } from "../utils/supabaseClient";
+import { getNeonSession, getNeonUser } from "../utils/neonAuthClient";
 import { fetchUserJobData } from "./jobSlice";
 
 // -------- helpers --------
-async function getRoleTier(userId, metaRole) {
-  // admin wins if set in app/user metadata
+function apiBaseUrl() {
+  const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
+  return raw.endsWith("/api") ? raw : `${raw}/api`;
+}
+
+async function getRoleTier(_userId, metaRole, token, metaTier) {
   if (metaRole === "admin") return { role: "admin", tier: "premium" };
 
-  // recruiter entitlements
-  const { data: rec } = await supabase
-    .from("recruiter_entitlements")
-    .select("plan,status")
-    .eq("profile_id", userId)
-    .maybeSingle();
-  if (rec?.status === "active") return { role: "recruiter", tier: rec.plan || "staff" };
+  try {
+    const res = await fetch(`${apiBaseUrl()}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok) {
+      const role = data?.profile?.role || data?.role || metaRole || "candidate";
+      return {
+        role,
+        tier: metaTier || (role === "recruiter" ? "staff" : "free"),
+      };
+    }
+  } catch {}
 
-  // candidate entitlements
-  const { data: can } = await supabase
-    .from("candidate_entitlements")
-    .select("plan,status")
-    .eq("profile_id", userId)
-    .maybeSingle();
-  if (can?.status === "active") return { role: "candidate", tier: can.plan || "free" };
-
-  // fallback
-  return { role: metaRole || "candidate", tier: "free" };
+  return {
+    role: metaRole || "candidate",
+    tier: metaTier || (metaRole === "recruiter" ? "staff" : "free"),
+  };
 }
 
 function safeGet(key) {
@@ -55,18 +59,31 @@ const initialState = {
 };
 
 /**
- * ✅ Thunk: read Supabase session/user on app boot or refresh
+ * Thunk: read Neon Auth session/user on app boot or refresh
  */
 export const fetchUserSession = createAsyncThunk(
   "auth/fetchUserSession",
   async (_, thunkAPI) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { session } = await getNeonSession();
+      const { user } = await getNeonUser();
       if (!session || !user) return thunkAPI.rejectWithValue("No active session");
 
-      const metaRole = user?.app_metadata?.role || user?.user_metadata?.role || null;
-      const { role, tier } = await getRoleTier(user.id, metaRole);
+      const metaRole =
+        user?.app_metadata?.role ||
+        user?.app_metadata?.accountRole ||
+        user?.app_metadata?.userRole ||
+        user?.user_metadata?.role ||
+        user?.user_metadata?.accountRole ||
+        user?.user_metadata?.userRole ||
+        null;
+      const metaTier = user?.app_metadata?.tier || user?.user_metadata?.tier || null;
+      const { role, tier } = await getRoleTier(
+        user.id,
+        metaRole,
+        session.access_token,
+        metaTier
+      );
 
       const shapedUser = {
         id: user.id,
@@ -98,7 +115,7 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    // Called by your login screen after supabase signInWithPassword()
+    // Called by your login screen after Neon Auth signInWithPassword()
     login(state, action) {
       const { token, userRole, user } = action.payload;
       state.token = token;

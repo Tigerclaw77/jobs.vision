@@ -1,5 +1,7 @@
 // backend/middleware/auth.js (CommonJS)
-const { supa } = require("../services/supaClient.js");
+const { one } = require("../services/db.js");
+const { verifyNeonAuthToken } = require("../services/neonAuthVerifier.js");
+const { ensureProfileForAuthUser } = require("../services/profileBootstrap.js");
 
 // --- tiny role cache to cut down DB lookups ---
 const ROLE_CACHE_TTL_MS = 60 * 1000; // 1 minute
@@ -20,37 +22,33 @@ function setCachedRole(userId, role) {
 }
 
 async function fetchRoleFromProfiles(userId) {
-  const { data, error } = await supa
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-
-  if (error) return null;
-  return data?.role || null;
+  const row = await one("select role from public.profiles where id = $1", [userId]);
+  return row?.role || null;
 }
 
 async function ensureUserRole(req) {
   if (!req.user?.id) return;
 
-  // 1) If the JWT already had a role (custom claims), trust it
-  if (req.user.role) {
-    setCachedRole(req.user.id, req.user.role);
+  if (req.profile?.role) {
+    req.user.role = req.profile.role;
+    setCachedRole(req.user.id, req.profile.role);
     return;
   }
 
-  // 2) Try cache
+  // 1) Try cache
   const cached = getCachedRole(req.user.id);
   if (cached) {
     req.user.role = cached;
     return;
   }
 
-  // 3) Fallback to DB
+  // 2) Prefer the canonical profile role. Fall back only to app_metadata.
   const role = await fetchRoleFromProfiles(req.user.id);
   if (role) {
     req.user.role = role;
     setCachedRole(req.user.id, role);
+  } else if (req.user.role) {
+    setCachedRole(req.user.id, req.user.role);
   }
 }
 
@@ -67,26 +65,19 @@ async function requireAuth(req, res, next) {
     const token = getBearerToken(req);
     if (!token) return res.status(401).json({ error: "Missing bearer token" });
 
-    const { data, error } = await supa.auth.getUser(token);
-    if (error || !data?.user) return res.status(401).json({ error: "Invalid token" });
-
-    // Some SDKs put email on user, but guard anyway
-    const email =
-      data.user.email ||
-      data.user.user_metadata?.email ||
-      data.user.identities?.[0]?.identity_data?.email ||
-      null;
+    const user = await verifyNeonAuthToken(token);
 
     // basic identity
     req.user = {
-      id: data.user.id,
-      email,
-      // some JWTs may carry custom claims (e.g., app_metadata / role)
-      role:
-        data.user.app_metadata?.role ||
-        data.user.user_metadata?.role ||
-        undefined,
+      id: user.id,
+      email: user.email,
+      role: user.role || undefined,
+      claims: user.claims || {},
     };
+
+    const profile = await ensureProfileForAuthUser(req.user);
+    req.profile = profile;
+    res.locals.profile = profile;
 
     // ensure role present (via cache/DB)
     await ensureUserRole(req);
@@ -102,26 +93,18 @@ async function requireAuth(req, res, next) {
 }
 
 // Optional: allow anonymous, but attach req.user if token present
-async function maybeAuth(req, _res, next) {
+async function maybeAuth(req, res, next) {
   try {
     const token = getBearerToken(req);
 
     if (token) {
-      const { data } = await supa.auth.getUser(token);
-      if (data?.user) {
-        const email =
-          data.user.email ||
-          data.user.user_metadata?.email ||
-          data.user.identities?.[0]?.identity_data?.email ||
-          null;
-
+      const user = await verifyNeonAuthToken(token);
+      if (user?.id) {
         req.user = {
-          id: data.user.id,
-          email,
-          role:
-            data.user.app_metadata?.role ||
-            data.user.user_metadata?.role ||
-            undefined,
+          id: user.id,
+          email: user.email,
+          role: user.role || undefined,
+          claims: user.claims || {},
         };
         await ensureUserRole(req);
         res.locals.user = req.user;
@@ -134,4 +117,28 @@ async function maybeAuth(req, _res, next) {
   }
 }
 
-module.exports = { requireAuth, maybeAuth };
+function requireRole(allowedRoles = []) {
+  const allowed = new Set(allowedRoles.map((role) => String(role).toLowerCase()));
+
+  return async function requireRoleMiddleware(req, res, next) {
+    try {
+      if (!req.user?.id) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      await ensureUserRole(req);
+      const role = String(req.user.role || "").toLowerCase();
+
+      if (!role || !allowed.has(role)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      return next();
+    } catch (e) {
+      console.error("Role check error:", e);
+      return res.status(500).json({ error: "Authorization failed" });
+    }
+  };
+}
+
+module.exports = { requireAuth, maybeAuth, requireRole };
