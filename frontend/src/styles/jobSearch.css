@@ -31,19 +31,18 @@
    FILTER PANEL
    ========================= */
 .filters-panel{
-  height: var(--top-panel-height);
-  min-height:280px;
+  min-height: var(--top-panel-height);
+  height:auto;
   padding:12px;
   border:1px solid var(--stroke);
   border-radius:12px;
   background: var(--glass);
   backdrop-filter: blur(8px) saturate(110%);
   -webkit-backdrop-filter: blur(8px) saturate(110%);
-  overflow:auto;
-  contain: paint;
+  overflow:visible;
 }
 .filters-panel > .job-filter{
-  height:100%;
+  min-height:100%;
   display:flex;
   flex-direction:column;
   box-sizing:border-box;
@@ -68,7 +67,7 @@
   border:0;
   display:flex;
   flex-direction:column;
-  gap:8px;
+  gap:10px;
 }
 .field-checks legend{
   margin:0;
@@ -96,20 +95,22 @@
 .filter-check-group{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
+  gap:10px 12px;
+  align-items:center;
 }
 .filter-check{
   display:inline-flex;
   align-items:center;
   gap:7px;
-  min-height:34px;
-  padding:7px 10px;
+  min-height:36px;
+  padding:8px 12px;
   border:1px solid var(--stroke);
   border-radius:10px;
   background:rgba(255,255,255,.06);
   color:var(--text);
   cursor:pointer;
   user-select:none;
+  flex:0 0 auto;
 }
 .filter-check,
 .filter-check span,
@@ -126,6 +127,7 @@
 .filter-check span{
   font-size:.9rem;
   line-height:1.1;
+  white-space:nowrap;
 }
 .advanced-filter-shell{
   min-width:0;
@@ -169,14 +171,26 @@
    MAP + CARDS
    ========================= */
 .map-card{
-  height: var(--map-panel-height);
+  min-height: var(--map-panel-height);
+  height:100%;
   border-radius:12px;
   overflow:hidden;
   border:1px solid var(--stroke);
   background: var(--glass-strong);
 }
-.map-card .job-map-inner{ width:100%; height:100%; position:relative; }
-.map-canvas-layer{ width:100%; height:100%; }
+.map-card .job-map-inner{
+  width:100%;
+  min-height:var(--map-panel-height);
+  height:100%;
+  position:relative;
+  overflow:hidden;
+}
+.map-canvas-layer{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
 .job-map-inner.map-locked .map-canvas-layer{
   pointer-events:none;
   user-select:none;
@@ -299,7 +313,11 @@
 @media (max-width:1100px){
   .jobs-top{ grid-template-columns:1fr; }
   .filters-panel{ height:auto; }
-  .map-card{ height:clamp(260px, 56vw, 340px); }
+  .map-card{
+    min-height:0;
+    height:clamp(260px, 56vw, 340px);
+  }
+  .map-card .job-map-inner{ min-height:100%; }
 }
 @media (max-width:720px){
   .jobs-page{
@@ -319,6 +337,7 @@
   }
   .job-cards{ grid-template-columns:1fr; }
   .map-card{ height:clamp(240px, 72vw, 320px); }
+  .map-card .job-map-inner{ min-height:100%; }
   .map-paywall-content{ padding:14px; }
   .map-paywall-actions{ gap:8px; }
   .map-paywall-actions button,
@@ -424,8 +443,8 @@
 
 /* make legacy .job-filter a simple content container */
 .jobsearch-scope .filters-panel > .job-filter{
-  width:100%!important; height:100%!important; margin:0!important; padding:12px!important;
-  background:transparent!important; border:0!important; border-radius:0!important; min-height:auto!important;
+  width:100%!important; min-height:100%!important; height:auto!important; margin:0!important; padding:12px!important;
+  background:transparent!important; border:0!important; border-radius:0!important;
 }
 
 /* >>> FLUID GRID: never clips inside the panel */
@@ -461,9 +480,9 @@
 .jobsearch-scope .field-location{ grid-column: 1 / 2; }
 .jobsearch-scope .field-radius  { grid-column: 2 / 3; }
 .jobsearch-scope .field-role    { grid-column: 1 / 2; }
-.jobsearch-scope .field-checks  { grid-column: 2 / 3; }
+.jobsearch-scope .filter-grid > .field-checks  { grid-column: 1 / -1; }
 .jobsearch-scope .advanced-filter-shell{ grid-column: 1 / -1; }
-.jobsearch-scope .reset-cell    { grid-column: 2 / 3; justify-self:end; align-self:start; }
+.jobsearch-scope .reset-cell    { grid-column: 1 / -1; justify-self:end; align-self:start; }
 
 /* inputs never overflow their tracks */
 .jobsearch-scope .field input,

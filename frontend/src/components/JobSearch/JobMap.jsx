@@ -47,6 +47,7 @@ const JobMap = ({
   const markers = useRef([]);
   const geoCache = useRef(new Map());
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   // stable callback to avoid re-running marker effect
   const clickCbRef = useRef(onMarkerClick);
@@ -55,32 +56,77 @@ const JobMap = ({
   // load script once
   useEffect(() => {
     if (!showMap) return;
-    if (window.google?.maps) { setReady(true); return; }
+    if (window.google?.maps) { setLoadError(""); setReady(true); return; }
+    if (!apiKey) {
+      setLoadError("Google Maps API key is not configured.");
+      setReady(false);
+      return;
+    }
+
     const id = "googleMaps";
     const existing = document.getElementById(id);
     if (existing) {
-      existing.addEventListener("load", () => setReady(true), { once: true });
+      existing.addEventListener("load", () => {
+        if (window.google?.maps) {
+          setLoadError("");
+          setReady(true);
+        } else {
+          setLoadError("Google Maps script loaded without Maps support.");
+        }
+      }, { once: true });
+      existing.addEventListener("error", () => {
+        setLoadError("Google Maps script failed to load.");
+      }, { once: true });
       return;
     }
+
+    const previousAuthFailure = window.gm_authFailure;
+    const authFailureHandler = () => {
+      setLoadError("Google Maps authentication failed.");
+      if (typeof previousAuthFailure === "function") previousAuthFailure();
+    };
+    window.gm_authFailure = authFailureHandler;
+
     const s = document.createElement("script");
     s.id = id; s.async = true; s.defer = true;
     s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-    s.onload = () => setReady(true);
+    s.onload = () => {
+      if (window.google?.maps) {
+        setLoadError("");
+        setReady(true);
+      } else {
+        setLoadError("Google Maps script loaded without Maps support.");
+      }
+    };
+    s.onerror = () => {
+      setLoadError("Google Maps script failed to load.");
+    };
     document.body.appendChild(s);
+
+    return () => {
+      if (window.gm_authFailure === authFailureHandler) {
+        window.gm_authFailure = previousAuthFailure;
+      }
+    };
   }, [apiKey, showMap]);
 
   // init map + geocoder
   useEffect(() => {
     if (!ready || !showMap || !mapEl.current || map.current) return;
-    map.current = new window.google.maps.Map(mapEl.current, {
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: true,
-      gestureHandling: "greedy",
-    });
-    geocoder.current = new window.google.maps.Geocoder();
+    try {
+      map.current = new window.google.maps.Map(mapEl.current, {
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+        gestureHandling: "greedy",
+      });
+      geocoder.current = new window.google.maps.Geocoder();
+      setLoadError("");
+    } catch (error) {
+      setLoadError(error?.message || "Google Maps failed to initialize.");
+    }
   }, [ready, showMap]);
 
   // add markers (ONLY when jobs change or map becomes ready)
@@ -156,6 +202,7 @@ const JobMap = ({
   return (
     <div
       ref={mapEl}
+      data-map-error={loadError || undefined}
       style={{ display: showMap ? "block" : "none", width: "100%", height: "100%" }}
     />
   );
