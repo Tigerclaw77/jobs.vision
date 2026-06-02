@@ -36,6 +36,15 @@ const app = express();
 app.use(helmet());
 console.log("BOOT database configured:", Boolean(process.env.DATABASE_URL));
 
+function apiPaths(path) {
+  if (path === "/api") {
+    return ["/api", "/"];
+  }
+
+  const strippedPath = path.replace(/^\/api(?=\/)/, "");
+  return strippedPath === path ? [path] : [path, strippedPath];
+}
+
 // =======================
 // Stripe Webhook
 // =======================
@@ -100,7 +109,7 @@ async function syncSubscriptionEntitlement(subscription, fallbackMetadata = {}) 
 // Only mount webhook if Stripe is configured
 if (stripe) {
   app.post(
-    "/api/stripe/webhook",
+    apiPaths("/api/stripe/webhook"),
     bodyParser.raw({ type: "application/json" }),
     async (req, res) => {
       const sig = req.headers["stripe-signature"];
@@ -370,9 +379,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const stripeRoutes = require("./routes/stripe");
-app.use("/api/stripe", stripeRoutes);
+app.use(apiPaths("/api/stripe"), stripeRoutes);
 
-app.get("/api/health", (_req, res) => {
+app.get(apiPaths("/api/health"), (_req, res) => {
   res.json({
     ok: true,
     service: "jobs.vision-api",
@@ -385,34 +394,34 @@ app.get("/api/health", (_req, res) => {
 // Routes
 // =======================
 const userRoutes = require("./routes/users");
-app.use("/api/users", userRoutes);
+app.use(apiPaths("/api/users"), userRoutes);
 
 const authRoutes = require("./routes/auth");
-app.use("/api/auth", authRoutes);
+app.use(apiPaths("/api/auth"), authRoutes);
 
 const profileRoutes = require("./routes/profile");
-app.use("/api/profile", profileRoutes);
+app.use(apiPaths("/api/profile"), profileRoutes);
 
 const jobRoutes = require("./routes/jobs");
-app.use("/api/jobs", jobRoutes);
+app.use(apiPaths("/api/jobs"), jobRoutes);
 
 const favoritesRoutes = require("./routes/favorites");
-app.use("/api/favorites", favoritesRoutes);
+app.use(apiPaths("/api/favorites"), favoritesRoutes);
 
 const applicationsRoutes = require("./routes/applications");
-app.use("/api/applications", applicationsRoutes);
+app.use(apiPaths("/api/applications"), applicationsRoutes);
 
 const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
+app.use(apiPaths('/api/admin'), adminRoutes);
 
 const notificationsRoutes = require('./routes/notifications');
-app.use('/api/notifications', notificationsRoutes);
+app.use(apiPaths('/api/notifications'), notificationsRoutes);
 
 const recruiterDomainsRouter = require("./routes/recruiterDomains");
-app.use("/api", recruiterDomainsRouter);
+app.use(apiPaths("/api"), recruiterDomainsRouter);
 
 const manualOverrides = require('./routes/manualOverrides.js');
-app.use('/api/manual-overrides', manualOverrides);
+app.use(apiPaths('/api/manual-overrides'), manualOverrides);
 
 // Welcome
 app.get("/", (req, res) => {
