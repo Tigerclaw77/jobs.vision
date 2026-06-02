@@ -101,9 +101,17 @@ async function geocodeAddress(address, apiKey) {
 const TYPE_LABEL = {
   full_time: "Full-time",
   part_time: "Part-time",
-  contract: "Contract",
-  temp: "Temporary",
-  internship: "Internship",
+  remote: "Remote",
+};
+const OPPORTUNITY_TYPE_LABEL = {
+  associate_position: "Associate Position",
+  lease_opportunity: "Lease Opportunity",
+  ownership_track: "Ownership Track",
+};
+const PRACTICE_TYPE_LABEL = {
+  private_practice: "Private Practice",
+  corporate: "Corporate",
+  od_md: "OD/MD",
 };
 const titleCase = (s = "") =>
   String(s)
@@ -111,6 +119,14 @@ const titleCase = (s = "") =>
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
     .join(" ");
 const normalizeType = (value = "") => String(value).trim().toLowerCase().replace(/-/g, "_");
+const normalizeFilterArray = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value) return [];
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
 
 function hasUnlimitedCandidateSaves(user, userRole) {
   if (String(userRole || "").toLowerCase() === "admin") return true;
@@ -133,20 +149,50 @@ const DEFAULT_FILTERS = {
   lng: null,
   radiusMi: 25,
   role: "",
-  hours: "",
-  type: "",
+  employmentTypes: [],
+  opportunityTypes: [],
+  practiceTypes: [],
   company: "",
 };
+
+const ARRAY_FILTER_KEYS = new Set([
+  "employmentTypes",
+  "opportunityTypes",
+  "practiceTypes",
+]);
 
 function searchParamsForFilters(filters, sort, page) {
   const params = {};
   Object.entries(filters || {}).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      if (value.length) params[key] = value.join(",");
+      return;
+    }
     if (value === "" || value == null) return;
     params[key] = String(value);
   });
   params.sort = sort || "newest";
   params.page = String(page || 1);
   return params;
+}
+
+function filtersFromSearchParams(searchParams) {
+  const initial = Object.fromEntries([...searchParams.entries()]);
+  delete initial.page;
+  delete initial.sort;
+
+  const next = { ...DEFAULT_FILTERS };
+  Object.entries(initial).forEach(([key, value]) => {
+    if (ARRAY_FILTER_KEYS.has(key)) {
+      next[key] = normalizeFilterArray(value);
+    } else if (key === "type") {
+      next.employmentTypes = normalizeFilterArray(value);
+    } else if (key !== "hours") {
+      next[key] = value;
+    }
+  });
+
+  return next;
 }
 
 export default function JobList() {
@@ -203,10 +249,7 @@ export default function JobList() {
 
   // parse URL
   useEffect(() => {
-    const initial = Object.fromEntries([...searchParams.entries()]);
-    delete initial.page;
-    delete initial.sort;
-    setFilters({ ...DEFAULT_FILTERS, ...initial });
+    setFilters(filtersFromSearchParams(searchParams));
     setSort(searchParams.get("sort") || "newest");
   }, [searchParams]);
 
@@ -268,7 +311,10 @@ export default function JobList() {
     setFilters((prev) => {
       const next = { ...prev };
       if (!prev.role && result.role) next.role = result.role;
-      if (!prev.type && result.hours) next.type = normalizeType(result.hours);
+      if (!prev.employmentTypes?.length && result.hours) {
+        const parsedType = normalizeType(result.hours);
+        if (TYPE_LABEL[parsedType]) next.employmentTypes = [parsedType];
+      }
       if (!prev.company && result.company) next.company = result.company;
       if (!prev.location && result.location) next.location = result.location;
       // keep only leftovers in the search box
@@ -355,20 +401,31 @@ export default function JobList() {
     if (filters.role) {
       tags.push({ type: "role", value: filters.role, label: titleCase(filters.role) });
     }
-    if (filters.hours) {
+    normalizeFilterArray(filters.employmentTypes).forEach((value) => {
       tags.push({
-        type: "hours",
-        value: filters.hours,
-        label: `${filters.hours}+ hrs/wk`,
+        type: "employmentTypes",
+        value,
+        label: TYPE_LABEL[normalizeType(value)] || titleCase(value.replace(/_/g, " ")),
       });
-    }
-    if (filters.type) {
+    });
+    normalizeFilterArray(filters.opportunityTypes).forEach((value) => {
       tags.push({
-        type: "type",
-        value: filters.type,
-        label: TYPE_LABEL[normalizeType(filters.type)] || titleCase(filters.type),
+        type: "opportunityTypes",
+        value,
+        label:
+          OPPORTUNITY_TYPE_LABEL[normalizeType(value)] ||
+          titleCase(value.replace(/_/g, " ")),
       });
-    }
+    });
+    normalizeFilterArray(filters.practiceTypes).forEach((value) => {
+      tags.push({
+        type: "practiceTypes",
+        value,
+        label:
+          PRACTICE_TYPE_LABEL[normalizeType(value)] ||
+          titleCase(value.replace(/_/g, " ")),
+      });
+    });
     if (filters.location) {
       tags.push({
         type: "location",
@@ -383,13 +440,25 @@ export default function JobList() {
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const { q = "", role = "", hours = "", type = "", location = "", company = "", lat, lng, radiusMi = 25 } = filters;
+      const {
+        q = "",
+        role = "",
+        employmentTypes = [],
+        opportunityTypes = [],
+        practiceTypes = [],
+        location = "",
+        company = "",
+        lat,
+        lng,
+        radiusMi = 25,
+      } = filters;
       const center = finitePoint(lat, lng);
       const locationText = String(location || "").trim().toLowerCase();
       const locationRadiusActive = canUseMapSearch && Boolean(locationText && center);
       const qLower = q.trim().toLowerCase();
-      const minHours = Number(hours);
-      const hasMinHours = hours !== "" && Number.isFinite(minHours);
+      const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
+      const opportunitySet = new Set(normalizeFilterArray(opportunityTypes).map(normalizeType));
+      const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
 
       const next = (jobs || []).filter((job) => {
         const hay = [
@@ -397,8 +466,13 @@ export default function JobList() {
           job.company,
           job.description,
           job.role,
-          job.hours,
           job.type,
+          job.employment_type,
+          TYPE_LABEL[normalizeType(job.employment_type || job.type)],
+          job.opportunity_type,
+          OPPORTUNITY_TYPE_LABEL[normalizeType(job.opportunity_type)],
+          job.practice_type,
+          PRACTICE_TYPE_LABEL[normalizeType(job.practice_type)],
           job.location,
         ]
           .filter(Boolean)
@@ -407,9 +481,13 @@ export default function JobList() {
 
         const matchQ = !qLower || hay.includes(qLower);
         const matchRole = !role || (job.role || "").toLowerCase() === role.toLowerCase();
-        const jobHours = Number(job.hours);
-        const matchHours = !hasMinHours || (Number.isFinite(jobHours) && jobHours >= minHours);
-        const matchType = !type || normalizeType(job.type) === normalizeType(type);
+        const jobEmploymentType = normalizeType(job.employment_type || job.type);
+        const matchEmployment =
+          employmentSet.size === 0 || employmentSet.has(jobEmploymentType);
+        const matchOpportunity =
+          opportunitySet.size === 0 || opportunitySet.has(normalizeType(job.opportunity_type));
+        const matchPractice =
+          practiceSet.size === 0 || practiceSet.has(normalizeType(job.practice_type));
         const matchCompany =
           !company || (job.company || "").toLowerCase().includes(String(company).toLowerCase());
         const matchLocText =
@@ -425,7 +503,16 @@ export default function JobList() {
             : false;
         }
 
-        return matchQ && matchRole && matchHours && matchType && matchCompany && matchLocText && matchRadius;
+        return (
+          matchQ &&
+          matchRole &&
+          matchEmployment &&
+          matchOpportunity &&
+          matchPractice &&
+          matchCompany &&
+          matchLocText &&
+          matchRadius
+        );
       });
 
       setFilteredJobs(next);
@@ -443,8 +530,11 @@ const removeQuickTag = (tag) => {
   const next = { ...filters };
   if (tag.type === "company")  next.company  = "";
   if (tag.type === "role")     next.role     = "";
-  if (tag.type === "hours")    next.hours    = "";
-  if (tag.type === "type")     next.type     = "";
+  if (ARRAY_FILTER_KEYS.has(tag.type)) {
+    next[tag.type] = normalizeFilterArray(next[tag.type]).filter(
+      (value) => value !== tag.value
+    );
+  }
   if (tag.type === "location") {
     next.location = "";
     next.lat = null;

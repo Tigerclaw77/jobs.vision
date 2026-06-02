@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="jobs.vision">
+  <rect width="64" height="64" rx="12" fill="#071a2f"/>
+  <circle cx="29" cy="28" r="17" fill="none" stroke="#f8fbff" stroke-width="6"/>
+  <circle cx="29" cy="28" r="6" fill="#47d7b2"/>
+  <path d="M41 41l12 12" fill="none" stroke="#47d7b2" stroke-linecap="round" stroke-width="8"/>
+  <path d="M16 28c4-7 9-10 13-10s9 3 13 10c-4 7-9 10-13 10s-9-3-13-10Z" fill="none" stroke="#93c5fd" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"/>
+</svg>

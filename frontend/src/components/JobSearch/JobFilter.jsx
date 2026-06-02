@@ -1,12 +1,52 @@
 import React, { useState } from "react";
 import { Navigation } from "lucide-react";
 
+const EMPLOYMENT_TYPE_OPTIONS = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "remote", label: "Remote" },
+];
+
+const OPPORTUNITY_TYPE_OPTIONS = [
+  { value: "associate_position", label: "Associate Position" },
+  { value: "lease_opportunity", label: "Lease Opportunity" },
+  { value: "ownership_track", label: "Ownership Track" },
+];
+
+const PRACTICE_TYPE_OPTIONS = [
+  { value: "private_practice", label: "Private Practice" },
+  { value: "corporate", label: "Corporate" },
+  { value: "od_md", label: "OD/MD" },
+];
+
 const RADIUS_OPTIONS = [
   { value: 10, label: "10 mi" },
   { value: 25, label: "25 mi" },
   { value: 50, label: "50 mi" },
   { value: 100, label: "100 mi" },
 ];
+
+function FilterChecks({ legend, options, selected = [], onToggle }) {
+  const values = Array.isArray(selected) ? selected : [];
+
+  return (
+    <fieldset className="field field-checks">
+      <legend>{legend}</legend>
+      <div className="filter-check-group">
+        {options.map((option) => (
+          <label key={option.value} className="filter-check">
+            <input
+              type="checkbox"
+              checked={values.includes(option.value)}
+              onChange={() => onToggle(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 export default function JobFilter({
   filters,
@@ -17,11 +57,21 @@ export default function JobFilter({
   canUseMapSearch = true,
 }) {
   const [locLoading, setLocLoading] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const set = (patch) => onFilterChange({ ...filters, ...patch });
   const hasLocation =
     Boolean(String(filters.location || "").trim()) ||
     (Number.isFinite(Number(filters.lat)) && Number.isFinite(Number(filters.lng)));
   const canUseRadius = canUseMapSearch && hasLocation;
+
+  const toggleMulti = (key, value) => {
+    const current = Array.isArray(filters[key]) ? filters[key] : [];
+    set({
+      [key]: current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    });
+  };
 
   const useMyLocation = () => {
     if (!canUseMapSearch) {
@@ -137,30 +187,40 @@ export default function JobFilter({
           </select>
         </div>
 
-        <div className="field field-type">
-          <label>Type</label>
-          <select
-            value={filters.type || ""}
-            onChange={(e) => set({ type: e.target.value })}
-          >
-            <option value="">All types</option>
-            <option value="full_time">Full-time</option>
-            <option value="part_time">Part-time</option>
-            <option value="contract">Contract</option>
-            <option value="temp">Temporary</option>
-            <option value="internship">Internship</option>
-          </select>
-        </div>
+        <FilterChecks
+          legend="Employment Type"
+          options={EMPLOYMENT_TYPE_OPTIONS}
+          selected={filters.employmentTypes}
+          onToggle={(value) => toggleMulti("employmentTypes", value)}
+        />
 
-        <div className="field field-hours">
-          <label>Min hours/week</label>
-          <input
-            type="number"
-            min="0"
-            placeholder="Any"
-            value={filters.hours || ""}
-            onChange={(e) => set({ hours: e.target.value })}
-          />
+        <div className="advanced-filter-shell">
+          <button
+            className="advanced-toggle"
+            type="button"
+            aria-expanded={advancedOpen}
+            onClick={() => setAdvancedOpen((open) => !open)}
+          >
+            <span>Advanced OD Filters</span>
+            <span aria-hidden="true">{advancedOpen ? "−" : "+"}</span>
+          </button>
+
+          {advancedOpen && (
+            <div className="advanced-filter-content">
+              <FilterChecks
+                legend="Opportunity Type"
+                options={OPPORTUNITY_TYPE_OPTIONS}
+                selected={filters.opportunityTypes}
+                onToggle={(value) => toggleMulti("opportunityTypes", value)}
+              />
+              <FilterChecks
+                legend="Practice Type"
+                options={PRACTICE_TYPE_OPTIONS}
+                selected={filters.practiceTypes}
+                onToggle={(value) => toggleMulti("practiceTypes", value)}
+              />
+            </div>
+          )}
         </div>
 
         {/* Reset */}
