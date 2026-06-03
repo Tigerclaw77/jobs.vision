@@ -17,10 +17,13 @@ const DEFAULT_CENTER = { lat: 31.0, lng: -99.0 };
 const DEFAULT_ZOOM = 5;
 
 function getSearchCenter(center) {
-  const lat = Number(center?.lat);
-  const lng = Number(center?.lng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
+  const lat = center?.lat;
+  const lng = center?.lng;
+  if (lat == null || lng == null || lat === "" || lng === "") return null;
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+  if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return null;
+  return { lat: nLat, lng: nLng };
 }
 
 function zoomForRadius(radiusMi) {

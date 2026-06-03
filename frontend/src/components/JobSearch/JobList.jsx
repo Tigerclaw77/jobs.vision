@@ -37,6 +37,7 @@ function haversineMi(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 function finitePoint(lat, lng) {
+  if (lat == null || lng == null || lat === "" || lng === "") return null;
   const nLat = Number(lat);
   const nLng = Number(lng);
   if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return null;
