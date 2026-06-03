@@ -11,12 +11,13 @@ import "../styles/Header.css";
 
 const Header = () => {
   // 🔐 Single source of truth for auth
-  const { session, user, profile, role, signOut } = useAuth();
+  const { session, user, profile, role: authRole, signOut } = useAuth();
 
   // Keep using Redux for notifications (unchanged)
   const hasUnreadNotifications = useSelector(
     (state) => state.notifications.hasUnreadNotifications
   );
+  const authState = useSelector((state) => state.auth || {});
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ const Header = () => {
     setLoading(true);
     setShowLogoutModal(false);
 
-    // Sign out from Supabase and clear local app state
+    // Sign out and clear local app state
     try {
       await signOut(); // AuthProvider signOut()
     } finally {
@@ -98,12 +99,12 @@ const Header = () => {
       setDropdownOpen(false);
       setDrawerOpen(false);
       setLoading(false);
-      navigate("/login");
+      navigate("/");
     }
   };
 
   const getProfileLink = () => {
-    const r = (role || "").toLowerCase();
+    const r = (authRole || authState.userRole || authState.user?.userRole || "").toLowerCase();
     switch (r) {
       case "candidate":
         return "/candidate/profile";
@@ -119,22 +120,25 @@ const Header = () => {
   const displayName =
     profile?.firstName ||
     user?.user_metadata?.firstName ||
+    authState.user?.firstName ||
     profile?.email ||
     user?.email ||
+    authState.user?.email ||
     "User";
 
   const getInitials = () => {
     const first =
       profile?.firstName ||
       user?.user_metadata?.firstName ||
-      (profile?.email || user?.email || "").split("@")[0];
-    const last = profile?.lastName || user?.user_metadata?.lastName || "";
+      authState.user?.firstName ||
+      (profile?.email || user?.email || authState.user?.email || "").split("@")[0];
+    const last = profile?.lastName || user?.user_metadata?.lastName || authState.user?.lastName || "";
     const a = (first || "").trim().charAt(0);
     const b = (last || "").trim().charAt(0);
     return (a + b || (first || "U").slice(0, 2)).toUpperCase();
   };
 
-  const isAuthed = !!session;
+  const isAuthed = !!session || !!authState.isAuthenticated || !!authState.token || !!authState.user;
 
   return (
     <>
@@ -166,6 +170,15 @@ const Header = () => {
                       Welcome, <strong>{displayName}</strong>
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    className="header-signout-button"
+                    onClick={openLogoutModal}
+                    aria-label="Sign Out"
+                  >
+                    <FiLogOut />
+                    <span>Sign Out</span>
+                  </button>
 
                   {dropdownOpen && (
                     <div className="dropdown-menu">
@@ -192,7 +205,7 @@ const Header = () => {
                       )}
 
                       <button className="dropdown-item" onClick={openLogoutModal}>
-                        <FiLogOut /> Logout
+                        <FiLogOut /> Sign Out
                       </button>
                     </div>
                   )}
@@ -211,6 +224,7 @@ const Header = () => {
               <button
                 className="user-circle"
                 onClick={() => setDrawerOpen(!drawerOpen)}
+                aria-label="Open account menu"
               >
                 <span className="initials">{getInitials()}</span>
                 {hasUnreadNotifications && <span className="notification-dot" />}
@@ -249,7 +263,7 @@ const Header = () => {
                   )}
 
                   <button className="drawer-item" onClick={openLogoutModal}>
-                    <FiLogOut /> Logout
+                    <FiLogOut /> Sign Out
                   </button>
                 </div>
                 <div className="drawer-top-slice"></div>
@@ -285,8 +299,8 @@ const Header = () => {
               boxShadow: "0 4px 15px rgba(0,0,0,0.15)",
             }}
           >
-            <h3>Confirm Logout</h3>
-            <p>Are you sure you want to log out?</p>
+            <h3>Confirm Sign Out</h3>
+            <p>Are you sure you want to sign out?</p>
             <div
               style={{
                 display: "flex",
@@ -305,7 +319,7 @@ const Header = () => {
                   borderRadius: "4px",
                 }}
               >
-                Yes, Logout
+                Yes, Sign Out
               </button>
               <button
                 onClick={closeLogoutModal}

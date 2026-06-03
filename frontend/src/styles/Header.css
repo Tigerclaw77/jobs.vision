@@ -101,6 +101,41 @@
 }
 .initials { z-index: 2; }
 
+.header-signout-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid #d7dee8;
+  background: #fff;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  margin: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+
+.header-signout-button:hover {
+  background: #f8fafc;
+  border-color: #b9c5d4;
+  color: #0f172a;
+  box-shadow: 0 3px 10px rgba(0,0,0,.08);
+  transform: none;
+}
+
+.header-signout-button svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
 .slide-drawer {
   position: fixed;
   top: 60px;
@@ -147,6 +182,7 @@
     position: relative;
     display: flex;
     align-items: center;        /* center the pill vertically */
+    gap: 10px;
     height: 100%;
   }
 
@@ -225,6 +261,7 @@
    ACCESSIBILITY
    ========================= */
 .account-link:focus-visible,
+.header-signout-button:focus-visible,
 .nav a.icon:focus-visible,
 .drawer-item:focus-visible,
 .user-circle:focus-visible {
