@@ -7,8 +7,9 @@ function getPosition(job) {
   const lng =
     job.lng ?? job.longitude ?? job?.coordinates?.lng ?? job?.geo?.lng ?? null;
 
-  const nLat = lat != null ? Number(lat) : NaN;
-  const nLng = lng != null ? Number(lng) : NaN;
+  if (lat == null || lng == null || lat === "" || lng === "") return null;
+  const nLat = Number(lat);
+  const nLng = Number(lng);
   if (!Number.isFinite(nLat) || !Number.isFinite(nLng)) return null;
   return { lat: nLat, lng: nLng };
 }
@@ -35,6 +36,37 @@ function zoomForRadius(radiusMi) {
   return 7;
 }
 
+function positionKey(position) {
+  return `${position.lat.toFixed(7)}:${position.lng.toFixed(7)}`;
+}
+
+function markerPixelOffsetFor(index, count) {
+  if (count <= 1) return { x: 0, y: 0 };
+  const angle = (2 * Math.PI * index) / count;
+  const offset = 18;
+  return {
+    x: Math.cos(angle) * offset,
+    y: Math.sin(angle) * offset,
+  };
+}
+
+function markerIconForOffset(google, offset) {
+  if (!offset.x && !offset.y) return undefined;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+      <g transform="translate(22 18)">
+        <path d="M14 1C7.4 1 2 6.4 2 13c0 9 12 22 12 22s12-13 12-22C26 6.4 20.6 1 14 1z" fill="#1f6feb" stroke="#ffffff" stroke-width="2"/>
+        <circle cx="14" cy="13" r="5" fill="#ffffff"/>
+      </g>
+    </svg>
+  `;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(72, 72),
+    anchor: new google.maps.Point(36 - offset.x, 53 - offset.y),
+  };
+}
+
 const JobMap = ({
   jobs = [],
   onMarkerClick,
@@ -47,9 +79,7 @@ const JobMap = ({
 }) => {
   const mapEl = useRef(null);
   const map = useRef(null);
-  const geocoder = useRef(null);
   const markers = useRef([]);
-  const geoCache = useRef(new Map());
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState("");
 
@@ -126,7 +156,6 @@ const JobMap = ({
         fullscreenControl: true,
         gestureHandling: "greedy",
       });
-      geocoder.current = new window.google.maps.Geocoder();
       setLoadError("");
     } catch (error) {
       setLoadError(error?.message || "Google Maps failed to initialize.");
@@ -177,12 +206,28 @@ const JobMap = ({
     markers.current.forEach((m) => m.setMap(null));
     markers.current = [];
 
+    const jobPositions = jobs
+      .map((job) => ({ job, position: getPosition(job) }))
+      .filter((item) => item.position);
+    const positionCounts = jobPositions.reduce((counts, { position }) => {
+      const key = positionKey(position);
+      counts.set(key, (counts.get(key) || 0) + 1);
+      return counts;
+    }, new Map());
+    const positionIndexes = new Map();
+
     const addMarker = (job, pos) => {
       if (cancelled) return;
+      const key = positionKey(pos);
+      const count = positionCounts.get(key) || 1;
+      const index = positionIndexes.get(key) || 0;
+      positionIndexes.set(key, index + 1);
+      const pixelOffset = markerPixelOffsetFor(index, count);
       const m = new window.google.maps.Marker({
         position: pos,
         map: map.current,
         title: job.title || "",
+        icon: markerIconForOffset(window.google, pixelOffset),
       });
       m.addListener("click", () => {
         if (clickCbRef.current) clickCbRef.current(job);
@@ -191,44 +236,8 @@ const JobMap = ({
       markerPositions.push(pos);
     };
 
-    const toGeocode = [];
-
-    jobs.forEach((job) => {
-      const pos = getPosition(job);
-      if (pos) addMarker(job, pos);
-      else if (job.location && typeof job.location === "string") {
-        const key = job.location.trim();
-        const cached = geoCache.current.get(key);
-        if (cached) addMarker(job, cached);
-        else toGeocode.push({ job, key });
-      }
-    });
-
-    // async geocoding for missing
-    const gc = geocoder.current;
-    if (toGeocode.length && gc) {
-      let i = 0;
-      const tick = () => {
-        if (cancelled) return;
-        if (i >= toGeocode.length) {
-          applyViewport();
-          return;
-        }
-        const { job, key } = toGeocode[i++];
-        gc.geocode({ address: key }, (res, status) => {
-          if (status === "OK" && res?.[0]?.geometry?.location) {
-            const loc = res[0].geometry.location;
-            const pos = { lat: loc.lat(), lng: loc.lng() };
-            geoCache.current.set(key, pos);
-            addMarker(job, pos);
-          }
-          setTimeout(tick, 180);
-        });
-      };
-      tick();
-    } else {
-      applyViewport();
-    }
+    jobPositions.forEach(({ job, position }) => addMarker(job, position));
+    applyViewport();
 
     return () => {
       cancelled = true;
