@@ -23,6 +23,7 @@
   display: flex;
   align-items: center;          /* center brand + nav vertically */
   justify-content: space-between;
+  position: relative;
 }
 
 /* =========================
@@ -33,6 +34,84 @@
   font-weight: 700;
   font-size: 24px;
   text-decoration: none;
+  position: relative;
+  z-index: 3;
+}
+
+.admin-view-mode-shell {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.admin-view-mode-control {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px;
+  border: 1px solid #d7dee8;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.admin-view-mode-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.admin-view-mode-label {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-view-mode-dot {
+  width: 10px;
+  height: 10px;
+  min-width: 10px;
+  min-height: 10px;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  border: 1px solid #64748b;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.admin-view-mode-dot.active {
+  background: #005a78;
+  border-color: #005a78;
+  box-shadow: 0 0 0 2px rgba(0, 90, 120, 0.15);
+}
+
+.admin-view-mode-dot:hover {
+  border-color: #005a78;
+}
+
+.admin-view-mode-badge {
+  color: #0f172a;
+  background: #f8fafc;
+  border: 1px solid #d7dee8;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  padding: 3px 7px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 /* =========================
@@ -43,6 +122,8 @@
   gap: 20px;
   align-items: center;
   height: 100%;                 /* for vertical centering in header */
+  position: relative;
+  z-index: 3;
 }
 
 /* Small action links/icons (desktop) */
@@ -98,6 +179,7 @@
   font-size: 14px;
   cursor: pointer;
   position: relative;
+  z-index: 3;
 }
 .initials { z-index: 2; }
 
@@ -261,6 +343,7 @@
    ACCESSIBILITY
    ========================= */
 .account-link:focus-visible,
+.admin-view-mode-dot:focus-visible,
 .header-signout-button:focus-visible,
 .nav a.icon:focus-visible,
 .drawer-item:focus-visible,
@@ -287,3 +370,49 @@
 .header .nav .account-link { margin: 0 !important; }
 .header .nav .account-link svg,
 .header .nav a.icon svg { display: block; }
+
+@media (max-width: 900px) {
+  .admin-view-mode-control {
+    gap: 6px;
+    padding: 4px 6px;
+  }
+
+  .admin-view-mode-group {
+    gap: 3px;
+  }
+
+  .admin-view-mode-dot {
+    width: 9px;
+    height: 9px;
+    min-width: 9px;
+    min-height: 9px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-view-mode-shell {
+    top: 50%;
+    max-width: 58vw;
+  }
+
+  .admin-view-mode-control {
+    gap: 5px;
+    padding: 3px 5px;
+  }
+
+  .admin-view-mode-label {
+    font-size: 10px;
+  }
+
+  .admin-view-mode-dot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    min-height: 8px;
+  }
+
+  .admin-view-mode-badge {
+    font-size: 8px;
+    padding: 2px 5px;
+  }
+}

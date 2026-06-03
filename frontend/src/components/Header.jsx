@@ -7,11 +7,58 @@ import { fetchNotifications, clearNotifications } from "../store/notificationsSl
 import { FiBell, FiUser, FiLogOut, FiSettings } from "react-icons/fi";
 import LoadingSpinner from "./ui/LoadingSpinner";
 import { useAuth } from "../components/auth/AuthProvider";
+import {
+  ADMIN_VIEW_MODE_GROUPS,
+  ADMIN_VIEW_MODES,
+  useAdminViewMode,
+} from "./auth/AdminViewModeProvider";
+import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 import "../styles/Header.css";
+
+const AdminViewModeControl = () => {
+  const { isRealAdmin, mode, setMode, config, viewingAs } = useAdminViewMode();
+
+  if (!isRealAdmin) return null;
+
+  return (
+    <div className="admin-view-mode-shell" aria-label="Admin view mode">
+      <div className="admin-view-mode-control">
+        {ADMIN_VIEW_MODE_GROUPS.map((group) => (
+          <div className="admin-view-mode-group" key={group.label}>
+            <span className="admin-view-mode-label">{group.label}</span>
+            {group.modes.map((modeKey) => {
+              const item = ADMIN_VIEW_MODES[modeKey];
+              return (
+                <button
+                  key={modeKey}
+                  type="button"
+                  className={`admin-view-mode-dot ${mode === modeKey ? "active" : ""}`}
+                  title={item.tooltip}
+                  aria-label={`View as ${item.tooltip}`}
+                  aria-pressed={mode === modeKey}
+                  onClick={() => setMode(modeKey)}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {viewingAs && (
+        <div className="admin-view-mode-badge">
+          VIEWING AS: <strong>{config.label}</strong>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Header = () => {
   // 🔐 Single source of truth for auth
   const { session, user, profile, role: authRole, signOut } = useAuth();
+  const effectiveAuth = useEffectiveAuth();
+  const displayUser = effectiveAuth.user;
+  const displayProfile = effectiveAuth.profile;
+  const activeRole = effectiveAuth.role || authRole;
 
   // Keep using Redux for notifications (unchanged)
   const hasUnreadNotifications = useSelector(
@@ -104,7 +151,7 @@ const Header = () => {
   };
 
   const getProfileLink = () => {
-    const r = (authRole || authState.userRole || authState.user?.userRole || "").toLowerCase();
+    const r = (activeRole || authState.userRole || authState.user?.userRole || "").toLowerCase();
     switch (r) {
       case "candidate":
         return "/candidate/profile";
@@ -118,27 +165,30 @@ const Header = () => {
   };
 
   const displayName =
-    profile?.firstName ||
-    user?.user_metadata?.firstName ||
-    authState.user?.firstName ||
-    profile?.email ||
-    user?.email ||
-    authState.user?.email ||
+    displayProfile?.firstName ||
+    displayUser?.user_metadata?.firstName ||
+    displayUser?.firstName ||
+    displayProfile?.email ||
+    displayUser?.email ||
     "User";
 
   const getInitials = () => {
     const first =
-      profile?.firstName ||
-      user?.user_metadata?.firstName ||
-      authState.user?.firstName ||
-      (profile?.email || user?.email || authState.user?.email || "").split("@")[0];
-    const last = profile?.lastName || user?.user_metadata?.lastName || authState.user?.lastName || "";
+      displayProfile?.firstName ||
+      displayUser?.user_metadata?.firstName ||
+      displayUser?.firstName ||
+      (displayProfile?.email || displayUser?.email || "").split("@")[0];
+    const last =
+      displayProfile?.lastName ||
+      displayUser?.user_metadata?.lastName ||
+      displayUser?.lastName ||
+      "";
     const a = (first || "").trim().charAt(0);
     const b = (last || "").trim().charAt(0);
     return (a + b || (first || "U").slice(0, 2)).toUpperCase();
   };
 
-  const isAuthed = !!session || !!authState.isAuthenticated || !!authState.token || !!authState.user;
+  const isAuthed = effectiveAuth.isAuthenticated;
 
   return (
     <>
@@ -149,6 +199,8 @@ const Header = () => {
           <Link to="/" className="logo">
             jobs<span style={{ color: "#e63946" }}>.</span>vision
           </Link>
+
+          <AdminViewModeControl />
 
           {!isMobile && (
             <nav className="nav">{/* right-aligned via CSS */}

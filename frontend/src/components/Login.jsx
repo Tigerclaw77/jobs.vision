@@ -8,6 +8,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { login as loginRedux } from "../store/authSlice";
 import { fetchUserJobData } from "../store/jobSlice";
 import { getRoleTier } from "../utils/getRoleTier";
+import { useAdminViewMode } from "./auth/AdminViewModeProvider";
 import GlassTextField from "../components/ui/GlassTextField";
 import {
   Button,
@@ -66,7 +67,9 @@ export default function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isRealAdmin, effectiveRole } = useAdminViewMode();
   const nextPath = searchParams.get("next") || null;
+  const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
 
   const [formError, setFormError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
@@ -112,6 +115,11 @@ export default function Login() {
     let mounted = true;
 
     const redirectIfAuthed = async () => {
+      if (viewingAsGuest) {
+        setRedirecting(false);
+        return;
+      }
+
       const { session } = await getNeonSession();
       if (!mounted) return;
       if (session) {
@@ -136,7 +144,7 @@ export default function Login() {
       sub.data?.subscription?.unsubscribe?.();
       window.removeEventListener("pageshow", onPageShow);
     };
-  }, [navigate, nextPath]);
+  }, [navigate, nextPath, viewingAsGuest]);
 
   const bootstrapReduxAfterSignIn = async (session) => {
     const { user: neonUser } = await getNeonUser();

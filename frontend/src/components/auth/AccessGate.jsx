@@ -1,5 +1,5 @@
-import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
+import { useEffectiveAuth } from "./useEffectiveAuth";
 
 /**
  * ✅ Combined role + tier gate with support for redirect, fallback UI, and OR logic.
@@ -19,10 +19,10 @@ const AccessGate = ({
   fallback = null,
   children,
 }) => {
-  const { user, userRole } = useSelector((state) => state.auth);
-  const role = String(user?.userRole || user?.role || user?.accountRole || userRole || "")
+  const { user, role: effectiveRole, tier: effectiveTier } = useEffectiveAuth();
+  const role = String(user?.userRole || user?.role || user?.accountRole || effectiveRole || "")
     .toLowerCase();
-  const tier = String(user?.tier || "").toLowerCase();
+  const tier = String(user?.tier || effectiveTier || "").toLowerCase();
 
   const hasRole =
     allowedRoles.length === 0 ||

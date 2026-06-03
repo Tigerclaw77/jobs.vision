@@ -49,6 +49,7 @@ import Footer from "./components/Footer";
 
 // 🔑 Single source of truth for auth/session/profile
 import AuthProvider, { useAuth } from "./components/auth/AuthProvider";
+import { AdminViewModeProvider, useAdminViewMode } from "./components/auth/AdminViewModeProvider";
 
 import "./styles.css";
 import "./styles/forms.css";
@@ -114,16 +115,19 @@ function AutoFillPatch() {
  */
 function PublicOnlyRoute({ children }) {
   const { session, loading, role } = useAuth();
+  const { isRealAdmin, effectiveRole } = useAdminViewMode();
+  const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
 
   if (loading) return null; // wait for session to resolve
-  if (session) {
+  if (session && !viewingAsGuest) {
     // If we don't know role yet, just park at Home; private pages will route correctly once role is loaded.
+    const routeRole = isRealAdmin && effectiveRole && effectiveRole !== "admin" ? effectiveRole : role;
     const dest =
-      role === "recruiter"
+      routeRole === "recruiter"
         ? "/recruiter/dashboard"
-        : role === "candidate"
+        : routeRole === "candidate"
         ? "/candidate/dashboard"
-        : role === "admin"
+        : routeRole === "admin"
         ? "/admin"
         : "/";
     return <Navigate to={dest} replace />;
@@ -415,7 +419,9 @@ function App() {
   // Wrap the whole app with the AuthProvider so everyone shares the SAME session state
   return (
     <AuthProvider>
-      <AppShell />
+      <AdminViewModeProvider>
+        <AppShell />
+      </AdminViewModeProvider>
     </AuthProvider>
   );
 }

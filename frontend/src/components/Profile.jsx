@@ -1,11 +1,11 @@
 import React from "react";
-import { useSelector } from "react-redux";
 import CandidateProfile from "./Candidate/CandidateProfile"; // Import CandidateProfile
 import AdminProfile from "./Admin/AdminProfile"; // Import AdminProfile
 import RecruiterProfile from "./Recruiter/RecruiterProfile"; // Import RecruiterProfile
+import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 
 const Profile = () => {
-  const user = useSelector((state) => state.auth.user); // Get user data from Redux
+  const { user } = useEffectiveAuth();
 
   // Conditional rendering based on userRole
   if (user?.userRole === "candidate") {

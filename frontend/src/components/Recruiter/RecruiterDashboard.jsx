@@ -10,6 +10,7 @@ import {
 
 import AddJob from "./AddJob";
 import AccessGate from "../auth/AccessGate";
+import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 import JobTabs from "./JobTabs";
 
 const PLAN_LABELS = {
@@ -42,7 +43,13 @@ function formatSlotLimit(maxActiveJobs) {
 }
 
 const RecruiterDashboard = () => {
-  const { user, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, userRole: reduxUserRole } = useSelector((state) => state.auth);
+  const {
+    user: effectiveUser,
+    role: effectiveRole,
+  } = useEffectiveAuth();
+  const user = effectiveUser ?? reduxUser;
+  const userRole = effectiveRole || reduxUserRole;
   const [categorizedJobs, setCategorizedJobs] = useState({
     active: [],
     pending: [],

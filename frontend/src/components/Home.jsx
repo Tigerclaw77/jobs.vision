@@ -3,11 +3,14 @@ import { useSelector } from "react-redux";
 import "../styles/Home.css";
 import OptionsSection from "./OptionsSection";
 import PricingTable from "./PricingTable";
+import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 
 const Home = () => {
   console.log("✅ Home.jsx is rendering");
 
-  const user = useSelector((state) => state.auth.user);
+  const reduxUser = useSelector((state) => state.auth.user);
+  const { user: effectiveUser } = useEffectiveAuth();
+  const user = effectiveUser ?? reduxUser;
 
   // ✅ Mark roles that start a new wrapped line so they don’t show a dot
   useEffect(() => {

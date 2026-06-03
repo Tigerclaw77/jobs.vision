@@ -1,9 +1,8 @@
 // src/components/JobSearch/JobList.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSelector } from "react-redux";
 import { Link, useSearchParams } from "react-router-dom";
-import { getNeonUser, neonAuth } from "../../utils/neonAuthClient";
 import { createStripeCheckout } from "../../utils/api";
+import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 
 import {
   fetchJobs,
@@ -196,8 +195,9 @@ function filtersFromSearchParams(searchParams) {
 }
 
 export default function JobList() {
-  const authUser = useSelector((state) => state.auth.user);
-  const userRole = String(authUser?.userRole || "").toLowerCase();
+  const effectiveAuth = useEffectiveAuth();
+  const authUser = effectiveAuth.user;
+  const userRole = String(authUser?.userRole || effectiveAuth.role || "").toLowerCase();
   const isCandidateUser = userRole === "candidate";
   const canUseMapSearch =
     userRole === "admin" || authUser?.entitlements?.candidate?.features?.mapSearch === true;
@@ -217,7 +217,7 @@ export default function JobList() {
   // interactions
   const [favorites, setFavorites] = useState(new Set());
   const [appliedJobs, setAppliedJobs] = useState(new Set());
-  const [isAuthed, setIsAuthed] = useState(false);
+  const isAuthed = effectiveAuth.isAuthenticated;
 
   // UI
   const [selectedJob, setSelectedJob] = useState(null);
@@ -228,24 +228,6 @@ export default function JobList() {
   const saveSlotsRemaining = hasUnlimitedSaves
     ? null
     : Math.max(0, FREE_SAVE_LIMIT - favorites.size);
-
-  // auth
-  useEffect(() => {
-    let unsub;
-    (async () => {
-      const { user } = await getNeonUser();
-      setIsAuthed(!!user);
-      const sub = neonAuth.onAuthStateChange((_e, session) =>
-        setIsAuthed(!!session?.user)
-      );
-      unsub = sub?.data?.subscription?.unsubscribe;
-    })();
-    return () => {
-      try {
-        unsub?.();
-      } catch {}
-    };
-  }, []);
 
   // parse URL
   useEffect(() => {

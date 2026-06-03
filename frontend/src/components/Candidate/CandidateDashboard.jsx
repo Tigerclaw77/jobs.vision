@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import AccessGate from "../auth/AccessGate";
+import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 import JobModal from "../JobSearch/JobModal";
 import {
   applyToJob,
@@ -62,7 +63,9 @@ function mapFavoriteJob(favorite) {
 
 const CandidateDashboard = () => {
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user: reduxUser } = useSelector((state) => state.auth);
+  const { user: effectiveUser } = useEffectiveAuth();
+  const user = effectiveUser ?? reduxUser;
   const {
     appliedJobs = [],
     favorites = [],

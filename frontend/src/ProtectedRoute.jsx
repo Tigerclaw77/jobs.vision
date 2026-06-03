@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { getNeonSession, neonAuth } from "./utils/neonAuthClient";
 import { getRoleTier } from "./utils/getRoleTier";
+import { useAdminViewMode } from "./components/auth/AdminViewModeProvider";
 
 /**
  * Minimal route guard:
@@ -18,6 +19,7 @@ export default function ProtectedRoute({
   allowedTiers = [],
 }) {
   const loc = useLocation();
+  const { isRealAdmin, mode, effectiveRole, effectivePlan } = useAdminViewMode();
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [role, setRole] = useState(null);
@@ -80,27 +82,38 @@ export default function ProtectedRoute({
   // Wait until we definitively know session/role
   if (!ready) return null;
 
+  const hasEffectiveMode = isRealAdmin && mode !== "admin";
+  const guardAuthed = hasEffectiveMode ? effectiveRole !== "guest" : authed;
+  const guardRole =
+    hasEffectiveMode && effectiveRole !== "guest"
+      ? String(effectiveRole || "").toLowerCase()
+      : role;
+  const guardTier =
+    hasEffectiveMode && effectiveRole !== "guest"
+      ? String(effectivePlan || "").toLowerCase()
+      : tier;
+
   // Not authenticated → bounce to login with ?next=
-  if (!authed) {
+  if (!guardAuthed) {
     const next = encodeURIComponent(loc.pathname + loc.search);
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
   // If role hasn’t resolved yet, pause to avoid mis-routing
-  if (!role) return null;
+  if (!guardRole) return null;
 
   // Admin bypass
-  if (role === "admin") return children;
+  if (guardRole === "admin") return children;
 
   // Role gating
   const roleAllowed =
     allowedUserRoles.length === 0 ||
-    allowedUserRoles.map((r) => r.toLowerCase()).includes(role);
+    allowedUserRoles.map((r) => r.toLowerCase()).includes(guardRole);
 
   // Tier gating (only if requested)
   const tierAllowed =
     allowedTiers.length === 0 ||
-    (tier ? allowedTiers.map((t) => t.toLowerCase()).includes(tier) : false);
+    (guardTier ? allowedTiers.map((t) => t.toLowerCase()).includes(guardTier) : false);
 
   if (!roleAllowed || !tierAllowed) {
     return <Navigate to="/unauthorized" replace />;
