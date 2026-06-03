@@ -43,7 +43,28 @@ function finitePoint(lat, lng) {
   return { lat: nLat, lng: nLng };
 }
 function locationKey(location = "") {
-  return String(location).trim().toLowerCase();
+  return normalizeLocationText(location);
+}
+function collapseLocationInput(location = "") {
+  return String(location).replace(/\s+/g, " ");
+}
+function cleanLocationInput(location = "") {
+  return collapseLocationInput(location).trim();
+}
+function normalizeLocationText(location = "") {
+  return cleanLocationInput(location).toLowerCase();
+}
+function getJobLocationText(job = {}) {
+  return [
+    job.location,
+    [job.city, job.state].filter(Boolean).join(", "),
+    job.city,
+    job.state,
+  ]
+    .filter(Boolean)
+    .map(normalizeLocationText)
+    .filter(Boolean)
+    .join(" ");
 }
 function getJobPosition(job, geocodedLocations = {}) {
   const direct = finitePoint(job?.latitude ?? job?.lat, job?.longitude ?? job?.lng);
@@ -167,8 +188,11 @@ function searchParamsForFilters(filters, sort, page) {
       if (value.length) params[key] = value.join(",");
       return;
     }
-    if (value === "" || value == null) return;
-    params[key] = String(value);
+    const serializedValue = key === "location" ? collapseLocationInput(value) : value;
+    if (serializedValue == null) return;
+    if (key === "location" && cleanLocationInput(serializedValue) === "") return;
+    if (serializedValue === "") return;
+    params[key] = String(serializedValue);
   });
   params.sort = sort || "newest";
   params.page = String(page || 1);
@@ -186,6 +210,8 @@ function filtersFromSearchParams(searchParams) {
       next[key] = normalizeFilterArray(value);
     } else if (key === "type") {
       next.employmentTypes = normalizeFilterArray(value);
+    } else if (key === "location") {
+      next.location = collapseLocationInput(value);
     } else if (key !== "hours") {
       next[key] = value;
     }
@@ -207,6 +233,8 @@ export default function JobList() {
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [fetchError, setFetchError] = useState("");
   const [jobLocationCoords, setJobLocationCoords] = useState({});
+  const [geocodeStatus, setGeocodeStatus] = useState("idle");
+  const [geocodeMessage, setGeocodeMessage] = useState("");
 
   // filters & query state
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
@@ -259,8 +287,18 @@ export default function JobList() {
 }, []);
 
   const updateFilters = (nextFilters) => {
-    setFilters(nextFilters);
-    setSearchParams(searchParamsForFilters(nextFilters, sort, 1), { replace: true });
+    const normalizedFilters = { ...nextFilters };
+    if ("location" in normalizedFilters) {
+      const nextLocation = collapseLocationInput(normalizedFilters.location);
+      const previousLocation = cleanLocationInput(filters.location);
+      normalizedFilters.location = nextLocation;
+      if (normalizeLocationText(nextLocation) !== normalizeLocationText(previousLocation)) {
+        normalizedFilters.lat = null;
+        normalizedFilters.lng = null;
+      }
+    }
+    setFilters(normalizedFilters);
+    setSearchParams(searchParamsForFilters(normalizedFilters, sort, 1), { replace: true });
   };
 
 
@@ -283,8 +321,11 @@ export default function JobList() {
     [filters.lat, filters.lng]
   );
   const canBuyCandidateMapPlan = isAuthed && isCandidateUser;
-  const hasLocationText = Boolean(String(filters.location || "").trim());
-  const hasActiveRadius = canUseMapSearch && hasLocationText && Boolean(searchCenter);
+  const displayLocation = cleanLocationInput(filters.location);
+  const normalizedLocation = normalizeLocationText(filters.location);
+  const hasLocationText = Boolean(normalizedLocation);
+  const hasActiveRadius =
+    canUseMapSearch && hasLocationText && geocodeStatus === "success" && Boolean(searchCenter);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -307,28 +348,54 @@ export default function JobList() {
   }, [filters.q, lookup]);
 
   useEffect(() => {
-    if (!canUseMapSearch) return;
+    if (!canUseMapSearch) {
+      setGeocodeStatus("idle");
+      setGeocodeMessage("");
+      return;
+    }
 
-    const location = String(filters.location || "").trim();
+    const location = cleanLocationInput(filters.location);
     if (!location) {
+      setGeocodeStatus("idle");
+      setGeocodeMessage("");
       if (filters.lat != null || filters.lng != null) {
         setFilters((prev) => ({ ...prev, lat: null, lng: null }));
       }
       return;
     }
-    if (finitePoint(filters.lat, filters.lng)) return;
+    if (finitePoint(filters.lat, filters.lng)) {
+      setGeocodeStatus("success");
+      setGeocodeMessage(`Location found: ${location}`);
+      return;
+    }
 
     let cancelled = false;
+    setGeocodeStatus("searching");
+    setGeocodeMessage(`Locating ${location}...`);
     const timeout = setTimeout(async () => {
       try {
         const point = await geocodeAddress(location, GOOGLE_MAPS_API_KEY);
         if (cancelled) return;
+        setGeocodeStatus("success");
+        setGeocodeMessage(`Location found: ${location}`);
         setFilters((prev) => {
-          if (String(prev.location || "").trim() !== location) return prev;
-          return { ...prev, lat: point.lat, lng: point.lng };
+          if (normalizeLocationText(prev.location) !== normalizeLocationText(location)) {
+            return prev;
+          }
+          return { ...prev, location, lat: point.lat, lng: point.lng };
         });
       } catch (err) {
-        if (!cancelled) console.warn(err?.message || err);
+        if (!cancelled) {
+          console.warn(err?.message || err);
+          setGeocodeStatus("failed");
+          setGeocodeMessage(`Could not locate ${location}. Showing text matches only.`);
+          setFilters((prev) => {
+            if (normalizeLocationText(prev.location) !== normalizeLocationText(location)) {
+              return prev;
+            }
+            return { ...prev, lat: null, lng: null };
+          });
+        }
       }
     }, 350);
 
@@ -411,8 +478,8 @@ export default function JobList() {
     if (filters.location) {
       tags.push({
         type: "location",
-        value: String(filters.location).toLowerCase(),
-        label: titleCase(filters.location),
+        value: normalizeLocationText(filters.location),
+        label: titleCase(cleanLocationInput(filters.location)),
       });
     }
     return tags;
@@ -435,8 +502,9 @@ export default function JobList() {
         radiusMi = 25,
       } = filters;
       const center = finitePoint(lat, lng);
-      const locationText = String(location || "").trim().toLowerCase();
-      const locationRadiusActive = canUseMapSearch && Boolean(locationText && center);
+      const locationText = normalizeLocationText(location);
+      const locationRadiusActive =
+        canUseMapSearch && geocodeStatus === "success" && Boolean(locationText && center);
       const qLower = q.trim().toLowerCase();
       const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
       const opportunitySet = new Set(normalizeFilterArray(opportunityTypes).map(normalizeType));
@@ -475,7 +543,7 @@ export default function JobList() {
         const matchLocText =
           !locationText ||
           locationRadiusActive ||
-          (job.location || "").toLowerCase().includes(String(location).toLowerCase());
+          getJobLocationText(job).includes(locationText);
 
         let matchRadius = true;
         if (locationRadiusActive) {
@@ -500,12 +568,23 @@ export default function JobList() {
       setFilteredJobs(next);
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [filters, jobs, canUseMapSearch, jobLocationCoords]);
+  }, [filters, jobs, canUseMapSearch, geocodeStatus, jobLocationCoords]);
 
   // pagination
   const page = parseInt(searchParams.get("page") || "1", 10);
   const paginated = filteredJobs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil((filteredJobs.length || 0) / PAGE_SIZE));
+  const radiusMiles = Number(filters.radiusMi || 25);
+  const jobsNoun = filteredJobs.length === 1 ? "job" : "jobs";
+  const resultCountText =
+    hasLocationText && canUseMapSearch && geocodeStatus === "success"
+      ? `${filteredJobs.length} ${jobsNoun} found within ${radiusMiles} miles`
+      : `${filteredJobs.length} ${jobsNoun} found`;
+  const noFilteredJobsMessage = hasLocationText
+    ? `No jobs found within ${radiusMiles} miles of ${displayLocation || "that location"}`
+    : "No jobs match your filters.";
+  const mapEmptyMessage =
+    !fetchError && jobs.length > 0 && filteredJobs.length === 0 ? noFilteredJobsMessage : "";
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
 const removeQuickTag = (tag) => {
@@ -617,6 +696,8 @@ const removeQuickTag = (tag) => {
             quickTags={quickTags}
             onRemoveQuickTag={removeQuickTag}
             canUseMapSearch={canUseMapSearch}
+            geocodeStatus={geocodeStatus}
+            geocodeMessage={geocodeMessage}
           />
         </div>
 
@@ -630,6 +711,7 @@ const removeQuickTag = (tag) => {
                 searchCenter={searchCenter}
                 radiusMi={filters.radiusMi}
                 hasActiveRadius={hasActiveRadius}
+                emptyMessage={mapEmptyMessage}
                 onMarkerClick={
                   canUseMapSearch
                     ? (job) => {
@@ -694,6 +776,12 @@ const removeQuickTag = (tag) => {
       </div>
 
       {/* CARDS */}
+      {!fetchError && (
+        <div className="jobs-result-summary" role="status" aria-live="polite">
+          {geocodeStatus === "searching" ? geocodeMessage : resultCountText}
+        </div>
+      )}
+
       <div className="job-cards">
         {paginated.length ? (
           paginated.map((job) => (
@@ -726,7 +814,7 @@ const removeQuickTag = (tag) => {
               ? `Failed to load jobs: ${fetchError}`
               : jobs.length === 0
               ? "No jobs available."
-              : "No jobs match your filters."}
+              : noFilteredJobsMessage}
           </div>
         )}
       </div>

@@ -40,6 +40,7 @@ const JobMap = ({
   searchCenter = null,
   radiusMi = 25,
   hasActiveRadius = false,
+  emptyMessage = "",
 }) => {
   const mapEl = useRef(null);
   const map = useRef(null);
@@ -132,8 +133,33 @@ const JobMap = ({
   // add markers (ONLY when jobs change or map becomes ready)
   useEffect(() => {
     if (!map.current || !showMap) return;
+    let cancelled = false;
     const activeCenter = hasActiveRadius ? getSearchCenter(searchCenter) : null;
+    const markerPositions = [];
+
     const applyViewport = () => {
+      if (cancelled || !map.current) return;
+      if (markerPositions.length > 0) {
+        const uniquePositions = markerPositions.filter((position, index, list) => {
+          return (
+            list.findIndex(
+              (item) => item.lat === position.lat && item.lng === position.lng
+            ) === index
+          );
+        });
+
+        if (uniquePositions.length === 1) {
+          map.current.setCenter(uniquePositions[0]);
+          map.current.setZoom(activeCenter ? zoomForRadius(radiusMi) : 10);
+          return;
+        }
+
+        const bounds = new window.google.maps.LatLngBounds();
+        markerPositions.forEach((position) => bounds.extend(position));
+        map.current.fitBounds(bounds, 48);
+        return;
+      }
+
       if (activeCenter) {
         map.current.setCenter(activeCenter);
         map.current.setZoom(zoomForRadius(radiusMi));
@@ -149,6 +175,7 @@ const JobMap = ({
     markers.current = [];
 
     const addMarker = (job, pos) => {
+      if (cancelled) return;
       const m = new window.google.maps.Marker({
         position: pos,
         map: map.current,
@@ -158,6 +185,7 @@ const JobMap = ({
         if (clickCbRef.current) clickCbRef.current(job);
       });
       markers.current.push(m);
+      markerPositions.push(pos);
     };
 
     const toGeocode = [];
@@ -178,6 +206,7 @@ const JobMap = ({
     if (toGeocode.length && gc) {
       let i = 0;
       const tick = () => {
+        if (cancelled) return;
         if (i >= toGeocode.length) {
           applyViewport();
           return;
@@ -194,17 +223,24 @@ const JobMap = ({
         });
       };
       tick();
+    } else {
+      applyViewport();
     }
 
-    applyViewport();
+    return () => {
+      cancelled = true;
+    };
   }, [jobs, ready, showMap, searchCenter, radiusMi, hasActiveRadius]); // <- NO onMarkerClick here
 
   return (
-    <div
-      ref={mapEl}
-      data-map-error={loadError || undefined}
-      style={{ display: showMap ? "block" : "none", width: "100%", height: "100%" }}
-    />
+    <div className="job-map-shell" style={{ display: showMap ? "block" : "none" }}>
+      <div
+        ref={mapEl}
+        className="job-map-canvas"
+        data-map-error={loadError || undefined}
+      />
+      {emptyMessage && <div className="map-empty-message">{emptyMessage}</div>}
+    </div>
   );
 };
 

@@ -26,6 +26,9 @@ const RADIUS_OPTIONS = [
   { value: 100, label: "100 mi" },
 ];
 
+const cleanLocationInput = (value = "") => String(value).replace(/\s+/g, " ").trim();
+const collapseLocationInput = (value = "") => String(value).replace(/\s+/g, " ");
+
 function FilterChecks({ legend, options, selected = [], onToggle }) {
   const values = Array.isArray(selected) ? selected : [];
 
@@ -55,6 +58,8 @@ export default function JobFilter({
   quickTags = [],
   onRemoveQuickTag,
   canUseMapSearch = true,
+  geocodeStatus = "idle",
+  geocodeMessage = "",
 }) {
   const [locLoading, setLocLoading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -135,8 +140,14 @@ export default function JobFilter({
             placeholder="City, ST"
             value={filters.location || ""}
             onChange={(e) =>
-              set({ location: e.target.value, lat: null, lng: null })
+              set({ location: collapseLocationInput(e.target.value), lat: null, lng: null })
             }
+            onBlur={(e) => {
+              const cleaned = cleanLocationInput(e.target.value);
+              if (cleaned !== filters.location) {
+                set({ location: cleaned });
+              }
+            }}
           />
           <button
             className="geo-btn"
@@ -171,6 +182,16 @@ export default function JobFilter({
             ))}
           </select>
         </div>
+
+        {canUseMapSearch && geocodeMessage && (
+          <div
+            className={`location-status location-status-${geocodeStatus}`}
+            role="status"
+            aria-live="polite"
+          >
+            {geocodeMessage}
+          </div>
+        )}
 
         {/* Role + Type */}
         <div className="field field-role">
