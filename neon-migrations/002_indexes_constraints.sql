@@ -164,6 +164,15 @@ create index if not exists job_favorites_user_created_idx
 create index if not exists job_favorites_job_idx
   on public.job_favorites (job_id);
 
+create unique index if not exists hidden_jobs_user_job_unique
+  on public.hidden_jobs (user_id, job_id);
+
+create index if not exists hidden_jobs_user_created_idx
+  on public.hidden_jobs (user_id, created_at desc);
+
+create index if not exists hidden_jobs_job_idx
+  on public.hidden_jobs (job_id);
+
 create unique index if not exists recruiter_domains_user_domain_unique
   on public.recruiter_domains (user_id, domain);
 

@@ -31,6 +31,7 @@ const PUBLIC_JOB_COLUMNS = [
   "employment_type",
   "salary",
   "tag_ids",
+  "featured",
   "posted_at",
   "employer_name",
   "employer_brand",

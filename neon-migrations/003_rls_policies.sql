@@ -57,6 +57,7 @@ alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
 alter table public.job_applications enable row level security;
 alter table public.job_favorites enable row level security;
+alter table public.hidden_jobs enable row level security;
 alter table public.recruiter_domains enable row level security;
 alter table public.manual_overrides enable row level security;
 alter table public.recruiter_entitlements enable row level security;
@@ -227,6 +228,33 @@ create policy job_favorites_insert_own_active_job
 drop policy if exists job_favorites_delete_own on public.job_favorites;
 create policy job_favorites_delete_own
   on public.job_favorites
+  for delete
+  using (user_id = public.current_auth_user_id());
+
+drop policy if exists hidden_jobs_select_own on public.hidden_jobs;
+create policy hidden_jobs_select_own
+  on public.hidden_jobs
+  for select
+  using (user_id = public.current_auth_user_id());
+
+drop policy if exists hidden_jobs_insert_own_active_job on public.hidden_jobs;
+create policy hidden_jobs_insert_own_active_job
+  on public.hidden_jobs
+  for insert
+  with check (
+    user_id = public.current_auth_user_id()
+    and exists (
+      select 1
+      from public.jobs j
+      where j.id = job_id
+        and j.status = 'active'
+        and j.is_archived = false
+    )
+  );
+
+drop policy if exists hidden_jobs_delete_own on public.hidden_jobs;
+create policy hidden_jobs_delete_own
+  on public.hidden_jobs
   for delete
   using (user_id = public.current_auth_user_id());
 

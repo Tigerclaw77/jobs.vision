@@ -8,6 +8,7 @@ import {
   fetchJobs,
   addJobToFavorites,
   applyToJob,
+  hideJob as hideJobPreference,
   getUserJobInteractions,
 } from "../../utils/api.supabase";
 
@@ -246,6 +247,7 @@ export default function JobList() {
   // interactions
   const [favorites, setFavorites] = useState(new Set());
   const [appliedJobs, setAppliedJobs] = useState(new Set());
+  const [hiddenJobs, setHiddenJobs] = useState(new Set());
   const isAuthed = effectiveAuth.isAuthenticated;
 
   // UI
@@ -307,9 +309,10 @@ export default function JobList() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { favorites, appliedJobs } = await getUserJobInteractions();
+        const { favorites, appliedJobs, hiddenJobs } = await getUserJobInteractions();
         setFavorites(new Set(favorites || []));
         setAppliedJobs(new Set(appliedJobs || []));
+        setHiddenJobs(new Set(hiddenJobs || []));
       } catch {}
     };
     load();
@@ -512,6 +515,9 @@ export default function JobList() {
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
 
       const next = (jobs || []).filter((job) => {
+        const jobId = String(job._id || job.id || "");
+        if (jobId && hiddenJobs.has(jobId)) return false;
+
         const hay = [
           job.title,
           job.company,
@@ -569,7 +575,7 @@ export default function JobList() {
       setFilteredJobs(next);
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [filters, jobs, canUseMapSearch, geocodeStatus, jobLocationCoords]);
+  }, [filters, jobs, canUseMapSearch, geocodeStatus, jobLocationCoords, hiddenJobs]);
 
   // pagination
   const page = parseInt(searchParams.get("page") || "1", 10);
@@ -586,6 +592,15 @@ export default function JobList() {
     : "No jobs match your filters.";
   const mapEmptyMessage =
     !fetchError && jobs.length > 0 && filteredJobs.length === 0 ? noFilteredJobsMessage : "";
+  const mapJobs = useMemo(
+    () =>
+      filteredJobs.map((job) => ({
+        ...job,
+        isApplied: appliedJobs.has(job._id),
+        isFavorite: favorites.has(job._id),
+      })),
+    [filteredJobs, appliedJobs, favorites]
+  );
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
 const removeQuickTag = (tag) => {
@@ -623,6 +638,10 @@ const removeQuickTag = (tag) => {
 
   const appliedTooltipFor = (jobId) => {
     return appliedJobs.has(jobId) ? "Already applied" : "Apply to this job";
+  };
+
+  const hideTooltipFor = () => {
+    return isAuthed ? "Hide job" : "Register or log in to hide jobs";
   };
 
   const handleFavorite = async (jobId) => {
@@ -670,6 +689,40 @@ const removeQuickTag = (tag) => {
     }
   };
 
+  const handleHideJob = async (jobId) => {
+    if (!isAuthed) return requireAuth("Register or log in to hide jobs. Go to Login?");
+
+    const normalizedId = String(jobId);
+    const wasHidden = hiddenJobs.has(normalizedId);
+    const previousSelectedJob = selectedJob;
+    const previousModalOpen = isModalOpen;
+
+    setHiddenJobs((prev) => {
+      const next = new Set(prev);
+      next.add(normalizedId);
+      return next;
+    });
+
+    if (selectedJob && String(selectedJob._id) === normalizedId) {
+      setSelectedJob(null);
+      setIsModalOpen(false);
+    }
+
+    try {
+      await hideJobPreference(normalizedId);
+    } catch (error) {
+      setHiddenJobs((prev) => {
+        const next = new Set(prev);
+        if (wasHidden) next.add(normalizedId);
+        else next.delete(normalizedId);
+        return next;
+      });
+      setSelectedJob(previousSelectedJob);
+      setIsModalOpen(previousModalOpen);
+      alert(error?.message || "Couldn't hide this job. Try again.");
+    }
+  };
+
   const handleCandidateUpgrade = async (planKey) => {
     setCheckoutError("");
     setCheckoutLoading(planKey);
@@ -706,7 +759,7 @@ const removeQuickTag = (tag) => {
           <div className={`job-map-inner top ${canUseMapSearch ? "" : "map-locked"}`}>
             <div className="map-canvas-layer" aria-hidden={!canUseMapSearch}>
               <JobMap
-                jobs={filteredJobs}
+                jobs={mapJobs}
                 showMap={true}
                 apiKey={GOOGLE_MAPS_API_KEY}
                 searchCenter={searchCenter}
@@ -793,8 +846,10 @@ const removeQuickTag = (tag) => {
               isApplied={appliedJobs.has(job._id)}
               savedTooltip={savedTooltipFor(job._id)}
               appliedTooltip={appliedTooltipFor(job._id)}
+              hideTooltip={hideTooltipFor(job._id)}
               onFavoriteClick={handleFavorite}
               onApplyClick={handleApply}
+              onHideClick={handleHideJob}
               onClick={() => {
                 setSelectedJob(job);
                 setIsModalOpen(true);
@@ -837,6 +892,7 @@ const removeQuickTag = (tag) => {
         appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
+        onHide={handleHideJob}
         onClose={() => {
           setSelectedJob(null);
           setIsModalOpen(false);

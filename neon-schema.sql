@@ -92,6 +92,13 @@ create table if not exists public.job_favorites (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.hidden_jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null references public.profiles(id) on delete cascade,
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.recruiter_domains (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references public.profiles(id) on delete cascade,
@@ -340,6 +347,15 @@ create index if not exists job_favorites_user_created_idx
 create index if not exists job_favorites_job_idx
   on public.job_favorites (job_id);
 
+create unique index if not exists hidden_jobs_user_job_unique
+  on public.hidden_jobs (user_id, job_id);
+
+create index if not exists hidden_jobs_user_created_idx
+  on public.hidden_jobs (user_id, created_at desc);
+
+create index if not exists hidden_jobs_job_idx
+  on public.hidden_jobs (job_id);
+
 create unique index if not exists recruiter_domains_user_domain_unique
   on public.recruiter_domains (user_id, domain);
 
@@ -428,6 +444,7 @@ alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
 alter table public.job_applications enable row level security;
 alter table public.job_favorites enable row level security;
+alter table public.hidden_jobs enable row level security;
 alter table public.recruiter_domains enable row level security;
 alter table public.manual_overrides enable row level security;
 alter table public.recruiter_entitlements enable row level security;
@@ -598,6 +615,33 @@ create policy job_favorites_insert_own_active_job
 drop policy if exists job_favorites_delete_own on public.job_favorites;
 create policy job_favorites_delete_own
   on public.job_favorites
+  for delete
+  using (user_id = public.current_auth_user_id());
+
+drop policy if exists hidden_jobs_select_own on public.hidden_jobs;
+create policy hidden_jobs_select_own
+  on public.hidden_jobs
+  for select
+  using (user_id = public.current_auth_user_id());
+
+drop policy if exists hidden_jobs_insert_own_active_job on public.hidden_jobs;
+create policy hidden_jobs_insert_own_active_job
+  on public.hidden_jobs
+  for insert
+  with check (
+    user_id = public.current_auth_user_id()
+    and exists (
+      select 1
+      from public.jobs j
+      where j.id = job_id
+        and j.status = 'active'
+        and j.is_archived = false
+    )
+  );
+
+drop policy if exists hidden_jobs_delete_own on public.hidden_jobs;
+create policy hidden_jobs_delete_own
+  on public.hidden_jobs
   for delete
   using (user_id = public.current_auth_user_id());
 

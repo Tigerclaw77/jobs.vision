@@ -348,6 +348,8 @@
 .jl-check{ color: rgba(58,200,126,.95); }
 .jl-check.active{ color: rgba(87,227,137,1); filter: drop-shadow(0 0 4px rgba(87,227,137,.28)); }
 .jl-check.active svg{ fill: rgba(87,227,137,.20); }
+.jl-hide{ color: rgba(203,213,225,.86); }
+.jl-hide:hover{ color:#fff; }
 
 .job-content{ min-width:0; }
 .job-title{ margin:0 0 6px 0; line-height:1.25; word-break:break-word; color:#fff !important; }
@@ -482,6 +484,10 @@
   background:transparent;
 }
 .btn-secondary:hover{ background:rgba(255,255,255,.07); }
+.btn-hide-job{
+  border-color:rgba(203,213,225,.34);
+  color:#f1f5f9;
+}
 
 /* =========================================================
    JOB SEARCH SCOPE — ONLY this page

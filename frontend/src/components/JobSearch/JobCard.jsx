@@ -1,5 +1,5 @@
 import React from "react";
-import { Star, CheckCircle } from "lucide-react";
+import { Star, CheckCircle, EyeOff } from "lucide-react";
 
 export default function JobCard({
   job,
@@ -10,6 +10,8 @@ export default function JobCard({
   onClick,
   savedTooltip,
   appliedTooltip,
+  onHideClick,
+  hideTooltip,
 }) {
   return (
     <div className="job-card" onClick={onClick} role="button" tabIndex={0}>
@@ -35,6 +37,15 @@ export default function JobCard({
           }}
         >
           <CheckCircle size={18} />
+        </button>
+        <button
+          type="button"
+          className="jl-icon-btn jl-hide"
+          title={hideTooltip || "Hide job"}
+          aria-label="Hide job"
+          onClick={() => onHideClick?.(job._id)}
+        >
+          <EyeOff size={18} />
         </button>
       </div>
 

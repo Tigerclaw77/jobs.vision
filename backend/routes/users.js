@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const requireAdmin = require("../middleware/requireAdmin");
+const { requireAuth } = require("../middleware/auth");
 const { one, query } = require("../services/db");
 
 const FREE_DOMAINS = new Set([
@@ -40,6 +41,79 @@ function orgFrom(email, company) {
   if (!d) return "";
   return FREE_DOMAINS.has(d) ? "Personal" : d;
 }
+
+// GET /api/users/hidden
+router.get("/hidden", requireAuth, async (req, res) => {
+  try {
+    const result = await query(
+      `
+        select job_id
+        from public.hidden_jobs
+        where user_id = $1
+        order by created_at desc
+      `,
+      [req.user.id]
+    );
+
+    return res.json(result.rows.map((row) => String(row.job_id)));
+  } catch (e) {
+    console.error("GET /api/users/hidden error", e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// POST /api/users/hide/:jobId
+router.post("/hide/:jobId", requireAuth, async (req, res) => {
+  try {
+    const job = await one(
+      `
+        select id
+        from public.jobs
+        where id = $1
+          and status = 'active'
+          and is_archived = false
+      `,
+      [req.params.jobId]
+    );
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    await query(
+      `
+        insert into public.hidden_jobs (user_id, job_id)
+        values ($1, $2)
+        on conflict (user_id, job_id) do nothing
+      `,
+      [req.user.id, job.id]
+    );
+
+    return res.status(201).json({ ok: true, job_id: String(job.id) });
+  } catch (e) {
+    if (e?.code === "22P02") return res.status(400).json({ error: "Invalid job id" });
+    console.error("POST /api/users/hide/:jobId error", e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// DELETE /api/users/hide/:jobId
+router.delete("/hide/:jobId", requireAuth, async (req, res) => {
+  try {
+    await query(
+      `
+        delete from public.hidden_jobs
+        where user_id = $1
+          and job_id = $2
+      `,
+      [req.user.id, req.params.jobId]
+    );
+
+    return res.json({ ok: true });
+  } catch (e) {
+    if (e?.code === "22P02") return res.status(400).json({ error: "Invalid job id" });
+    console.error("DELETE /api/users/hide/:jobId error", e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 // GET /api/users?role=&search=&page=&limit=&sort=created_at.desc
 router.get("/", requireAdmin(), async (req, res) => {

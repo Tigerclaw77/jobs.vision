@@ -47,6 +47,7 @@ function mapJobRow(row = {}) {
     opportunity_type: row.opportunity_type || "",
     practice_type: row.practice_type || "",
     employment_type: row.employment_type || "",
+    featured: row.featured === true,
     salary: row.salary,
     tags: tagsRaw.map((t) => String(t).toLowerCase()),
     latitude: row.latitude != null ? Number(row.latitude) : undefined,
@@ -74,6 +75,29 @@ export async function removeJobFromFavorites(jobId) {
     headers,
   });
   return { removed: true };
+}
+
+export async function fetchHiddenJobs() {
+  const headers = await authHeaders();
+  return apiJson("/users/hidden", { headers });
+}
+
+export async function hideJob(jobId) {
+  const headers = await authHeaders();
+  await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
+    method: "POST",
+    headers,
+  });
+  return { hidden: true };
+}
+
+export async function unhideJob(jobId) {
+  const headers = await authHeaders();
+  await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
+    method: "DELETE",
+    headers,
+  });
+  return { hidden: false };
 }
 
 export async function addJobToFavorites(jobId) {
@@ -115,16 +139,18 @@ export async function applyToJob(jobId) {
 export async function getUserJobInteractions() {
   const { session } = await getNeonSession();
   const token = session?.access_token;
-  if (!token) return { favorites: [], appliedJobs: [] };
+  if (!token) return { favorites: [], appliedJobs: [], hiddenJobs: [] };
 
   const headers = { Authorization: `Bearer ${token}` };
-  const [favs, apps] = await Promise.all([
+  const [favs, apps, hidden] = await Promise.all([
     apiJson("/favorites", { headers }),
     apiJson("/applications/mine", { headers }),
+    apiJson("/users/hidden", { headers }).catch(() => []),
   ]);
 
   return {
     favorites: (Array.isArray(favs) ? favs : []).map((row) => String(row.job_id)),
     appliedJobs: (Array.isArray(apps) ? apps : []).map((row) => String(row.job_id)),
+    hiddenJobs: (Array.isArray(hidden) ? hidden : []).map((jobId) => String(jobId)),
   };
 }

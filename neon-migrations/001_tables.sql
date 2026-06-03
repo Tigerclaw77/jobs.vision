@@ -93,6 +93,13 @@ create table if not exists public.job_favorites (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.hidden_jobs (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null references public.profiles(id) on delete cascade,
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.recruiter_domains (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references public.profiles(id) on delete cascade,
