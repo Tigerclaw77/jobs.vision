@@ -27,6 +27,14 @@ async function apiJson(path, options = {}) {
   return data;
 }
 
+function friendlyJobUpdateError(error) {
+  const message = String(error?.message || "").trim();
+  if (!message || /server error|request failed/i.test(message)) {
+    return "We couldn't update this job. Please try again.";
+  }
+  return message;
+}
+
 function mapJobRow(row = {}) {
   const rawTags = row.tag_ids || row.tags;
   const tagsRaw = Array.isArray(rawTags)
@@ -82,21 +90,34 @@ export async function fetchHiddenJobs() {
   return apiJson("/users/hidden", { headers });
 }
 
+export async function fetchHiddenJobDetails() {
+  const headers = await authHeaders();
+  return apiJson("/users/hidden/jobs", { headers });
+}
+
 export async function hideJob(jobId) {
   const headers = await authHeaders();
-  await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
-    method: "POST",
-    headers,
-  });
+  try {
+    await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
+      method: "POST",
+      headers,
+    });
+  } catch (error) {
+    throw new Error(friendlyJobUpdateError(error));
+  }
   return { hidden: true };
 }
 
 export async function unhideJob(jobId) {
   const headers = await authHeaders();
-  await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
-    method: "DELETE",
-    headers,
-  });
+  try {
+    await apiJson(`/users/hide/${encodeURIComponent(jobId)}`, {
+      method: "DELETE",
+      headers,
+    });
+  } catch (error) {
+    throw new Error(friendlyJobUpdateError(error));
+  }
   return { hidden: false };
 }
 

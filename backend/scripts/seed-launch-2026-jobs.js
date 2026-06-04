@@ -17,6 +17,7 @@ const rawJobs = [
     latitude: 29.7097,
     longitude: -95.3975,
     role: "optometrist",
+    featured: true,
     salary: "$145,000 - $185,000 base plus production",
     tags: ["optometrist", "od-md", "medical-optometry", "houston"],
     description:
@@ -647,6 +648,18 @@ function assertSeedData() {
       throw new Error(`Expected at least one seed job with employment_type=${type}.`);
     }
   }
+
+  const featuredHoustonJobs = jobs.filter(
+    (job) =>
+      job.featured === true &&
+      job.state === "TX" &&
+      (job.city === "Houston" || job.tags.includes("houston"))
+  );
+  if (featuredHoustonJobs.length !== 1) {
+    throw new Error(
+      `Expected exactly one featured Houston launch seed job, found ${featuredHoustonJobs.length}.`
+    );
+  }
 }
 
 async function ensureSeedColumns() {
@@ -655,6 +668,7 @@ async function ensureSeedColumns() {
   await query("alter table public.jobs add column if not exists opportunity_type text");
   await query("alter table public.jobs add column if not exists practice_type text");
   await query("alter table public.jobs add column if not exists employment_type text");
+  await query("alter table public.jobs add column if not exists featured boolean not null default false");
 }
 
 async function seedJobs() {
@@ -700,8 +714,8 @@ async function seedJobs() {
       )
       values (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17::text[], 'active', false, false, false,
-        now(), now(), now(), $18, $19, now()
+        $11, $12, $13, $14, $15, $16, $17::text[], 'active', false, $18, false,
+        now(), now(), now(), $19, $20, now()
       )
     `;
 
@@ -724,6 +738,7 @@ async function seedJobs() {
         job.employment_type,
         job.salary,
         job.tags,
+        job.featured === true,
         SOURCE,
         SEED_BATCH,
       ]);

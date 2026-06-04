@@ -58,7 +58,81 @@ router.get("/hidden", requireAuth, async (req, res) => {
     return res.json(result.rows.map((row) => String(row.job_id)));
   } catch (e) {
     console.error("GET /api/users/hidden error", e);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "We couldn't update this job. Please try again." });
+  }
+});
+
+// GET /api/users/hidden/jobs
+router.get("/hidden/jobs", requireAuth, async (req, res) => {
+  try {
+    const result = await query(
+      `
+        select
+          hj.job_id,
+          hj.created_at as hidden_at,
+          j.id,
+          j.title,
+          j.description,
+          j.location,
+          j.city,
+          j.state,
+          j.latitude,
+          j.longitude,
+          j.role,
+          j.hours,
+          j.type,
+          j.opportunity_type,
+          j.practice_type,
+          j.employment_type,
+          j.salary,
+          j.tag_ids,
+          j.featured,
+          j.posted_at,
+          j.employer_name,
+          j.company,
+          j.venue_name,
+          j.status
+        from public.hidden_jobs hj
+        join public.jobs j on j.id = hj.job_id
+        where hj.user_id = $1
+        order by hj.created_at desc
+      `,
+      [req.user.id]
+    );
+
+    return res.json(
+      result.rows.map((row) => ({
+        job_id: String(row.job_id),
+        hidden_at: row.hidden_at,
+        jobs: {
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          location: row.location,
+          city: row.city,
+          state: row.state,
+          latitude: row.latitude,
+          longitude: row.longitude,
+          role: row.role,
+          hours: row.hours,
+          type: row.type,
+          opportunity_type: row.opportunity_type,
+          practice_type: row.practice_type,
+          employment_type: row.employment_type,
+          salary: row.salary,
+          tag_ids: row.tag_ids,
+          featured: row.featured,
+          posted_at: row.posted_at,
+          employer_name: row.employer_name,
+          company: row.company,
+          venue_name: row.venue_name,
+          status: row.status,
+        },
+      }))
+    );
+  } catch (e) {
+    console.error("GET /api/users/hidden/jobs error", e);
+    return res.status(500).json({ error: "We couldn't update this job. Please try again." });
   }
 });
 
@@ -91,7 +165,7 @@ router.post("/hide/:jobId", requireAuth, async (req, res) => {
   } catch (e) {
     if (e?.code === "22P02") return res.status(400).json({ error: "Invalid job id" });
     console.error("POST /api/users/hide/:jobId error", e);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "We couldn't update this job. Please try again." });
   }
 });
 
@@ -111,7 +185,7 @@ router.delete("/hide/:jobId", requireAuth, async (req, res) => {
   } catch (e) {
     if (e?.code === "22P02") return res.status(400).json({ error: "Invalid job id" });
     console.error("DELETE /api/users/hide/:jobId error", e);
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "We couldn't update this job. Please try again." });
   }
 });
 

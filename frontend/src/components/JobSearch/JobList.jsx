@@ -719,7 +719,7 @@ const removeQuickTag = (tag) => {
       });
       setSelectedJob(previousSelectedJob);
       setIsModalOpen(previousModalOpen);
-      alert(error?.message || "Couldn't hide this job. Try again.");
+      alert(error?.message || "We couldn't update this job. Please try again.");
     }
   };
 

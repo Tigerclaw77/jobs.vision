@@ -120,13 +120,15 @@ export default function JobModal({
           <button className="btn-secondary" onClick={onClose}>
             Close
           </button>
-          <button
-            type="button"
-            className="btn-secondary btn-hide-job"
-            onClick={() => onHide?.(job._id)}
-          >
-            Hide Job
-          </button>
+          {onHide && (
+            <button
+              type="button"
+              className="btn-secondary btn-hide-job"
+              onClick={() => onHide(job._id)}
+            >
+              Hide Job
+            </button>
+          )}
         </div>
       </div>
     </div>
