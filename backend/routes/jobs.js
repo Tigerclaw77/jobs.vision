@@ -57,7 +57,7 @@ const WORK_ARRANGEMENT_ALIASES = new Map([
   ["remote", "remote"],
 ]);
 
-const PUBLIC_JOB_COLUMNS = [
+const PUBLIC_JOB_COLUMN_NAMES = [
   "id",
   "title",
   "description",
@@ -86,10 +86,40 @@ const PUBLIC_JOB_COLUMNS = [
   "venue_store_id",
   "venue_note",
   "status",
-].join(",");
+];
+const PUBLIC_JOB_COLUMNS_CACHE_MS = 60_000;
+let cachedPublicJobColumns = null;
+let cachedPublicJobColumnsAt = 0;
 
 function isAdmin(user) {
   return String(user?.role || "").toLowerCase() === "admin";
+}
+
+async function getPublicJobColumns() {
+  const now = Date.now();
+  if (cachedPublicJobColumns && now - cachedPublicJobColumnsAt < PUBLIC_JOB_COLUMNS_CACHE_MS) {
+    return cachedPublicJobColumns;
+  }
+
+  const result = await query(
+    `
+      select column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'jobs'
+    `
+  );
+  const available = new Set((result.rows || []).map((row) => row.column_name));
+
+  cachedPublicJobColumns = PUBLIC_JOB_COLUMN_NAMES.map((column) => {
+    if (column === "work_arrangement" && !available.has(column)) {
+      return "null::text as work_arrangement";
+    }
+    return column;
+  }).join(",");
+  cachedPublicJobColumnsAt = now;
+
+  return cachedPublicJobColumns;
 }
 
 function canManageJob(user, job) {
@@ -382,9 +412,10 @@ router.get("/", maybeAuth, async (req, res) => {
     params.push(safeOffset);
     const offsetParam = params.length;
 
+    const publicJobColumns = await getPublicJobColumns();
     const result = await query(
       `
-        select ${PUBLIC_JOB_COLUMNS}
+        select ${publicJobColumns}
         from public.jobs
         where ${where.join(" and ")}
         order by posted_at desc

@@ -6,8 +6,17 @@ function apiBaseUrl() {
   return raw.endsWith("/api") ? raw : `${raw}/api`;
 }
 
-export async function getRoleTier() {
-  const { user } = await getNeonUser();
+function roleFromAccount(account, fallbackRole) {
+  return account?.profile?.role || account?.role || fallbackRole || null;
+}
+
+function tierFromAccount(account, fallbackTier) {
+  return account?.tier || account?.entitlements?.tier || fallbackTier || null;
+}
+
+export async function getRoleTier(options = {}) {
+  const { account = null, user: providedUser = null, session: providedSession = null } = options || {};
+  const { user } = providedUser ? { user: providedUser } : await getNeonUser();
   if (!user) return { role: null, tier: null, entitlements: null, user };
 
   const metadata = {
@@ -17,7 +26,20 @@ export async function getRoleTier() {
   let role = metadata.role || metadata.accountRole || metadata.userRole || null;
   let tier = metadata.tier || null;
 
-  const { session } = await getNeonSession();
+  if (account) {
+    role = roleFromAccount(account, role);
+    tier = tierFromAccount(account, tier);
+    return {
+      role,
+      tier: tier || null,
+      entitlements: account?.entitlements || null,
+      user,
+    };
+  }
+
+  const { session } = providedSession
+    ? { session: providedSession }
+    : await getNeonSession();
   const token = session?.access_token;
 
   if (token) {

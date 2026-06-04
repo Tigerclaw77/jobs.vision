@@ -25,6 +25,7 @@ export function useAuth() {
 
 export default function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
+  const [account, setAccount] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -38,11 +39,14 @@ export default function AuthProvider({ children }) {
       const { session: currentSession } = await getNeonSession();
       if (!alive) return;
 
+      setLoadingProfile(!!currentSession);
       setSession(currentSession || null);
       setLoading(false);
 
       unsub = neonAuth.onAuthStateChange((_event, nextSession) => {
-        setSession(normalizeSessionResult({ data: { session: nextSession } }) || null);
+        const normalized = normalizeSessionResult({ data: { session: nextSession } }) || null;
+        setLoadingProfile(!!normalized);
+        setSession(normalized);
       }).data?.subscription;
     })();
 
@@ -55,16 +59,20 @@ export default function AuthProvider({ children }) {
   useEffect(() => {
     (async () => {
       if (!session) {
+        setAccount(null);
         setProfile(null);
+        setLoadingProfile(false);
         return;
       }
 
       setLoadingProfile(true);
       try {
         const me = await fetchMe(session.access_token);
+        setAccount(me || null);
         setProfile(me.profile || { id: me.id, email: me.email, role: me.role });
       } catch {
         await neonAuth.signOut();
+        setAccount(null);
         setProfile(null);
       } finally {
         setLoadingProfile(false);
@@ -73,20 +81,44 @@ export default function AuthProvider({ children }) {
   }, [session]);
 
   const value = useMemo(
-    () => ({
-      session,
-      user: session?.user || null,
-      accessToken: session?.access_token || null,
-      profile,
-      role: profile?.role || null,
-      loading,
-      loadingProfile,
-      async signOut() {
-        await neonAuth.signOut();
-        setProfile(null);
-      },
-    }),
-    [session, profile, loading, loadingProfile]
+    () => {
+      const metadata = {
+        ...(session?.user?.app_metadata || {}),
+        ...(session?.user?.user_metadata || {}),
+      };
+      const role =
+        profile?.role ||
+        account?.profile?.role ||
+        account?.role ||
+        metadata.role ||
+        metadata.accountRole ||
+        metadata.userRole ||
+        null;
+      const tier =
+        account?.tier ||
+        account?.entitlements?.tier ||
+        metadata.tier ||
+        null;
+
+      return {
+        session,
+        user: session?.user || null,
+        accessToken: session?.access_token || null,
+        account,
+        profile,
+        role,
+        tier,
+        entitlements: account?.entitlements || null,
+        loading,
+        loadingProfile,
+        async signOut() {
+          await neonAuth.signOut();
+          setAccount(null);
+          setProfile(null);
+        },
+      };
+    },
+    [session, account, profile, loading, loadingProfile]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

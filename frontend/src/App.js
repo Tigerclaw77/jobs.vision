@@ -1,5 +1,5 @@
 // App.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Route,
@@ -10,11 +10,7 @@ import {
 import { useDispatch } from "react-redux";
 
 import { fetchUserSession } from "./store/authSlice";
-import {
-  fetchNotifications,
-  clearNotifications,
-} from "./store/notificationsSlice";
-import { fetchUserJobData } from "./store/jobSlice";
+import { clearNotifications } from "./store/notificationsSlice";
 
 import Login from "./components/Login";
 import Logout from "./components/Logout";
@@ -118,7 +114,7 @@ function PublicOnlyRoute({ children }) {
   const { isRealAdmin, effectiveRole } = useAdminViewMode();
   const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
 
-  if (loading) return null; // wait for session to resolve
+  if (loading) return <RouteLoading message="Loading..." />;
   if (session && !viewingAsGuest) {
     // If we don't know role yet, just park at Home; private pages will route correctly once role is loaded.
     const routeRole = isRealAdmin && effectiveRole && effectiveRole !== "admin" ? effectiveRole : role;
@@ -135,16 +131,34 @@ function PublicOnlyRoute({ children }) {
   return children;
 }
 
+function RouteLoading({ message = "Loading..." }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        minHeight: "220px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#f8fafc",
+        fontWeight: 700,
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 /**
  * AppShell
- * - Waits for AuthProvider to finish loading session once.
- * - Bootstraps Redux slices AFTER a real session exists (prevents loops/flicker).
- * - Renders all routes.
+ * - Renders the page shell immediately.
+ * - Hydrates legacy Redux auth state after AuthProvider resolves the account.
+ * - Lets protected routes handle private-route loading states.
  */
 function AppShell() {
   const dispatch = useDispatch();
-  const { session, loading } = useAuth();
-  const [bootstrapped, setBootstrapped] = useState(false);
+  const { session, user, account, loading, loadingProfile } = useAuth();
 
   // Session-gated bootstrap: only fetch user/notifications when a real session exists
   useEffect(() => {
@@ -155,31 +169,20 @@ function AppShell() {
       if (!session) {
         // signed-out: clear any user-specific state and render public routes
         dispatch(clearNotifications());
-        if (mounted) setBootstrapped(true);
         return;
       }
 
-      try {
-        // hydrate your Redux auth slice + fetch user-linked data once
-        const res = await dispatch(fetchUserSession()).unwrap();
+      if (loadingProfile && !account) return;
 
-        if (res?.user) {
-          dispatch(fetchNotifications());
-          dispatch(
-            fetchUserJobData({
-              savedJobs: res.user.savedJobs || [],
-              appliedJobs: res.user.appliedJobs || [],
-              recruiterJobs: res.user.recruiterJobs || [],
-              hiddenJobs: res.user.hiddenJobs || [],
-            })
-          );
-        } else {
+      try {
+        // Hydrate legacy Redux auth state from AuthProvider's already-loaded account.
+        const res = await dispatch(fetchUserSession({ session, user, account })).unwrap();
+
+        if (!res?.user) {
           dispatch(clearNotifications());
         }
       } catch {
-        dispatch(clearNotifications());
-      } finally {
-        if (mounted) setBootstrapped(true);
+        if (mounted) dispatch(clearNotifications());
       }
     }
 
@@ -187,10 +190,7 @@ function AppShell() {
     return () => {
       mounted = false;
     };
-  }, [dispatch, session, loading]);
-
-  // Prevent header/user flicker before we know the real session state
-  if (loading || !bootstrapped) return null;
+  }, [dispatch, session, user, account, loading, loadingProfile]);
 
   return (
     <Router>

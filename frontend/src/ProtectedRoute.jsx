@@ -1,17 +1,14 @@
 // src/ProtectedRoute.jsx
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { getNeonSession, neonAuth } from "./utils/neonAuthClient";
-import { getRoleTier } from "./utils/getRoleTier";
 import { useAdminViewMode } from "./components/auth/AdminViewModeProvider";
+import { useAuth } from "./components/auth/AuthProvider";
 
 /**
- * Minimal route guard:
- * - Reads session from Neon Auth directly.
- * - Resolves role (and optionally tier) via getRoleTier().
- * - Admin bypass.
- * - Preserves ?next= on redirect.
- * - No external providers. No styling changes.
+ * Route guard:
+ * - Uses AuthProvider as the source of truth for session/profile.
+ * - Avoids duplicate /api/auth/me calls inside protected routes.
+ * - Fails closed without flashing protected content.
  */
 export default function ProtectedRoute({
   children,
@@ -20,70 +17,41 @@ export default function ProtectedRoute({
 }) {
   const loc = useLocation();
   const { isRealAdmin, mode, effectiveRole, effectivePlan } = useAdminViewMode();
-  const [ready, setReady] = useState(false);
-  const [authed, setAuthed] = useState(false);
-  const [role, setRole] = useState(null);
-  const [tier, setTier] = useState(null);
+  const {
+    session,
+    user,
+    account,
+    profile,
+    role: authRole,
+    tier: authTier,
+    loading,
+    loadingProfile,
+  } = useAuth();
 
-  const needsTier = allowedTiers.length > 0;
-
-  useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      // 1) Session
-      const { session } = await getNeonSession();
-      if (!alive) return;
-
-      if (!session) {
-        setAuthed(false);
-        setReady(true);
-        return;
-      }
-
-      // 2) Role (and tier if requested)
-      try {
-        const rt = await getRoleTier(); // expected { role, tier }
-        if (!alive) return;
-
-        setAuthed(true);
-        setRole(rt?.role ? String(rt.role).toLowerCase() : null);
-        setTier(rt?.tier ? String(rt.tier).toLowerCase() : null);
-      } catch {
-        if (!alive) return;
-        setAuthed(true);
-        setRole(null);
-        setTier(null);
-      } finally {
-        if (alive) setReady(true);
-      }
-    }
-
-    load();
-    const sub = neonAuth.onAuthStateChange((_evt, session) => {
-      if (!alive) return;
-      if (!session) {
-        setAuthed(false);
-        setRole(null);
-        setTier(null);
-        setReady(true);
-      } else {
-        // re-run load to refresh role/tier
-        load();
-      }
-    });
-
-    return () => {
-      alive = false;
-      sub.data?.subscription?.unsubscribe?.();
-    };
-  }, [needsTier]);
-
-  // Wait until we definitively know session/role
-  if (!ready) return null;
+  const metadata = {
+    ...(user?.app_metadata || {}),
+    ...(user?.user_metadata || {}),
+  };
+  const role = String(
+    authRole ||
+      profile?.role ||
+      account?.profile?.role ||
+      account?.role ||
+      metadata.role ||
+      metadata.accountRole ||
+      metadata.userRole ||
+      ""
+  ).toLowerCase();
+  const tier = String(
+    authTier ||
+      account?.tier ||
+      account?.entitlements?.tier ||
+      metadata.tier ||
+      ""
+  ).toLowerCase();
 
   const hasEffectiveMode = isRealAdmin && mode !== "admin";
-  const guardAuthed = hasEffectiveMode ? effectiveRole !== "guest" : authed;
+  const guardAuthed = hasEffectiveMode ? effectiveRole !== "guest" : Boolean(session);
   const guardRole =
     hasEffectiveMode && effectiveRole !== "guest"
       ? String(effectiveRole || "").toLowerCase()
@@ -93,24 +61,25 @@ export default function ProtectedRoute({
       ? String(effectivePlan || "").toLowerCase()
       : tier;
 
-  // Not authenticated → bounce to login with ?next=
+  if (loading || (session && loadingProfile && !guardRole)) {
+    return <RouteLoading />;
+  }
+
   if (!guardAuthed) {
     const next = encodeURIComponent(loc.pathname + loc.search);
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
-  // If role hasn’t resolved yet, pause to avoid mis-routing
-  if (!guardRole) return null;
+  if (!guardRole) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
-  // Admin bypass
   if (guardRole === "admin") return children;
 
-  // Role gating
   const roleAllowed =
     allowedUserRoles.length === 0 ||
     allowedUserRoles.map((r) => r.toLowerCase()).includes(guardRole);
 
-  // Tier gating (only if requested)
   const tierAllowed =
     allowedTiers.length === 0 ||
     (guardTier ? allowedTiers.map((t) => t.toLowerCase()).includes(guardTier) : false);
@@ -120,4 +89,23 @@ export default function ProtectedRoute({
   }
 
   return children;
+}
+
+function RouteLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        minHeight: "220px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#f8fafc",
+        fontWeight: 700,
+      }}
+    >
+      Loading...
+    </div>
+  );
 }

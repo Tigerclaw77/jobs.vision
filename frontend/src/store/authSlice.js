@@ -9,7 +9,35 @@ function apiBaseUrl() {
   return raw.endsWith("/api") ? raw : `${raw}/api`;
 }
 
-async function getRoleTier(_userId, metaRole, token, metaTier) {
+function roleFromAccount(account, fallbackRole) {
+  return (
+    account?.profile?.role ||
+    account?.role ||
+    fallbackRole ||
+    "candidate"
+  );
+}
+
+function tierFromAccount(account, role, fallbackTier) {
+  return (
+    account?.tier ||
+    account?.entitlements?.tier ||
+    fallbackTier ||
+    (role === "recruiter" ? "staff" : "free")
+  );
+}
+
+async function getRoleTier(_userId, metaRole, token, metaTier, account = null) {
+  if (account) {
+    const role = roleFromAccount(account, metaRole);
+    return {
+      role,
+      tier: tierFromAccount(account, role, metaTier),
+      entitlements: account?.entitlements || null,
+      profile: account?.profile || null,
+    };
+  }
+
   if (metaRole === "admin") {
     return {
       role: "admin",
@@ -76,10 +104,14 @@ const initialState = {
  */
 export const fetchUserSession = createAsyncThunk(
   "auth/fetchUserSession",
-  async (_, thunkAPI) => {
+  async (provided = {}, thunkAPI) => {
     try {
-      const { session } = await getNeonSession();
-      const { user } = await getNeonUser();
+      const { session } = provided.session
+        ? { session: provided.session }
+        : await getNeonSession();
+      const { user } = provided.user
+        ? { user: provided.user }
+        : await getNeonUser();
       if (!session || !user) return thunkAPI.rejectWithValue("No active session");
 
       const metaRole =
@@ -91,11 +123,12 @@ export const fetchUserSession = createAsyncThunk(
         user?.user_metadata?.userRole ||
         null;
       const metaTier = user?.app_metadata?.tier || user?.user_metadata?.tier || null;
-      const { role, tier, entitlements } = await getRoleTier(
+      const { role, tier, entitlements, profile } = await getRoleTier(
         user.id,
         metaRole,
         session.access_token,
-        metaTier
+        metaTier,
+        provided.account
       );
 
       const shapedUser = {
@@ -105,6 +138,7 @@ export const fetchUserSession = createAsyncThunk(
         userRole: role,   // keep this for places that read user.userRole
         tier,             // AccessGate reads this
         entitlements,
+        profile,
         ...user.user_metadata, // e.g., firstName, lastName, recruiterType
       };
 

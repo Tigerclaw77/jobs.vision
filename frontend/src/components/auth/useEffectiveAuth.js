@@ -134,8 +134,13 @@ export function useEffectiveAuth() {
 
   const realRole = String(roleFromState(auth, authState) || "").toLowerCase();
   const realUser = authState.user || auth.user || null;
-  const realTier = authState.user?.tier || authState.user?.entitlements?.tier || null;
-  const realEntitlements = authState.user?.entitlements || null;
+  const realTier =
+    authState.user?.tier ||
+    auth.tier ||
+    authState.user?.entitlements?.tier ||
+    auth.entitlements?.tier ||
+    null;
+  const realEntitlements = authState.user?.entitlements || auth.entitlements || null;
   const realIsAuthenticated =
     !!auth.session || !!authState.isAuthenticated || !!authState.token || !!authState.user;
 
