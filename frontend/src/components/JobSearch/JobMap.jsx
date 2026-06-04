@@ -14,8 +14,8 @@ function getPosition(job) {
   return { lat: nLat, lng: nLng };
 }
 
-const DEFAULT_CENTER = { lat: 31.0, lng: -99.0 };
-const DEFAULT_ZOOM = 5;
+const DEFAULT_CENTER = { lat: 39.0, lng: -98.0 };
+const DEFAULT_ZOOM = 4;
 
 function getSearchCenter(center) {
   const lat = center?.lat;
@@ -84,6 +84,7 @@ const JobMap = ({
   searchCenter = null,
   radiusMi = 25,
   hasActiveRadius = false,
+  fitToJobs = false,
   emptyMessage = "",
 }) => {
   const mapEl = useRef(null);
@@ -176,11 +177,12 @@ const JobMap = ({
     if (!map.current || !showMap) return;
     let cancelled = false;
     const activeCenter = hasActiveRadius ? getSearchCenter(searchCenter) : null;
+    const shouldFitJobs = Boolean(hasActiveRadius || fitToJobs);
     const markerPositions = [];
 
     const applyViewport = () => {
       if (cancelled || !map.current) return;
-      if (markerPositions.length > 0) {
+      if (shouldFitJobs && markerPositions.length > 0) {
         const uniquePositions = markerPositions.filter((position, index, list) => {
           return (
             list.findIndex(
@@ -243,7 +245,7 @@ const JobMap = ({
     return () => {
       cancelled = true;
     };
-  }, [jobs, ready, showMap, searchCenter, radiusMi, hasActiveRadius]); // <- NO onMarkerClick here
+  }, [jobs, ready, showMap, searchCenter, radiusMi, hasActiveRadius, fitToJobs]); // <- NO onMarkerClick here
 
   return (
     <div className="job-map-shell" style={{ display: showMap ? "block" : "none" }}>

@@ -41,9 +41,8 @@ function FilterChecks({ legend, options, selected = [], onToggle }) {
   );
 }
 
-function selectedSummary(label, selected = []) {
-  const values = Array.isArray(selected) ? selected : [];
-  return values.length ? `${label} (${values.length})` : label;
+function selectedSummary(label) {
+  return label;
 }
 
 function CheckboxDropdown({ label, options, selected = [], onToggle }) {
@@ -52,7 +51,7 @@ function CheckboxDropdown({ label, options, selected = [], onToggle }) {
   return (
     <details className="field field-role filter-dropdown">
       <summary className="filter-dropdown-summary">
-        <span>{selectedSummary(label, values)}</span>
+        <span>{selectedSummary(label)}</span>
       </summary>
       <div className="filter-dropdown-menu" role="group" aria-label={label}>
         {options.map((option) => (
@@ -231,23 +230,25 @@ export default function JobFilter({
           </div>
         )}
 
-        <div className="field field-show-hidden">
-          <label className="show-hidden-toggle">
-            <input
-              type="checkbox"
-              checked={Boolean(filters.showHiddenJobs)}
-              onChange={(e) => set({ showHiddenJobs: e.target.checked })}
-            />
-            <span>Show Hidden Jobs</span>
-          </label>
-        </div>
+        <div className="filter-role-hidden-row">
+          <CheckboxDropdown
+            label="Role(s)"
+            options={ROLE_OPTIONS}
+            selected={filters.roles}
+            onToggle={(value) => toggleMulti("roles", value)}
+          />
 
-        <CheckboxDropdown
-          label="Role(s)"
-          options={ROLE_OPTIONS}
-          selected={filters.roles}
-          onToggle={(value) => toggleMulti("roles", value)}
-        />
+          <div className="field field-show-hidden">
+            <label className="show-hidden-toggle">
+              <input
+                type="checkbox"
+                checked={Boolean(filters.showHiddenJobs)}
+                onChange={(e) => set({ showHiddenJobs: e.target.checked })}
+              />
+              <span>Show Hidden Jobs</span>
+            </label>
+          </div>
+        </div>
 
         <FilterChecks
           legend="Employment Type"

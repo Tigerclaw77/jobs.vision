@@ -230,6 +230,14 @@
   color:#f8fbff !important;
   white-space:nowrap;
 }
+.filter-role-hidden-row{
+  grid-column:1 / -1;
+  display:grid;
+  grid-template-columns:minmax(190px, 1fr) clamp(180px, 28%, 240px);
+  gap:12px;
+  align-items:end;
+  min-width:0;
+}
 .show-hidden-toggle{
   width:100%;
   min-height:40px;
@@ -703,8 +711,7 @@
 .jobsearch-scope .quick-tags { grid-column: 1 / -1; margin-top: 6px; }
 .jobsearch-scope .field-location{ grid-column: 1 / 2; }
 .jobsearch-scope .field-radius  { grid-column: 2 / 3; }
-.jobsearch-scope .field-role    { grid-column: 1 / 2; }
-.jobsearch-scope .field-show-hidden{ grid-column: 2 / 3; align-self:end; }
+.jobsearch-scope .filter-role-hidden-row{ grid-column: 1 / -1; }
 .jobsearch-scope .filter-grid > .field-checks  { grid-column: 1 / -1; }
 .jobsearch-scope .advanced-filter-shell{ grid-column: 1 / -1; }
 .jobsearch-scope .reset-cell    { grid-column: 1 / -1; justify-self:end; align-self:start; }
@@ -777,10 +784,10 @@
   .jobsearch-scope .quick-tags,
   .jobsearch-scope .field-location,
   .jobsearch-scope .field-radius,
-  .jobsearch-scope .field-role,
-  .jobsearch-scope .field-show-hidden,
+  .jobsearch-scope .filter-role-hidden-row,
   .jobsearch-scope .field-checks,
   .jobsearch-scope .advanced-filter-shell{ grid-column: 1 / -1; }
+  .filter-role-hidden-row{ grid-template-columns:1fr; }
   .advanced-filter-content{ grid-template-columns:1fr; }
   .jobsearch-scope .reset-cell{ grid-column: 1 / -1; justify-self:stretch; }
   .jobsearch-scope .clear-filters{ width:100% !important; }

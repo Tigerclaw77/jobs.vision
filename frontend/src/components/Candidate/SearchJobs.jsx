@@ -45,14 +45,14 @@ function CheckboxGroup({ legend, options, selected = [], onToggle }) {
   );
 }
 
-function selectedSummary(label, selected = []) {
-  return selected.length ? `${label} (${selected.length})` : label;
+function selectedSummary(label) {
+  return label;
 }
 
 function CheckboxDropdown({ label, options, selected = [], onToggle }) {
   return (
     <details style={styles.dropdown}>
-      <summary style={styles.dropdownSummary}>{selectedSummary(label, selected)}</summary>
+      <summary style={styles.dropdownSummary}>{selectedSummary(label)}</summary>
       <div style={styles.dropdownMenu} role="group" aria-label={label}>
         {options.map((option) => (
           <label key={option.value} style={styles.dropdownLabel}>

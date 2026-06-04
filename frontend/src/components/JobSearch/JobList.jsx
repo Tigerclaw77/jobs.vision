@@ -365,6 +365,22 @@ export default function JobList() {
   const hasLocationText = Boolean(normalizedLocation);
   const hasActiveRadius =
     canUseMapSearch && hasLocationText && geocodeStatus === "success" && Boolean(searchCenter);
+  const shouldFitMapToJobs = useMemo(() => {
+    const hasArrayFilter = [
+      filters.roles,
+      filters.employmentTypes,
+      filters.workArrangements,
+      filters.opportunityTypes,
+      filters.practiceTypes,
+    ].some((value) => normalizeFilterArray(value).length > 0);
+
+    return Boolean(
+      cleanLocationInput(filters.q) ||
+        cleanLocationInput(filters.company) ||
+        cleanLocationInput(filters.location) ||
+        hasArrayFilter
+    );
+  }, [filters]);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -856,6 +872,7 @@ const removeQuickTag = (tag) => {
                 searchCenter={searchCenter}
                 radiusMi={filters.radiusMi}
                 hasActiveRadius={hasActiveRadius}
+                fitToJobs={shouldFitMapToJobs}
                 emptyMessage={mapEmptyMessage}
                 onMarkerClick={
                   canUseMapSearch
