@@ -7,7 +7,7 @@
 :root {
   --top-panel-height: 390px;
   --map-panel-height: var(--top-panel-height);
-  --filter-label-control-gap: 12px;
+  --filter-label-control-gap: 9px;
 }
 .jobs-top{
   display:grid;
@@ -34,7 +34,7 @@
 .filters-panel{
   min-height: var(--top-panel-height);
   height:auto;
-  padding:12px;
+  padding:10px;
   border:1px solid var(--stroke);
   border-radius:12px;
   background: var(--glass);
@@ -47,14 +47,14 @@
   display:flex;
   flex-direction:column;
   box-sizing:border-box;
-  background:transparent; border:0; padding:12px; gap:10px;
+  background:transparent; border:0; padding:10px; gap:8px;
 }
 .filters-panel *, .job-filter *, .filter-grid *, .field * { box-sizing: border-box; }
 
 /* base controls */
 .filter-grid{
   display:grid;
-  gap:12px 14px;
+  gap:9px 12px;
   min-width:0;
   grid-template-columns: 1fr 1fr;
 }
@@ -104,15 +104,15 @@
 .filter-check-group{
   display:flex;
   flex-wrap:wrap;
-  gap:10px 12px;
+  gap:7px 9px;
   align-items:center;
 }
 .filter-check{
   display:inline-flex;
   align-items:center;
-  gap:7px;
-  min-height:36px;
-  padding:8px 12px;
+  gap:6px;
+  min-height:32px;
+  padding:6px 10px;
   border:1px solid var(--stroke);
   border-radius:10px;
   background:rgba(255,255,255,.06);
@@ -145,20 +145,24 @@
 }
 .filter-dropdown-summary{
   width:100%;
-  min-height:40px;
+  min-height:38px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  padding:10px 12px;
+  padding:8px 11px;
   border:1px solid var(--stroke);
   border-radius:10px;
   background:rgba(255,255,255,.06);
-  color:var(--text);
+  color:#f8fbff !important;
   cursor:pointer;
   font-size:.95rem;
   outline:none;
   list-style:none;
+}
+.filter-dropdown-summary,
+.filter-dropdown-summary span{
+  color:#f8fbff !important;
 }
 .filter-dropdown-summary::-webkit-details-marker{ display:none; }
 .filter-dropdown-summary::after{
@@ -179,25 +183,28 @@
 }
 .filter-dropdown-menu{
   position:absolute;
-  top:calc(100% + 6px);
+  top:calc(100% + 5px);
   left:0;
-  right:0;
+  right:auto;
   z-index:30;
   display:flex;
   flex-direction:column;
-  gap:4px;
-  padding:8px;
+  gap:2px;
+  width:min(100%, 260px);
+  min-width:220px;
+  padding:6px;
   border:1px solid var(--stroke);
   border-radius:10px;
   background:#0a2540;
   box-shadow:0 16px 34px rgba(0,0,0,.32);
 }
 .filter-dropdown-option{
-  min-height:34px;
+  min-height:30px;
   display:flex;
   align-items:center;
-  gap:8px;
-  padding:7px 8px;
+  justify-content:flex-start;
+  gap:6px;
+  padding:5px 7px;
   border-radius:8px;
   color:var(--text);
   cursor:pointer;
@@ -207,15 +214,16 @@
   background:rgba(255,255,255,.08);
 }
 .filter-dropdown-option input{
-  width:14px;
-  height:14px;
-  min-width:14px;
+  width:13px;
+  height:13px;
+  min-width:13px;
+  margin:0;
   accent-color:#47d7b2;
 }
 .filter-dropdown-option span{
-  font-size:.9rem;
+  font-size:.88rem;
   line-height:1.1;
-  color:var(--text);
+  color:#f8fbff !important;
 }
 .show-hidden-toggle{
   width:100%;
@@ -427,12 +435,16 @@
 }
 .jobs-result-summary{
   margin:0 0 10px;
-  padding:8px 10px;
-  border:1px solid rgba(255,255,255,.12);
+  padding:9px 14px 9px 18px;
+  border:1px solid rgba(255,255,255,.16);
+  border-left:3px solid rgba(71,215,178,.72);
   border-radius:10px;
-  background:rgba(20,22,28,.48);
+  background:linear-gradient(90deg, rgba(71,215,178,.14), rgba(20,22,28,.62) 42%);
   color:#eef2ff;
   font-size:.94rem;
+  font-weight:600;
+  letter-spacing:0;
+  box-shadow:0 8px 20px rgba(0,0,0,.14);
 }
 .location-status{
   grid-column:1 / -1;
