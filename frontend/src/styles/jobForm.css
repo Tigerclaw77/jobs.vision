@@ -1,0 +1,165 @@
+.recruiter-job-form-page {
+  width: 100%;
+  box-sizing: border-box;
+  padding: clamp(24px, 4vw, 48px) 16px 56px;
+  position: relative;
+  z-index: 5;
+}
+
+.recruiter-job-form-card {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: clamp(24px, 3vw, 36px);
+  box-sizing: border-box;
+  color: #f8fafc;
+  background: rgba(10, 18, 33, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+}
+
+.recruiter-job-form-title {
+  margin: 0 0 24px !important;
+  color: #ffffff !important;
+  font-size: clamp(1.45rem, 2vw, 1.85rem) !important;
+  font-weight: 800 !important;
+  text-align: center;
+}
+
+.recruiter-job-form-card .MuiFormControl-root,
+.recruiter-job-form-card .MuiTextField-root {
+  width: 100%;
+}
+
+.recruiter-job-form-card .MuiInputLabel-root {
+  color: rgba(248, 250, 252, 0.9) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0;
+}
+
+.recruiter-job-form-card .MuiInputLabel-root.Mui-focused,
+.recruiter-job-form-card .MuiInputLabel-root.MuiFormLabel-filled {
+  color: #ffffff !important;
+}
+
+.recruiter-job-form-card .MuiInputLabel-root.Mui-error {
+  color: #fecaca !important;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-root {
+  min-height: 56px;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.82);
+  border-radius: 10px;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-root textarea,
+.recruiter-job-form-card .MuiOutlinedInput-input,
+.recruiter-job-form-card .MuiSelect-select {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  font-weight: 500;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-input::placeholder {
+  color: rgba(248, 250, 252, 0.62) !important;
+  opacity: 1;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.36) !important;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(255, 255, 255, 0.64) !important;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #8bd3ff !important;
+  border-width: 2px;
+}
+
+.recruiter-job-form-card .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline {
+  border-color: #fca5a5 !important;
+}
+
+.recruiter-job-form-card .MuiSvgIcon-root {
+  color: rgba(248, 250, 252, 0.9);
+}
+
+.recruiter-job-form-card .MuiFormHelperText-root {
+  margin-left: 0;
+  color: #fecaca !important;
+  font-weight: 700;
+}
+
+.recruiter-job-form-card .MuiTypography-subtitle2 {
+  color: rgba(248, 250, 252, 0.92) !important;
+  font-weight: 800;
+}
+
+.recruiter-job-form-card .MuiChip-root {
+  color: #ffffff;
+  background: rgba(59, 130, 246, 0.32);
+  border: 1px solid rgba(147, 197, 253, 0.45);
+}
+
+.recruiter-job-form-card .MuiChip-deleteIcon {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.recruiter-job-form-card .MuiChip-deleteIcon:hover {
+  color: #ffffff;
+}
+
+.recruiter-job-form-actions {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.recruiter-job-form-actions .MuiButton-outlined {
+  border-color: rgba(147, 197, 253, 0.72);
+  color: #dbeafe;
+}
+
+.recruiter-job-form-actions .MuiButton-text {
+  color: #fed7aa;
+}
+
+.recruiter-job-form-actions .MuiButton-contained {
+  background: #0085b2;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.recruiter-job-form-actions .MuiButton-contained:hover {
+  background: #00739a;
+}
+
+.recruiter-job-form-card .MuiTypography-body2 {
+  color: #dbeafe !important;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .recruiter-job-form-page {
+    padding: 18px 12px 40px;
+  }
+
+  .recruiter-job-form-card {
+    padding: 20px;
+    border-radius: 14px;
+  }
+
+  .recruiter-job-form-actions {
+    align-items: stretch;
+  }
+
+  .recruiter-job-form-actions .MuiButton-root {
+    width: 100%;
+  }
+}

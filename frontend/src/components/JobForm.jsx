@@ -15,6 +15,7 @@ import {
 } from "@mui/material";
 
 import { createJob, updateJob } from "../utils/api";
+import "../styles/jobForm.css";
 
 // Draft storage key
 const DRAFT_KEY = "jobFormDraft:v1";
@@ -362,10 +363,17 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ maxWidth: 980, mx: "auto", p: 2 }}>
-      <Typography variant="h5" sx={{ mb: 2 }}>{isEditing ? "Edit Job" : "Add a Job"}</Typography>
+    <Box className="recruiter-job-form-page">
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        className="recruiter-job-form-card"
+      >
+        <Typography variant="h5" className="recruiter-job-form-title">
+          {isEditing ? "Edit Job" : "Add a Job"}
+        </Typography>
 
-      <Grid container spacing={2}>
+        <Grid container spacing={2.5}>
         <Grid item xs={12} md={8}>
           <TextField
             label="Job Title*"
@@ -557,7 +565,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
         </Grid>
 
         <Grid item xs={12}>
-          <Stack direction="row" spacing={1}>
+          <Stack className="recruiter-job-form-actions" direction="row" spacing={1}>
             {!isEditing && (
               <Button type="button" variant="outlined" onClick={saveDraft}>
                 Save Draft (Local)
@@ -580,7 +588,8 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
             </Typography>
           </Grid>
         )}
-      </Grid>
+        </Grid>
+      </Box>
     </Box>
   );
 }
