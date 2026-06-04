@@ -41,6 +41,40 @@ function FilterChecks({ legend, options, selected = [], onToggle }) {
   );
 }
 
+function selectedSummary(label, options, selected = []) {
+  const values = Array.isArray(selected) ? selected : [];
+  const selectedOptions = options.filter((option) => values.includes(option.value));
+  if (selectedOptions.length === 0) return label;
+  if (selectedOptions.length <= 2) {
+    return `${label}: ${selectedOptions.map((option) => option.label).join(", ")}`;
+  }
+  return `${label}: ${selectedOptions.length} selected`;
+}
+
+function CheckboxDropdown({ label, options, selected = [], onToggle }) {
+  const values = Array.isArray(selected) ? selected : [];
+
+  return (
+    <details className="field field-role filter-dropdown">
+      <summary className="filter-dropdown-summary">
+        <span>{selectedSummary(label, options, values)}</span>
+      </summary>
+      <div className="filter-dropdown-menu" role="group" aria-label={label}>
+        {options.map((option) => (
+          <label key={option.value} className="filter-dropdown-option">
+            <input
+              type="checkbox"
+              checked={values.includes(option.value)}
+              onChange={() => onToggle(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 export default function JobFilter({
   filters,
   onFilterChange,
@@ -213,8 +247,8 @@ export default function JobFilter({
           </label>
         </div>
 
-        <FilterChecks
-          legend="Roles"
+        <CheckboxDropdown
+          label="Roles"
           options={ROLE_OPTIONS}
           selected={filters.roles}
           onToggle={(value) => toggleMulti("roles", value)}

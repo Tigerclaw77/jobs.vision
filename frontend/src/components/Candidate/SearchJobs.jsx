@@ -45,6 +45,35 @@ function CheckboxGroup({ legend, options, selected = [], onToggle }) {
   );
 }
 
+function selectedSummary(label, options, selected = []) {
+  const selectedOptions = options.filter((option) => selected.includes(option.value));
+  if (selectedOptions.length === 0) return label;
+  if (selectedOptions.length <= 2) {
+    return `${label}: ${selectedOptions.map((option) => option.label).join(", ")}`;
+  }
+  return `${label}: ${selectedOptions.length} selected`;
+}
+
+function CheckboxDropdown({ label, options, selected = [], onToggle }) {
+  return (
+    <details style={styles.dropdown}>
+      <summary style={styles.dropdownSummary}>{selectedSummary(label, options, selected)}</summary>
+      <div style={styles.dropdownMenu} role="group" aria-label={label}>
+        {options.map((option) => (
+          <label key={option.value} style={styles.dropdownLabel}>
+            <input
+              type="checkbox"
+              checked={selected.includes(option.value)}
+              onChange={() => onToggle(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function mapJob(row = {}) {
   const employmentTypes = normalizeMultiValue(
     row.employment_types || row.employment_type || row.type,
@@ -196,8 +225,8 @@ const SearchJobs = () => {
       <h2>Search Jobs</h2>
 
       <div style={styles.filterContainer}>
-        <CheckboxGroup
-          legend="Roles"
+        <CheckboxDropdown
+          label="Roles"
           options={ROLE_OPTIONS}
           selected={filters.roles}
           onToggle={(value) => toggleFilter("roles", value)}
@@ -336,6 +365,43 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     gap: "6px",
+    cursor: "pointer",
+  },
+  dropdown: {
+    position: "relative",
+    minWidth: "220px",
+    textAlign: "left",
+  },
+  dropdownSummary: {
+    minHeight: "40px",
+    padding: "10px 12px",
+    border: "1px solid #ccc",
+    borderRadius: "5px",
+    background: "white",
+    color: "#111",
+    cursor: "pointer",
+    listStyle: "none",
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+    padding: "8px",
+    border: "1px solid #ccc",
+    borderRadius: "5px",
+    background: "white",
+    boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
+  },
+  dropdownLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "6px 8px",
     cursor: "pointer",
   },
 };
