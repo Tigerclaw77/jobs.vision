@@ -532,19 +532,23 @@ const rawJobs = [
   },
 ];
 
-const ownershipTrackTitles = new Set([
+const partnershipOpportunityTitles = new Set([
   "Optometrist - Growing Austin Practice",
-  "Optometrist - Mountain Community Practice",
   "Optometrist - Southwest Lifestyle Role",
 ]);
 
-const leaseOpportunityTitles = new Set(["Optometrist - Desert Market Growth Role"]);
+const practiceAcquisitionTitles = new Set(["Optometrist - Mountain Community Practice"]);
+
+const corporateLeaseTitles = new Set(["Optometrist - Desert Market Growth Role"]);
 
 const partTimeTitles = new Set([
-  "Optician - Community Eye Clinic",
   "Optician - Independent Optical",
-  "Ophthalmic Technician - Dry Eye and Specialty Testing",
   "Ophthalmic Technician - Northern Plains Eye Care",
+]);
+
+const perDiemFillInTitles = new Set([
+  "Optician - Community Eye Clinic",
+  "Ophthalmic Technician - Dry Eye and Specialty Testing",
 ]);
 
 const remoteTitles = new Set([
@@ -552,10 +556,27 @@ const remoteTitles = new Set([
   "Practice Administrator - Phoenix Metro",
 ]);
 
+const hybridTitles = new Set([
+  "Optometrist - Multi-Location Group",
+  "Practice Administrator - DFW Eye Clinic",
+  "Practice Manager - San Antonio Vision Group",
+  "Practice Manager - Specialty Eye Clinic",
+]);
+
+const associate1099Titles = new Set([
+  "Optician - Community Eye Clinic",
+  "Ophthalmic Technician - Dry Eye and Specialty Testing",
+]);
+
 function opportunityTypeFor(job) {
-  if (ownershipTrackTitles.has(job.title)) return "ownership_track";
-  if (leaseOpportunityTitles.has(job.title)) return "lease_opportunity";
-  return "associate_position";
+  if (practiceAcquisitionTitles.has(job.title)) return "practice_acquisition";
+  if (partnershipOpportunityTitles.has(job.title)) return "partnership_opportunity";
+  if (corporateLeaseTitles.has(job.title)) return "corporate_lease";
+  if (associate1099Titles.has(job.title)) return "associate_1099";
+  if (job.tags.includes("retail-optical") || job.tags.includes("multi-location")) {
+    return "corporate_employment";
+  }
+  return "associate_w2";
 }
 
 function practiceTypeFor(job) {
@@ -565,12 +586,19 @@ function practiceTypeFor(job) {
 }
 
 function employmentTypeFor(job) {
-  if (remoteTitles.has(job.title)) return "remote";
+  if (perDiemFillInTitles.has(job.title)) return "per_diem_fill_in";
   if (partTimeTitles.has(job.title)) return "part_time";
   return "full_time";
 }
 
+function workArrangementFor(job) {
+  if (remoteTitles.has(job.title)) return "remote";
+  if (hybridTitles.has(job.title)) return "hybrid";
+  return "on_site";
+}
+
 function hoursFor(job) {
+  if (job.employment_type === "per_diem_fill_in") return "8";
   return job.employment_type === "part_time" ? "24" : "40";
 }
 
@@ -579,22 +607,28 @@ const jobs = rawJobs.map((job) => ({
   opportunity_type: opportunityTypeFor(job),
   practice_type: practiceTypeFor(job),
   employment_type: employmentTypeFor(job),
+  work_arrangement: workArrangementFor(job),
 }));
 
 function assertSeedData() {
   if (jobs.length !== 40) throw new Error(`Expected 40 jobs, found ${jobs.length}.`);
 
   const allowedOpportunityTypes = new Set([
-    "associate_position",
-    "lease_opportunity",
-    "ownership_track",
+    "associate_w2",
+    "associate_1099",
+    "corporate_employment",
+    "corporate_lease",
+    "partnership_opportunity",
+    "practice_acquisition",
   ]);
   const allowedPracticeTypes = new Set(["private_practice", "corporate", "od_md"]);
-  const allowedEmploymentTypes = new Set(["full_time", "part_time", "remote"]);
+  const allowedEmploymentTypes = new Set(["full_time", "part_time", "per_diem_fill_in"]);
+  const allowedWorkArrangements = new Set(["on_site", "hybrid", "remote"]);
   const distributions = {
     opportunity_type: {},
     practice_type: {},
     employment_type: {},
+    work_arrangement: {},
   };
 
   const counts = jobs.reduce((acc, job) => {
@@ -611,12 +645,17 @@ function assertSeedData() {
     if (!allowedEmploymentTypes.has(job.employment_type)) {
       throw new Error(`Invalid employment_type for ${job.title}: ${job.employment_type}`);
     }
+    if (!allowedWorkArrangements.has(job.work_arrangement)) {
+      throw new Error(`Invalid work_arrangement for ${job.title}: ${job.work_arrangement}`);
+    }
     distributions.opportunity_type[job.opportunity_type] =
       (distributions.opportunity_type[job.opportunity_type] || 0) + 1;
     distributions.practice_type[job.practice_type] =
       (distributions.practice_type[job.practice_type] || 0) + 1;
     distributions.employment_type[job.employment_type] =
       (distributions.employment_type[job.employment_type] || 0) + 1;
+    distributions.work_arrangement[job.work_arrangement] =
+      (distributions.work_arrangement[job.work_arrangement] || 0) + 1;
     return acc;
   }, {});
 
@@ -648,6 +687,11 @@ function assertSeedData() {
       throw new Error(`Expected at least one seed job with employment_type=${type}.`);
     }
   }
+  for (const type of allowedWorkArrangements) {
+    if (!distributions.work_arrangement[type]) {
+      throw new Error(`Expected at least one seed job with work_arrangement=${type}.`);
+    }
+  }
 
   const featuredHoustonJobs = jobs.filter(
     (job) =>
@@ -668,6 +712,7 @@ async function ensureSeedColumns() {
   await query("alter table public.jobs add column if not exists opportunity_type text");
   await query("alter table public.jobs add column if not exists practice_type text");
   await query("alter table public.jobs add column if not exists employment_type text");
+  await query("alter table public.jobs add column if not exists work_arrangement text");
   await query("alter table public.jobs add column if not exists featured boolean not null default false");
 }
 
@@ -699,6 +744,7 @@ async function seedJobs() {
         opportunity_type,
         practice_type,
         employment_type,
+        work_arrangement,
         salary,
         tag_ids,
         status,
@@ -714,8 +760,8 @@ async function seedJobs() {
       )
       values (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17::text[], 'active', false, $18, false,
-        now(), now(), now(), $19, $20, now()
+        $11, $12, $13, $14, $15, $16, $17, $18::text[], 'active', false, $19, false,
+        now(), now(), now(), $20, $21, now()
       )
     `;
 
@@ -736,6 +782,7 @@ async function seedJobs() {
         job.opportunity_type,
         job.practice_type,
         job.employment_type,
+        job.work_arrangement,
         job.salary,
         job.tags,
         job.featured === true,

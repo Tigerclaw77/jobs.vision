@@ -30,6 +30,32 @@ const ROLE_ALIASES = new Map([
   ["optometrist", "optometrist"],
   ["optician", "optician"],
 ]);
+const OPPORTUNITY_TYPE_ALIASES = new Map([
+  ["associate w2", "associate_w2"],
+  ["associate w 2", "associate_w2"],
+  ["associate position", "associate_w2"],
+  ["associate 1099", "associate_1099"],
+  ["corporate employment", "corporate_employment"],
+  ["corporate lease", "corporate_lease"],
+  ["lease opportunity", "corporate_lease"],
+  ["partnership opportunity", "partnership_opportunity"],
+  ["ownership track", "partnership_opportunity"],
+  ["buy in opportunity", "partnership_opportunity"],
+  ["practice acquisition", "practice_acquisition"],
+]);
+const EMPLOYMENT_TYPE_ALIASES = new Map([
+  ["full time", "full_time"],
+  ["part time", "part_time"],
+  ["per diem fill in", "per_diem_fill_in"],
+  ["per diem", "per_diem_fill_in"],
+  ["fill in", "per_diem_fill_in"],
+]);
+const WORK_ARRANGEMENT_ALIASES = new Map([
+  ["on site", "on_site"],
+  ["onsite", "on_site"],
+  ["hybrid", "hybrid"],
+  ["remote", "remote"],
+]);
 
 const PUBLIC_JOB_COLUMNS = [
   "id",
@@ -47,6 +73,7 @@ const PUBLIC_JOB_COLUMNS = [
   "opportunity_type",
   "practice_type",
   "employment_type",
+  "work_arrangement",
   "salary",
   "tag_ids",
   "featured",
@@ -74,6 +101,57 @@ function requestError(statusCode, message, code) {
   error.statusCode = statusCode;
   error.code = code;
   return error;
+}
+
+function normalizeChoiceKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[()]/g, "")
+    .replace(/[/-]+/g, " ")
+    .replace(/[_]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function normalizeOptionalChoice(value, aliases, message, code) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const canonical = aliases.get(normalizeChoiceKey(raw));
+  if (canonical) return canonical;
+  throw requestError(400, message, code);
+}
+
+function normalizeOpportunityType(value) {
+  return normalizeOptionalChoice(
+    value,
+    OPPORTUNITY_TYPE_ALIASES,
+    "Please choose a valid opportunity type.",
+    "invalid_opportunity_type"
+  );
+}
+
+function normalizeEmploymentType(value) {
+  return normalizeOptionalChoice(
+    value,
+    EMPLOYMENT_TYPE_ALIASES,
+    "Please choose a valid employment type.",
+    "invalid_employment_type"
+  );
+}
+
+function normalizeWorkArrangement(value) {
+  return normalizeOptionalChoice(
+    value,
+    WORK_ARRANGEMENT_ALIASES,
+    "Please choose a valid work arrangement.",
+    "invalid_work_arrangement"
+  );
+}
+
+function isLegacyRemoteEmployment(value) {
+  return normalizeChoiceKey(value) === "remote";
 }
 
 function normalizeRole(value, { required = false } = {}) {
@@ -364,6 +442,16 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
 
     const role = normalizeRole(req.body.role, { required: true });
     const coordinates = await resolveJobCoordinates(req.body, { required: true });
+    const rawEmploymentType = req.body.employment_type ?? req.body.type;
+    const legacyRemoteEmployment = isLegacyRemoteEmployment(rawEmploymentType);
+    const employment_type = legacyRemoteEmployment
+      ? "full_time"
+      : normalizeEmploymentType(rawEmploymentType);
+    const work_arrangement = normalizeWorkArrangement(
+      req.body.work_arrangement ??
+        req.body.onsite_type ??
+        (legacyRemoteEmployment ? "remote" : undefined)
+    );
 
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
@@ -414,10 +502,11 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       longitude: coordinates.longitude,
       role,
       hours: req.body.hours ?? null,
-      type: req.body.type ?? req.body.employment_type ?? null,
-      opportunity_type: toNullableText(req.body.opportunity_type),
+      type: employment_type ?? null,
+      opportunity_type: normalizeOpportunityType(req.body.opportunity_type),
       practice_type: toNullableText(req.body.practice_type),
-      employment_type: toNullableText(req.body.employment_type),
+      employment_type,
+      work_arrangement,
       salary: req.body.salary ?? null,
       tag_ids: toTagIds(req.body.tag_ids),
       recruiter_id,
@@ -494,6 +583,7 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "opportunity_type",
       "practice_type",
       "employment_type",
+      "work_arrangement",
       "salary",
       "tag_ids",
       "employer_name",
@@ -527,10 +617,28 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       delete updates.longitude;
     }
 
-    if ("opportunity_type" in updates) updates.opportunity_type = toNullableText(updates.opportunity_type);
+    if ("opportunity_type" in updates) updates.opportunity_type = normalizeOpportunityType(updates.opportunity_type);
     if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
-    if ("employment_type" in updates) updates.employment_type = toNullableText(updates.employment_type);
-    if ("employment_type" in updates && !("type" in updates)) updates.type = updates.employment_type;
+    const hasEmploymentInput = "employment_type" in req.body || "type" in req.body;
+    const rawEmploymentType = req.body.employment_type ?? req.body.type;
+    const legacyRemoteEmployment = hasEmploymentInput && isLegacyRemoteEmployment(rawEmploymentType);
+    if (hasEmploymentInput) {
+      updates.employment_type = legacyRemoteEmployment
+        ? "full_time"
+        : normalizeEmploymentType(rawEmploymentType);
+      updates.type = updates.employment_type;
+    }
+    const hasWorkArrangementInput =
+      "work_arrangement" in req.body || "onsite_type" in req.body || legacyRemoteEmployment;
+    if (hasWorkArrangementInput) {
+      updates.work_arrangement = normalizeWorkArrangement(
+        req.body.work_arrangement ??
+          req.body.onsite_type ??
+          (legacyRemoteEmployment ? "remote" : undefined)
+      );
+    } else if ("work_arrangement" in updates) {
+      updates.work_arrangement = normalizeWorkArrangement(updates.work_arrangement);
+    }
 
     let employer_name =
       ("employer_name" in updates ? updates.employer_name : job.employer_name) ??

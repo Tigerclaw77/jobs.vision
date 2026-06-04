@@ -124,17 +124,25 @@ async function geocodeAddress(address, apiKey) {
 const TYPE_LABEL = {
   full_time: "Full-time",
   part_time: "Part-time",
-  remote: "Remote",
+  per_diem_fill_in: "Per Diem / Fill-In",
 };
 const OPPORTUNITY_TYPE_LABEL = {
-  associate_position: "Associate Position",
-  lease_opportunity: "Lease Opportunity",
-  ownership_track: "Ownership Track",
+  associate_w2: "Associate (W-2)",
+  associate_1099: "Associate (1099)",
+  corporate_employment: "Corporate Employment",
+  corporate_lease: "Corporate Lease",
+  partnership_opportunity: "Partnership Opportunity",
+  practice_acquisition: "Practice Acquisition",
 };
 const PRACTICE_TYPE_LABEL = {
   private_practice: "Private Practice",
   corporate: "Corporate",
   od_md: "OD/MD",
+};
+const WORK_ARRANGEMENT_LABEL = {
+  on_site: "On-Site",
+  hybrid: "Hybrid",
+  remote: "Remote",
 };
 const titleCase = (s = "") =>
   String(s)
@@ -173,6 +181,7 @@ const DEFAULT_FILTERS = {
   radiusMi: 25,
   role: "",
   employmentTypes: [],
+  workArrangements: [],
   opportunityTypes: [],
   practiceTypes: [],
   company: "",
@@ -181,6 +190,7 @@ const DEFAULT_FILTERS = {
 
 const ARRAY_FILTER_KEYS = new Set([
   "employmentTypes",
+  "workArrangements",
   "opportunityTypes",
   "practiceTypes",
 ]);
@@ -478,6 +488,15 @@ export default function JobList() {
           titleCase(value.replace(/_/g, " ")),
       });
     });
+    normalizeFilterArray(filters.workArrangements).forEach((value) => {
+      tags.push({
+        type: "workArrangements",
+        value,
+        label:
+          WORK_ARRANGEMENT_LABEL[normalizeType(value)] ||
+          titleCase(value.replace(/_/g, " ")),
+      });
+    });
     normalizeFilterArray(filters.practiceTypes).forEach((value) => {
       tags.push({
         type: "practiceTypes",
@@ -505,6 +524,7 @@ export default function JobList() {
         q = "",
         role = "",
         employmentTypes = [],
+        workArrangements = [],
         opportunityTypes = [],
         practiceTypes = [],
         location = "",
@@ -520,6 +540,7 @@ export default function JobList() {
         canUseMapSearch && geocodeStatus === "success" && Boolean(locationText && center);
       const qLower = q.trim().toLowerCase();
       const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
+      const workArrangementSet = new Set(normalizeFilterArray(workArrangements).map(normalizeType));
       const opportunitySet = new Set(normalizeFilterArray(opportunityTypes).map(normalizeType));
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
 
@@ -535,6 +556,8 @@ export default function JobList() {
           job.type,
           job.employment_type,
           TYPE_LABEL[normalizeType(job.employment_type || job.type)],
+          job.work_arrangement,
+          WORK_ARRANGEMENT_LABEL[normalizeType(job.work_arrangement)],
           job.opportunity_type,
           OPPORTUNITY_TYPE_LABEL[normalizeType(job.opportunity_type)],
           job.practice_type,
@@ -550,6 +573,9 @@ export default function JobList() {
         const jobEmploymentType = normalizeType(job.employment_type || job.type);
         const matchEmployment =
           employmentSet.size === 0 || employmentSet.has(jobEmploymentType);
+        const matchWorkArrangement =
+          workArrangementSet.size === 0 ||
+          workArrangementSet.has(normalizeType(job.work_arrangement));
         const matchOpportunity =
           opportunitySet.size === 0 || opportunitySet.has(normalizeType(job.opportunity_type));
         const matchPractice =
@@ -573,6 +599,7 @@ export default function JobList() {
           matchQ &&
           matchRole &&
           matchEmployment &&
+          matchWorkArrangement &&
           matchOpportunity &&
           matchPractice &&
           matchCompany &&

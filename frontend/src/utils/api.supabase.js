@@ -55,6 +55,7 @@ function mapJobRow(row = {}) {
     opportunity_type: row.opportunity_type || "",
     practice_type: row.practice_type || "",
     employment_type: row.employment_type || "",
+    work_arrangement: row.work_arrangement || "",
     featured: row.featured === true,
     salary: row.salary,
     tags: tagsRaw.map((t) => String(t).toLowerCase()),

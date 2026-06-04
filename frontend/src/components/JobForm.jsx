@@ -31,7 +31,7 @@ const defaultValues = {
   opportunity_type: "",
   practice_type: "",
   employment_type: "",
-  onsite_type: "onsite",        // onsite | hybrid | remote
+  work_arrangement: "",
   hours_per_week: "",
   salary_min: "",
   salary_max: "",
@@ -60,6 +60,53 @@ function normalizeRoleValue(value = "") {
     "ophthalmic technician": "ophthalmic technician",
   };
   return aliases[normalized] || "";
+}
+
+function normalizeOptionValue(value = "", aliases = {}) {
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[()]/g, "")
+    .replace(/[/-]+/g, " ")
+    .replace(/[_]+/g, " ")
+    .replace(/\s+/g, " ");
+  return aliases[normalized] || "";
+}
+
+function normalizeOpportunityValue(value = "") {
+  return normalizeOptionValue(value, {
+    "associate w2": "associate_w2",
+    "associate w 2": "associate_w2",
+    "associate position": "associate_w2",
+    "associate 1099": "associate_1099",
+    "corporate employment": "corporate_employment",
+    "corporate lease": "corporate_lease",
+    "lease opportunity": "corporate_lease",
+    "partnership opportunity": "partnership_opportunity",
+    "ownership track": "partnership_opportunity",
+    "buy in opportunity": "partnership_opportunity",
+    "practice acquisition": "practice_acquisition",
+  });
+}
+
+function normalizeEmploymentValue(value = "") {
+  return normalizeOptionValue(value, {
+    "full time": "full_time",
+    "part time": "part_time",
+    "per diem fill in": "per_diem_fill_in",
+    "per diem": "per_diem_fill_in",
+    "fill in": "per_diem_fill_in",
+    remote: "full_time",
+  });
+}
+
+function normalizeWorkArrangementValue(value = "") {
+  return normalizeOptionValue(value, {
+    "on site": "on_site",
+    onsite: "on_site",
+    hybrid: "hybrid",
+    remote: "remote",
+  });
 }
 
 function cleanGeocodeText(value = "") {
@@ -150,9 +197,15 @@ function valuesFromJob(job = {}) {
     company: job.employer_name || job.company || "",
     location: job.location || [job.city, job.state].filter(Boolean).join(", "),
     role_type: normalizeRoleValue(job.role) || "",
-    opportunity_type: job.opportunity_type || "",
+    opportunity_type: normalizeOpportunityValue(job.opportunity_type) || "",
     practice_type: job.practice_type || "",
-    employment_type: job.employment_type || job.type || "",
+    employment_type: normalizeEmploymentValue(job.employment_type || job.type) || "",
+    work_arrangement:
+      normalizeWorkArrangementValue(
+        job.work_arrangement ||
+          job.onsite_type ||
+          (job.employment_type === "remote" || job.type === "remote" ? "remote" : "")
+      ) || "",
     hours_per_week: job.hours && !Number.isNaN(numericHours) ? String(job.hours) : "",
     salary_min: salary.salary_min,
     salary_max: salary.salary_max,
@@ -171,14 +224,16 @@ const roleOptions = [
 const employmentOptions = [
   { value: "full_time", label: "Full-Time" },
   { value: "part_time", label: "Part-Time" },
-  { value: "remote", label: "Remote" },
+  { value: "per_diem_fill_in", label: "Per Diem / Fill-In" },
 ];
 
 const opportunityOptions = [
-  { value: "associate_position", label: "Associate Position" },
-  { value: "lease_opportunity", label: "Lease Opportunity" },
-  { value: "ownership_track", label: "Ownership Track" },
-  { value: "buy_in_opportunity", label: "Buy-In Opportunity" },
+  { value: "associate_w2", label: "Associate (W-2)" },
+  { value: "associate_1099", label: "Associate (1099)" },
+  { value: "corporate_employment", label: "Corporate Employment" },
+  { value: "corporate_lease", label: "Corporate Lease" },
+  { value: "partnership_opportunity", label: "Partnership Opportunity" },
+  { value: "practice_acquisition", label: "Practice Acquisition" },
 ];
 
 const practiceOptions = [
@@ -187,8 +242,8 @@ const practiceOptions = [
   { value: "od_md", label: "OD/MD" },
 ];
 
-const onsiteOptions = [
-  { value: "onsite", label: "On-site" },
+const workArrangementOptions = [
+  { value: "on_site", label: "On-Site" },
   { value: "hybrid", label: "Hybrid" },
   { value: "remote", label: "Remote" },
 ];
@@ -324,6 +379,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       opportunity_type: values.opportunity_type || null,
       practice_type: values.practice_type || null,
       employment_type: values.employment_type || null,
+      work_arrangement: values.work_arrangement || null,
       hours: values.hours_per_week ? String(Number(values.hours_per_week)) : null,
       salary,
       description: values.description.trim(),
@@ -485,14 +541,15 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
 
         <Grid item xs={12} md={6}>
           <FormControl fullWidth>
-            <InputLabel id="onsite-type-label">On-site / Remote</InputLabel>
+            <InputLabel id="work-arrangement-label">Work Arrangement</InputLabel>
             <Select
-              labelId="onsite-type-label"
-              label="On-site / Remote"
-              value={values.onsite_type}
-              onChange={handleChange("onsite_type")}
+              labelId="work-arrangement-label"
+              label="Work Arrangement"
+              value={values.work_arrangement}
+              onChange={handleChange("work_arrangement")}
             >
-              {onsiteOptions.map((opt) => (
+              <MenuItem value="">Optional</MenuItem>
+              {workArrangementOptions.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>

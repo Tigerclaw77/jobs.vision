@@ -2,10 +2,12 @@ import React from "react";
 
 const LABELS = {
   opportunity_type: {
-    associate_position: "Associate Position",
-    lease_opportunity: "Lease Opportunity",
-    ownership_track: "Ownership Track",
-    buy_in_opportunity: "Buy-In Opportunity",
+    associate_w2: "Associate (W-2)",
+    associate_1099: "Associate (1099)",
+    corporate_employment: "Corporate Employment",
+    corporate_lease: "Corporate Lease",
+    partnership_opportunity: "Partnership Opportunity",
+    practice_acquisition: "Practice Acquisition",
   },
   practice_type: {
     private_practice: "Private Practice",
@@ -15,6 +17,11 @@ const LABELS = {
   employment_type: {
     full_time: "Full-Time",
     part_time: "Part-Time",
+    per_diem_fill_in: "Per Diem / Fill-In",
+  },
+  work_arrangement: {
+    on_site: "On-Site",
+    hybrid: "Hybrid",
     remote: "Remote",
   },
 };
@@ -51,6 +58,7 @@ const RecruiterJobCard = ({ job, onEdit, onArchive, onUnarchive }) => {
     ["Opportunity", labelFor("opportunity_type", job.opportunity_type)],
     ["Practice", labelFor("practice_type", job.practice_type)],
     ["Employment", labelFor("employment_type", job.employment_type)],
+    ["Work Arrangement", labelFor("work_arrangement", job.work_arrangement)],
   ].filter(([, value]) => value);
 
   return (

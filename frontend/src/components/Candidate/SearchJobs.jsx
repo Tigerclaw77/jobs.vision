@@ -10,6 +10,24 @@ function apiBaseUrl() {
   return raw.endsWith("/api") ? raw : `${raw}/api`;
 }
 
+const LABELS = {
+  employment_type: {
+    full_time: "Full-Time",
+    part_time: "Part-Time",
+    per_diem_fill_in: "Per Diem / Fill-In",
+  },
+  work_arrangement: {
+    on_site: "On-Site",
+    hybrid: "Hybrid",
+    remote: "Remote",
+  },
+};
+
+function labelFor(field, value) {
+  if (!value) return "";
+  return LABELS[field]?.[value] || String(value).replace(/_/g, " ");
+}
+
 function mapJob(row = {}) {
   return {
     id: row.id || row._id,
@@ -18,7 +36,8 @@ function mapJob(row = {}) {
     description: row.description || "",
     hours: row.hours || row.type || "",
     role: row.role || "",
-    type: row.type || "",
+    type: row.employment_type || row.type || "",
+    work_arrangement: row.work_arrangement || "",
     location: row.location || [row.city, row.state].filter(Boolean).join(", "),
   };
 }
@@ -29,6 +48,7 @@ const SearchJobs = () => {
     role: "",
     hours: "",
     type: "",
+    work_arrangement: "",
     company: "",
   });
   const [loading, setLoading] = useState(false);
@@ -81,10 +101,12 @@ const SearchJobs = () => {
         !filters.hours ||
         (Number.isFinite(Number(job.hours)) && Number(job.hours) >= Number(filters.hours));
       const typeOk = !filters.type || job.type === filters.type;
+      const workArrangementOk =
+        !filters.work_arrangement || job.work_arrangement === filters.work_arrangement;
       const companyOk =
         !filters.company ||
         job.company.toLowerCase().includes(filters.company.toLowerCase());
-      return roleOk && hoursOk && typeOk && companyOk;
+      return roleOk && hoursOk && typeOk && workArrangementOk && companyOk;
     });
   }, [jobs, filters]);
 
@@ -128,12 +150,17 @@ const SearchJobs = () => {
         />
 
         <select onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
-          <option value="">Select Type</option>
-          <option value="full_time">Full-time</option>
-          <option value="part_time">Part-time</option>
-          <option value="contract">Contract</option>
-          <option value="temp">Temporary</option>
-          <option value="internship">Internship</option>
+          <option value="">Employment Type</option>
+          <option value="full_time">Full-Time</option>
+          <option value="part_time">Part-Time</option>
+          <option value="per_diem_fill_in">Per Diem / Fill-In</option>
+        </select>
+
+        <select onChange={(e) => setFilters({ ...filters, work_arrangement: e.target.value })}>
+          <option value="">Work Arrangement</option>
+          <option value="on_site">On-Site</option>
+          <option value="hybrid">Hybrid</option>
+          <option value="remote">Remote</option>
         </select>
 
         <input
@@ -157,7 +184,8 @@ const SearchJobs = () => {
               <p><strong>Description:</strong> {job.description}</p>
               <p><strong>Hours:</strong> {job.hours || "Not listed"}</p>
               <p><strong>Role:</strong> {job.role || "Not listed"}</p>
-              <p><strong>Type:</strong> {job.type || "Not listed"}</p>
+              <p><strong>Employment:</strong> {labelFor("employment_type", job.type) || "Not listed"}</p>
+              <p><strong>Work Arrangement:</strong> {labelFor("work_arrangement", job.work_arrangement) || "Not listed"}</p>
 
               <button style={styles.saveButton} onClick={() => handleSaveJob(job)}>Save Job</button>
               <button style={styles.shareButton} onClick={() => handleShareJob(job)}>Share Job</button>

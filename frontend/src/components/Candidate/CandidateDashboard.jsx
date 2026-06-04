@@ -55,6 +55,7 @@ function mapFavoriteJob(favorite) {
     opportunity_type: job.opportunity_type || "",
     practice_type: job.practice_type || "",
     employment_type: job.employment_type || "",
+    work_arrangement: job.work_arrangement || "",
     salary: job.salary || "",
     description: job.description || "",
     status: job.status || "",

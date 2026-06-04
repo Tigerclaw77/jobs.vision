@@ -56,6 +56,7 @@ create table if not exists public.jobs (
   opportunity_type text,
   practice_type text,
   employment_type text,
+  work_arrangement text,
   salary text,
   tag_ids text[] not null default '{}',
   status text not null default 'active',

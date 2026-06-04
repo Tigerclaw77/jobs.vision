@@ -4,13 +4,22 @@ import { Navigation } from "lucide-react";
 const EMPLOYMENT_TYPE_OPTIONS = [
   { value: "full_time", label: "Full-Time" },
   { value: "part_time", label: "Part-Time" },
-  { value: "remote", label: "Remote" },
+  { value: "per_diem_fill_in", label: "Per Diem / Fill-In" },
 ];
 
 const OPPORTUNITY_TYPE_OPTIONS = [
-  { value: "associate_position", label: "Associate Position" },
-  { value: "lease_opportunity", label: "Lease Opportunity" },
-  { value: "ownership_track", label: "Ownership Track" },
+  { value: "associate_w2", label: "Associate (W-2)" },
+  { value: "associate_1099", label: "Associate (1099)" },
+  { value: "corporate_employment", label: "Corporate Employment" },
+  { value: "corporate_lease", label: "Corporate Lease" },
+  { value: "partnership_opportunity", label: "Partnership Opportunity" },
+  { value: "practice_acquisition", label: "Practice Acquisition" },
+];
+
+const WORK_ARRANGEMENT_OPTIONS = [
+  { value: "on_site", label: "On-Site" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "remote", label: "Remote" },
 ];
 
 const PRACTICE_TYPE_OPTIONS = [
@@ -224,6 +233,13 @@ export default function JobFilter({
           options={EMPLOYMENT_TYPE_OPTIONS}
           selected={filters.employmentTypes}
           onToggle={(value) => toggleMulti("employmentTypes", value)}
+        />
+
+        <FilterChecks
+          legend="Work Arrangement"
+          options={WORK_ARRANGEMENT_OPTIONS}
+          selected={filters.workArrangements}
+          onToggle={(value) => toggleMulti("workArrangements", value)}
         />
 
         <div className="advanced-filter-shell">
