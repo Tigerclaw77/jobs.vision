@@ -258,6 +258,7 @@ export default function JobList() {
   const isCandidateUser = userRole === "candidate";
   const canUseMapSearch =
     userRole === "admin" || authUser?.entitlements?.candidate?.features?.mapSearch === true;
+  const canUseAdvancedOdFilters = canUseMapSearch;
 
   // data
   const [jobs, setJobs] = useState([]);
@@ -370,8 +371,8 @@ export default function JobList() {
       filters.roles,
       filters.employmentTypes,
       filters.workArrangements,
-      filters.opportunityTypes,
-      filters.practiceTypes,
+      canUseAdvancedOdFilters ? filters.opportunityTypes : [],
+      canUseAdvancedOdFilters ? filters.practiceTypes : [],
     ].some((value) => normalizeFilterArray(value).length > 0);
 
     return Boolean(
@@ -380,7 +381,7 @@ export default function JobList() {
         cleanLocationInput(filters.location) ||
         hasArrayFilter
     );
-  }, [filters]);
+  }, [filters, canUseAdvancedOdFilters]);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -513,15 +514,17 @@ export default function JobList() {
         label: TYPE_LABEL[normalizeType(value)] || titleCase(value.replace(/_/g, " ")),
       });
     });
-    normalizeFilterArray(filters.opportunityTypes).forEach((value) => {
-      tags.push({
-        type: "opportunityTypes",
-        value,
-        label:
-          OPPORTUNITY_TYPE_LABEL[normalizeType(value)] ||
-          titleCase(value.replace(/_/g, " ")),
+    if (canUseAdvancedOdFilters) {
+      normalizeFilterArray(filters.opportunityTypes).forEach((value) => {
+        tags.push({
+          type: "opportunityTypes",
+          value,
+          label:
+            OPPORTUNITY_TYPE_LABEL[normalizeType(value)] ||
+            titleCase(value.replace(/_/g, " ")),
+        });
       });
-    });
+    }
     normalizeFilterArray(filters.workArrangements).forEach((value) => {
       tags.push({
         type: "workArrangements",
@@ -531,15 +534,17 @@ export default function JobList() {
           titleCase(value.replace(/_/g, " ")),
       });
     });
-    normalizeFilterArray(filters.practiceTypes).forEach((value) => {
-      tags.push({
-        type: "practiceTypes",
-        value,
-        label:
-          PRACTICE_TYPE_LABEL[normalizeType(value)] ||
-          titleCase(value.replace(/_/g, " ")),
+    if (canUseAdvancedOdFilters) {
+      normalizeFilterArray(filters.practiceTypes).forEach((value) => {
+        tags.push({
+          type: "practiceTypes",
+          value,
+          label:
+            PRACTICE_TYPE_LABEL[normalizeType(value)] ||
+            titleCase(value.replace(/_/g, " ")),
+        });
       });
-    });
+    }
     if (filters.location) {
       tags.push({
         type: "location",
@@ -548,7 +553,7 @@ export default function JobList() {
       });
     }
     return tags;
-  }, [filters, lookup]);
+  }, [filters, lookup, canUseAdvancedOdFilters]);
 
   // filtering (debounced)
   useEffect(() => {
@@ -579,9 +584,10 @@ export default function JobList() {
       const roleSet = new Set(
         normalizeRoleFilters(roles)
       );
-      const opportunitySet = roleSet.has("optometrist")
+      const opportunitySet = canUseAdvancedOdFilters && roleSet.has("optometrist")
         ? new Set(normalizeFilterArray(opportunityTypes).map(normalizeType))
         : new Set();
+      const activePracticeSet = canUseAdvancedOdFilters ? practiceSet : new Set();
 
       const next = (jobs || []).filter((job) => {
         const jobId = String(job._id || job.id || "");
@@ -622,7 +628,7 @@ export default function JobList() {
         const matchOpportunity =
           opportunitySet.size === 0 || opportunityValues.some((value) => opportunitySet.has(value));
         const matchPractice =
-          practiceSet.size === 0 || practiceSet.has(normalizeType(job.practice_type));
+          activePracticeSet.size === 0 || activePracticeSet.has(normalizeType(job.practice_type));
         const matchCompany =
           !company || (job.company || "").toLowerCase().includes(String(company).toLowerCase());
         const matchLocText =
@@ -654,7 +660,15 @@ export default function JobList() {
       setFilteredJobs(next);
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [filters, jobs, canUseMapSearch, geocodeStatus, jobLocationCoords, hiddenJobs]);
+  }, [
+    filters,
+    jobs,
+    canUseMapSearch,
+    canUseAdvancedOdFilters,
+    geocodeStatus,
+    jobLocationCoords,
+    hiddenJobs,
+  ]);
 
   // pagination
   const page = parseInt(searchParams.get("page") || "1", 10);
@@ -857,6 +871,7 @@ const removeQuickTag = (tag) => {
             quickTags={quickTags}
             onRemoveQuickTag={removeQuickTag}
             canUseMapSearch={canUseMapSearch}
+            canUseAdvancedOdFilters={canUseAdvancedOdFilters}
             geocodeStatus={geocodeStatus}
             geocodeMessage={geocodeMessage}
           />

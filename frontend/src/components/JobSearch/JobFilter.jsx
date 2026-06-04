@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Navigation } from "lucide-react";
+import { Lock, Navigation, SlidersHorizontal } from "lucide-react";
 import {
   EMPLOYMENT_TYPE_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
@@ -76,6 +76,7 @@ export default function JobFilter({
   quickTags = [],
   onRemoveQuickTag,
   canUseMapSearch = true,
+  canUseAdvancedOdFilters = false,
   geocodeStatus = "idle",
   geocodeMessage = "",
 }) {
@@ -89,7 +90,8 @@ export default function JobFilter({
   const selectedRoles = Array.isArray(filters.roles)
     ? filters.roles.map((role) => normalizeRole(role) || role).filter(Boolean)
     : [];
-  const showOpportunityTypes = selectedRoles.includes("optometrist");
+  const showOpportunityTypes =
+    canUseAdvancedOdFilters && selectedRoles.includes("optometrist");
 
   const toggleMulti = (key, value) => {
     const current = Array.isArray(filters[key]) ? filters[key] : [];
@@ -264,14 +266,23 @@ export default function JobFilter({
           onToggle={(value) => toggleMulti("workArrangements", value)}
         />
 
-        <div className="advanced-filter-shell">
+        <div
+          className={`advanced-filter-shell ${
+            canUseAdvancedOdFilters ? "advanced-filter-unlocked" : "advanced-filter-locked"
+          }`}
+        >
+          {canUseAdvancedOdFilters ? (
+            <>
           <button
             className="advanced-toggle"
             type="button"
             aria-expanded={advancedOpen}
             onClick={() => setAdvancedOpen((open) => !open)}
           >
-            <span>Advanced OD Filters</span>
+            <span className="advanced-toggle-title">
+              <SlidersHorizontal size={15} aria-hidden="true" />
+              <span>Advanced OD Filters</span>
+            </span>
             <span aria-hidden="true">{advancedOpen ? "−" : "+"}</span>
           </button>
 
@@ -291,6 +302,16 @@ export default function JobFilter({
                 selected={filters.practiceTypes}
                 onToggle={(value) => toggleMulti("practiceTypes", value)}
               />
+            </div>
+          )}
+            </>
+          ) : (
+            <div className="advanced-locked-message" aria-label="Advanced OD Filters">
+              <span className="advanced-locked-title">
+                <Lock size={15} aria-hidden="true" />
+                <span>Advanced OD Filters</span>
+              </span>
+              <span className="advanced-locked-subtitle">Available with Candidate Plus</span>
             </div>
           )}
         </div>
