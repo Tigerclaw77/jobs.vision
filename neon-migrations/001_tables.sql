@@ -60,6 +60,8 @@ create table if not exists public.jobs (
   tag_ids text[] not null default '{}',
   status text not null default 'active',
   featured boolean not null default false,
+  source text,
+  seed_batch text,
   is_archived boolean not null default false,
   posted_at timestamptz not null default now(),
   first_activated_at timestamptz,

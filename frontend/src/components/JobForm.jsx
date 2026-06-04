@@ -18,6 +18,9 @@ import { createJob, updateJob } from "../utils/api";
 
 // Draft storage key
 const DRAFT_KEY = "jobFormDraft:v1";
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+const LOCATION_MAP_ERROR = "We couldn't map this location. Please check the city and state.";
+let googleMapsPromise;
 
 const defaultValues = {
   title: "",
@@ -43,6 +46,91 @@ function splitLocation(location = "") {
   };
 }
 
+function normalizeRoleValue(value = "") {
+  const normalized = String(value).trim().toLowerCase().replace(/[_-]+/g, " ");
+  const aliases = {
+    tech: "ophthalmic technician",
+    technician: "ophthalmic technician",
+    "ophthalmic tech": "ophthalmic technician",
+    manager: "practice manager",
+    "practice manager": "practice manager",
+    optometrist: "optometrist",
+    optician: "optician",
+    "ophthalmic technician": "ophthalmic technician",
+  };
+  return aliases[normalized] || "";
+}
+
+function cleanGeocodeText(value = "") {
+  return String(value).replace(/\s+/g, " ").trim();
+}
+
+function sameText(a, b) {
+  return cleanGeocodeText(a).toLowerCase() === cleanGeocodeText(b).toLowerCase();
+}
+
+function hasLocationChanged(job, payload) {
+  if (!job) return true;
+  return (
+    !sameText(job.location, payload.location) ||
+    !sameText(job.city, payload.city) ||
+    !sameText(job.state, payload.state)
+  );
+}
+
+function loadGoogleMaps(apiKey) {
+  if (!apiKey) return Promise.reject(new Error(LOCATION_MAP_ERROR));
+  if (window.google?.maps) return Promise.resolve(window.google.maps);
+  if (googleMapsPromise) return googleMapsPromise;
+
+  googleMapsPromise = new Promise((resolve, reject) => {
+    const id = "googleMaps";
+    const existing = document.getElementById(id);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.google.maps), { once: true });
+      existing.addEventListener("error", () => reject(new Error(LOCATION_MAP_ERROR)), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = id;
+    script.async = true;
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    script.onload = () => resolve(window.google.maps);
+    script.onerror = () => reject(new Error(LOCATION_MAP_ERROR));
+    document.body.appendChild(script);
+  });
+
+  return googleMapsPromise;
+}
+
+async function geocodeJobPayload(payload) {
+  const address = cleanGeocodeText(
+    payload.location || [payload.city, payload.state].filter(Boolean).join(", ")
+  );
+  if (!address) throw new Error(LOCATION_MAP_ERROR);
+
+  const maps = await loadGoogleMaps(GOOGLE_MAPS_API_KEY);
+  const geocoder = new maps.Geocoder();
+
+  return new Promise((resolve, reject) => {
+    geocoder.geocode(
+      { address, componentRestrictions: { country: "US" } },
+      (results, status) => {
+        const location = results?.[0]?.geometry?.location;
+        if (status === "OK" && location) {
+          resolve({ latitude: location.lat(), longitude: location.lng() });
+          return;
+        }
+        reject(new Error(LOCATION_MAP_ERROR));
+      }
+    );
+  });
+}
+
 function parseSalaryRange(salary) {
   if (salary == null) return { salary_min: "", salary_max: "" };
   const parts = String(salary).match(/\d+(?:\.\d+)?/g) || [];
@@ -60,7 +148,7 @@ function valuesFromJob(job = {}) {
     title: job.title || "",
     company: job.employer_name || job.company || "",
     location: job.location || [job.city, job.state].filter(Boolean).join(", "),
-    role_type: job.role || defaultValues.role_type,
+    role_type: normalizeRoleValue(job.role) || "",
     opportunity_type: job.opportunity_type || "",
     practice_type: job.practice_type || "",
     employment_type: job.employment_type || job.type || "",
@@ -75,10 +163,8 @@ function valuesFromJob(job = {}) {
 const roleOptions = [
   { value: "optometrist", label: "Optometrist" },
   { value: "optician", label: "Optician" },
-  { value: "tech", label: "Tech / Assistant" },
-  { value: "manager", label: "Manager" },
-  { value: "front_desk", label: "Front Desk" },
-  { value: "other", label: "Other" },
+  { value: "ophthalmic technician", label: "Ophthalmic Technician" },
+  { value: "practice manager", label: "Practice Manager" },
 ];
 
 const employmentOptions = [
@@ -244,6 +330,14 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
     };
 
     try {
+      if (!isEditing || hasLocationChanged(jobToEdit, payload)) {
+        if (GOOGLE_MAPS_API_KEY) {
+          const coords = await geocodeJobPayload(payload);
+          payload.latitude = coords.latitude;
+          payload.longitude = coords.longitude;
+        }
+      }
+
       const result = isEditing
         ? await updateJob(editingJobId, payload)
         : await createJob(payload);
@@ -260,7 +354,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       setErrors({});
     } catch (err) {
       console.error("Submit failed:", err);
-      setMessage(err?.message || "Failed to save job.");
+      setMessage(err?.response?.data?.error || err?.message || "Failed to save job.");
     } finally {
       setSubmitting(false);
       setTimeout(() => setMessage(""), 2000);

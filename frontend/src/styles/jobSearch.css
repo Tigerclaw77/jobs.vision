@@ -7,6 +7,7 @@
 :root {
   --top-panel-height: 390px;
   --map-panel-height: var(--top-panel-height);
+  --filter-label-control-gap: 14px;
 }
 .jobs-top{
   display:grid;
@@ -58,7 +59,7 @@
   grid-template-columns: 1fr 1fr;
 }
 .filter-grid > .field{ min-width:0; }
-.field{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.field{ display:flex; flex-direction:column; gap:var(--filter-label-control-gap); min-width:0; }
 .field label{ font-size:.9rem; color:var(--muted); }
 .field-checks{
   min-width:0;
@@ -67,7 +68,7 @@
   border:0;
   display:flex;
   flex-direction:column;
-  gap:10px;
+  gap:var(--filter-label-control-gap);
 }
 .field-checks legend{
   margin:0;

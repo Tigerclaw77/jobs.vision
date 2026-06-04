@@ -13,11 +13,29 @@ const {
 
 const router = express.Router();
 const requireJobManager = requireRole(["recruiter", "admin"]);
+const LOCATION_MAP_ERROR = "We couldn't map this location. Please check the city and state.";
+const CANONICAL_ROLES = new Set([
+  "optometrist",
+  "optician",
+  "ophthalmic technician",
+  "practice manager",
+]);
+const ROLE_ALIASES = new Map([
+  ["tech", "ophthalmic technician"],
+  ["technician", "ophthalmic technician"],
+  ["ophthalmic tech", "ophthalmic technician"],
+  ["ophthalmic technician", "ophthalmic technician"],
+  ["manager", "practice manager"],
+  ["practice manager", "practice manager"],
+  ["optometrist", "optometrist"],
+  ["optician", "optician"],
+]);
 
 const PUBLIC_JOB_COLUMNS = [
   "id",
   "title",
   "description",
+  "company",
   "location",
   "city",
   "state",
@@ -49,6 +67,116 @@ function isAdmin(user) {
 
 function canManageJob(user, job) {
   return isAdmin(user) || job?.recruiter_id === user?.id || job?.posted_by === user?.id;
+}
+
+function requestError(statusCode, message, code) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+}
+
+function normalizeRole(value, { required = false } = {}) {
+  const raw = value == null ? "" : String(value).trim();
+  if (!raw) {
+    if (required) {
+      throw requestError(400, "Please choose a valid job role.", "invalid_job_role");
+    }
+    return null;
+  }
+
+  const key = raw.toLowerCase().replace(/[_-]+/g, " ");
+  const canonical = ROLE_ALIASES.get(key);
+  if (canonical && CANONICAL_ROLES.has(canonical)) return canonical;
+
+  throw requestError(400, "Please choose a valid job role.", "invalid_job_role");
+}
+
+function cleanText(value = "") {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function sameText(a, b) {
+  return cleanText(a).toLowerCase() === cleanText(b).toLowerCase();
+}
+
+function didLocationChange(body, job) {
+  return ["location", "city", "state"].some(
+    (field) => field in body && !sameText(body[field], job?.[field])
+  );
+}
+
+function coordinateFrom(value, field, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < min || n > max) {
+    throw requestError(400, LOCATION_MAP_ERROR, "invalid_job_location");
+  }
+  return n;
+}
+
+function providedCoordinatePair(fields = {}) {
+  const hasLat = Object.prototype.hasOwnProperty.call(fields, "latitude");
+  const hasLng = Object.prototype.hasOwnProperty.call(fields, "longitude");
+  if (!hasLat && !hasLng) return undefined;
+
+  const latBlank = fields.latitude == null || fields.latitude === "";
+  const lngBlank = fields.longitude == null || fields.longitude === "";
+  if (latBlank && lngBlank) return null;
+  if (latBlank || lngBlank) {
+    throw requestError(400, LOCATION_MAP_ERROR, "invalid_job_location");
+  }
+
+  return {
+    latitude: coordinateFrom(fields.latitude, "latitude", -90, 90),
+    longitude: coordinateFrom(fields.longitude, "longitude", -180, 180),
+  };
+}
+
+function geocodeAddressForJob(fields = {}) {
+  return cleanText(fields.location || [fields.city, fields.state].filter(Boolean).join(", "));
+}
+
+async function geocodeJobLocation(fields = {}) {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  const address = geocodeAddressForJob(fields);
+  if (!apiKey || !address) return null;
+
+  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+  url.searchParams.set("address", address);
+  url.searchParams.set("components", "country:US");
+  url.searchParams.set("key", apiKey);
+
+  let response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
+  }
+
+  const data = await response.json().catch(() => null);
+  const location = data?.results?.[0]?.geometry?.location;
+  if (!response.ok || data?.status !== "OK" || !location) {
+    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
+  }
+
+  return {
+    latitude: coordinateFrom(location.lat, "latitude", -90, 90),
+    longitude: coordinateFrom(location.lng, "longitude", -180, 180),
+  };
+}
+
+async function resolveJobCoordinates(fields, { required = false } = {}) {
+  const provided = providedCoordinatePair(fields);
+  if (provided) return provided;
+
+  const geocoded = await geocodeJobLocation(fields);
+  if (geocoded) return geocoded;
+
+  if (required) {
+    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
+  }
+
+  return undefined;
 }
 
 async function enforceRecruiterCanPost(req, res, excludeJobId = null) {
@@ -92,12 +220,6 @@ function toTagIds(value) {
     return value.split(",").map((tag) => tag.trim()).filter(Boolean);
   }
   return [];
-}
-
-function toNullableNumber(value) {
-  if (value === "" || value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
 }
 
 function toNullableText(value) {
@@ -240,6 +362,9 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
 
     if (await enforceRecruiterCanPost(req, res)) return;
 
+    const role = normalizeRole(req.body.role, { required: true });
+    const coordinates = await resolveJobCoordinates(req.body, { required: true });
+
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
     let employer_domain = normalizeDomain(req.body.employer_domain ?? req.body.company_domain ?? "");
@@ -285,9 +410,9 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       location: req.body.location ?? null,
       city: req.body.city ?? null,
       state: req.body.state ?? null,
-      latitude: toNullableNumber(req.body.latitude),
-      longitude: toNullableNumber(req.body.longitude),
-      role: req.body.role ?? null,
+      latitude: coordinates.latitude,
+      longitude: coordinates.longitude,
+      role,
       hours: req.body.hours ?? null,
       type: req.body.type ?? req.body.employment_type ?? null,
       opportunity_type: toNullableText(req.body.opportunity_type),
@@ -322,6 +447,9 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
           : undefined,
     });
   } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
     console.error("Create job error:", e);
     res.status(500).json({ error: "Failed to create job" });
   }
@@ -380,9 +508,25 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key];
     }
+    if ("role" in updates) updates.role = normalizeRole(updates.role, { required: true });
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
-    if ("latitude" in updates) updates.latitude = toNullableNumber(updates.latitude);
-    if ("longitude" in updates) updates.longitude = toNullableNumber(updates.longitude);
+
+    const locationChanged = didLocationChange(req.body, job);
+    const coordinateFieldsProvided =
+      Object.prototype.hasOwnProperty.call(req.body, "latitude") ||
+      Object.prototype.hasOwnProperty.call(req.body, "longitude");
+    if (locationChanged || coordinateFieldsProvided) {
+      const coordinates = await resolveJobCoordinates(
+        { ...job, ...req.body },
+        { required: true }
+      );
+      updates.latitude = coordinates.latitude;
+      updates.longitude = coordinates.longitude;
+    } else {
+      delete updates.latitude;
+      delete updates.longitude;
+    }
+
     if ("opportunity_type" in updates) updates.opportunity_type = toNullableText(updates.opportunity_type);
     if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
     if ("employment_type" in updates) updates.employment_type = toNullableText(updates.employment_type);
@@ -457,6 +601,9 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
 
     res.json(data);
   } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
     console.error("Update job error:", e);
     res.status(500).json({ error: "Failed to update job" });
   }
@@ -477,24 +624,30 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
 
     if (!job.is_archived && job.status === nextStatus) return res.json(job);
     if (await enforceRecruiterCanPost(req, res, jobId)) return;
+    const coordinates = await resolveJobCoordinates(job, { required: true });
 
     const update = buildUpdate(
       "public.jobs",
       {
         status: nextStatus,
         is_archived: false,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
         archived_at: null,
         last_activated_at: now,
         first_activated_at: job.first_activated_at ?? now,
         updated_at: now,
       },
-      "id = $7",
+      "id = $9",
       [jobId]
     );
     const data = await one(update.text, update.params);
 
     res.json(data);
   } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
     console.error("Unarchive job error:", e);
     res.status(500).json({ error: "Failed to unarchive job" });
   }
