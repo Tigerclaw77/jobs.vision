@@ -16,6 +16,12 @@ function getPosition(job) {
 
 const DEFAULT_CENTER = { lat: 39.0, lng: -98.0 };
 const DEFAULT_ZOOM = 4;
+const LOWER_48_BOUNDS = {
+  north: 49.5,
+  south: 24,
+  west: -125,
+  east: -66,
+};
 
 function getSearchCenter(center) {
   const lat = center?.lat;
@@ -34,6 +40,32 @@ function zoomForRadius(radiusMi) {
   if (radius <= 50) return 9;
   if (radius <= 100) return 8;
   return 7;
+}
+
+function isLower48Position(position) {
+  if (!position) return false;
+  return (
+    position.lat >= LOWER_48_BOUNDS.south &&
+    position.lat <= LOWER_48_BOUNDS.north &&
+    position.lng >= LOWER_48_BOUNDS.west &&
+    position.lng <= LOWER_48_BOUNDS.east
+  );
+}
+
+function uniquePositions(positions) {
+  return positions.filter((position, index, list) => {
+    return (
+      list.findIndex(
+        (item) => item.lat === position.lat && item.lng === position.lng
+      ) === index
+    );
+  });
+}
+
+function positionsForViewport(positions, explicitMapContext) {
+  if (explicitMapContext) return positions;
+  const lower48Positions = positions.filter(isLower48Position);
+  return lower48Positions.length > 0 ? lower48Positions : positions;
 }
 
 const MARKER_STYLES = {
@@ -99,6 +131,7 @@ const JobMap = ({
   const markers = useRef([]);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState("");
+  const [legendCollapsed, setLegendCollapsed] = useState(true);
 
   // stable callback to avoid re-running marker effect
   const clickCbRef = useRef(onMarkerClick);
@@ -185,27 +218,23 @@ const JobMap = ({
     let cancelled = false;
     const activeCenter = hasActiveRadius ? getSearchCenter(searchCenter) : null;
     const shouldFitJobs = Boolean(hasActiveRadius || fitToJobs);
+    const explicitMapContext = Boolean(activeCenter);
     const markerPositions = [];
 
     const applyViewport = () => {
       if (cancelled || !map.current) return;
       if (shouldFitJobs && markerPositions.length > 0) {
-        const uniquePositions = markerPositions.filter((position, index, list) => {
-          return (
-            list.findIndex(
-              (item) => item.lat === position.lat && item.lng === position.lng
-            ) === index
-          );
-        });
+        const viewportPositions = positionsForViewport(markerPositions, explicitMapContext);
+        const distinctViewportPositions = uniquePositions(viewportPositions);
 
-        if (uniquePositions.length === 1) {
-          map.current.setCenter(uniquePositions[0]);
+        if (distinctViewportPositions.length === 1) {
+          map.current.setCenter(distinctViewportPositions[0]);
           map.current.setZoom(activeCenter ? zoomForRadius(radiusMi) : 10);
           return;
         }
 
         const bounds = new window.google.maps.LatLngBounds();
-        markerPositions.forEach((position) => bounds.extend(position));
+        viewportPositions.forEach((position) => bounds.extend(position));
         map.current.fitBounds(bounds, 48);
         return;
       }
@@ -261,13 +290,43 @@ const JobMap = ({
         className="job-map-canvas"
         data-map-error={loadError || undefined}
       />
-      <div className="map-marker-legend" aria-label="Map marker legend">
-        {LEGEND_ITEMS.map((item) => (
-          <span key={item.label} className="map-legend-item">
-            <span className="map-legend-dot" style={{ backgroundColor: item.color }} />
-            <span>{item.label}</span>
+      <div
+        className={`map-marker-legend ${
+          legendCollapsed ? "map-marker-legend-collapsed" : "map-marker-legend-expanded"
+        }`}
+        aria-label="Map marker legend"
+      >
+        <button
+          type="button"
+          className="map-legend-toggle"
+          aria-expanded={!legendCollapsed}
+          title={legendCollapsed ? "Show map legend" : "Collapse map legend"}
+          onClick={() => setLegendCollapsed((value) => !value)}
+        >
+          <span className="map-legend-dot-stack" aria-hidden="true">
+            {LEGEND_ITEMS.map((item) => (
+              <span
+                key={item.label}
+                className="map-legend-dot"
+                style={{ backgroundColor: item.color }}
+              />
+            ))}
           </span>
-        ))}
+          <span className="map-legend-toggle-label">
+            {legendCollapsed ? "Legend" : "Collapse"}
+          </span>
+          <span className="map-legend-chevron" aria-hidden="true">
+            {legendCollapsed ? ">" : "<"}
+          </span>
+        </button>
+        <div className="map-legend-items" aria-hidden={legendCollapsed}>
+          {LEGEND_ITEMS.map((item) => (
+            <span key={item.label} className="map-legend-item">
+              <span className="map-legend-dot" style={{ backgroundColor: item.color }} />
+              <span>{item.label}</span>
+            </span>
+          ))}
+        </div>
       </div>
       {emptyMessage && <div className="map-empty-message">{emptyMessage}</div>}
     </div>
