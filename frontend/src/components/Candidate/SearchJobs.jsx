@@ -45,19 +45,14 @@ function CheckboxGroup({ legend, options, selected = [], onToggle }) {
   );
 }
 
-function selectedSummary(label, options, selected = []) {
-  const selectedOptions = options.filter((option) => selected.includes(option.value));
-  if (selectedOptions.length === 0) return label;
-  if (selectedOptions.length <= 2) {
-    return `${label}: ${selectedOptions.map((option) => option.label).join(", ")}`;
-  }
-  return `${label}: ${selectedOptions.length} selected`;
+function selectedSummary(label, selected = []) {
+  return selected.length ? `${label} (${selected.length})` : label;
 }
 
 function CheckboxDropdown({ label, options, selected = [], onToggle }) {
   return (
     <details style={styles.dropdown}>
-      <summary style={styles.dropdownSummary}>{selectedSummary(label, options, selected)}</summary>
+      <summary style={styles.dropdownSummary}>{selectedSummary(label, selected)}</summary>
       <div style={styles.dropdownMenu} role="group" aria-label={label}>
         {options.map((option) => (
           <label key={option.value} style={styles.dropdownLabel}>
@@ -226,7 +221,7 @@ const SearchJobs = () => {
 
       <div style={styles.filterContainer}>
         <CheckboxDropdown
-          label="Roles"
+          label="Role(s)"
           options={ROLE_OPTIONS}
           selected={filters.roles}
           onToggle={(value) => toggleFilter("roles", value)}
@@ -386,25 +381,29 @@ const styles = {
     position: "absolute",
     top: "calc(100% + 6px)",
     left: 0,
-    width: "min(100%, 260px)",
-    minWidth: "220px",
+    width: "max-content",
+    minWidth: "190px",
+    maxWidth: "min(calc(100vw - 32px), 250px)",
     zIndex: 20,
     display: "flex",
     flexDirection: "column",
     gap: "2px",
-    padding: "6px",
+    padding: "5px",
     border: "1px solid #ccc",
     borderRadius: "5px",
     background: "white",
     boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
   },
   dropdownLabel: {
-    display: "flex",
+    display: "grid",
+    gridTemplateColumns: "13px max-content",
     alignItems: "center",
-    gap: "6px",
-    minHeight: "30px",
-    padding: "5px 7px",
+    columnGap: "6px",
+    minHeight: "28px",
+    width: "max-content",
+    padding: "4px 7px",
     cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 };
 
