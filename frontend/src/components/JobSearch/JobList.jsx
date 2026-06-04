@@ -9,6 +9,7 @@ import {
   addJobToFavorites,
   applyToJob,
   hideJob as hideJobPreference,
+  unhideJob as unhideJobPreference,
   getUserJobInteractions,
 } from "../../utils/api.supabase";
 
@@ -175,6 +176,7 @@ const DEFAULT_FILTERS = {
   opportunityTypes: [],
   practiceTypes: [],
   company: "",
+  showHiddenJobs: false,
 };
 
 const ARRAY_FILTER_KEYS = new Set([
@@ -186,6 +188,10 @@ const ARRAY_FILTER_KEYS = new Set([
 function searchParamsForFilters(filters, sort, page) {
   const params = {};
   Object.entries(filters || {}).forEach(([key, value]) => {
+    if (key === "showHiddenJobs") {
+      if (value === true) params[key] = "1";
+      return;
+    }
     if (Array.isArray(value)) {
       if (value.length) params[key] = value.join(",");
       return;
@@ -214,6 +220,8 @@ function filtersFromSearchParams(searchParams) {
       next.employmentTypes = normalizeFilterArray(value);
     } else if (key === "location") {
       next.location = collapseLocationInput(value);
+    } else if (key === "showHiddenJobs") {
+      next.showHiddenJobs = value === "1" || value === "true";
     } else if (key !== "hours") {
       next[key] = value;
     }
@@ -504,6 +512,7 @@ export default function JobList() {
         lat,
         lng,
         radiusMi = 25,
+        showHiddenJobs = false,
       } = filters;
       const center = finitePoint(lat, lng);
       const locationText = normalizeLocationText(location);
@@ -516,7 +525,7 @@ export default function JobList() {
 
       const next = (jobs || []).filter((job) => {
         const jobId = String(job._id || job.id || "");
-        if (jobId && hiddenJobs.has(jobId)) return false;
+        if (jobId && hiddenJobs.has(jobId) && !showHiddenJobs) return false;
 
         const hay = [
           job.title,
@@ -598,8 +607,9 @@ export default function JobList() {
         ...job,
         isApplied: appliedJobs.has(job._id),
         isFavorite: favorites.has(job._id),
+        isHidden: hiddenJobs.has(job._id),
       })),
-    [filteredJobs, appliedJobs, favorites]
+    [filteredJobs, appliedJobs, favorites, hiddenJobs]
   );
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
@@ -642,6 +652,10 @@ const removeQuickTag = (tag) => {
 
   const hideTooltipFor = () => {
     return isAuthed ? "Hide job" : "Register or log in to hide jobs";
+  };
+
+  const restoreTooltipFor = () => {
+    return isAuthed ? "Restore job" : "Register or log in to restore jobs";
   };
 
   const handleFavorite = async (jobId) => {
@@ -719,6 +733,30 @@ const removeQuickTag = (tag) => {
       });
       setSelectedJob(previousSelectedJob);
       setIsModalOpen(previousModalOpen);
+      alert(error?.message || "We couldn't update this job. Please try again.");
+    }
+  };
+
+  const handleRestoreJob = async (jobId) => {
+    if (!isAuthed) return requireAuth("Register or log in to restore jobs. Go to Login?");
+
+    const normalizedId = String(jobId);
+    const wasHidden = hiddenJobs.has(normalizedId);
+
+    setHiddenJobs((prev) => {
+      const next = new Set(prev);
+      next.delete(normalizedId);
+      return next;
+    });
+
+    try {
+      await unhideJobPreference(normalizedId);
+    } catch (error) {
+      setHiddenJobs((prev) => {
+        const next = new Set(prev);
+        if (wasHidden) next.add(normalizedId);
+        return next;
+      });
       alert(error?.message || "We couldn't update this job. Please try again.");
     }
   };
@@ -844,12 +882,15 @@ const removeQuickTag = (tag) => {
               job={job}
               isFavorite={favorites.has(job._id)}
               isApplied={appliedJobs.has(job._id)}
+              isHidden={hiddenJobs.has(job._id)}
               savedTooltip={savedTooltipFor(job._id)}
               appliedTooltip={appliedTooltipFor(job._id)}
               hideTooltip={hideTooltipFor(job._id)}
+              restoreTooltip={restoreTooltipFor(job._id)}
               onFavoriteClick={handleFavorite}
               onApplyClick={handleApply}
               onHideClick={handleHideJob}
+              onRestoreClick={handleRestoreJob}
               onClick={() => {
                 setSelectedJob(job);
                 setIsModalOpen(true);
@@ -888,11 +929,13 @@ const removeQuickTag = (tag) => {
         job={selectedJob}
         isFavorite={selectedJob && favorites.has(selectedJob._id)}
         isApplied={selectedJob && appliedJobs.has(selectedJob._id)}
+        isHidden={selectedJob && hiddenJobs.has(selectedJob._id)}
         savedTooltip={selectedJob ? savedTooltipFor(selectedJob._id) : ""}
         appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
         onHide={handleHideJob}
+        onRestore={handleRestoreJob}
         onClose={() => {
           setSelectedJob(null);
           setIsModalOpen(false);

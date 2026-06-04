@@ -364,15 +364,6 @@ input:focus, textarea:focus, select:focus {
   background: #0085b2;
 }
 
-.hidden-jobs-note {
-  margin-top: 0;
-  color: #334155 !important;
-}
-
-.hidden-job-row {
-  background: rgba(255, 255, 255, 0.72);
-}
-
 .save-slot-error {
   color: #991b1b !important;
   font-weight: 700;

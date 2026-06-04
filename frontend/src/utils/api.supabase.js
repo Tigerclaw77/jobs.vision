@@ -90,11 +90,6 @@ export async function fetchHiddenJobs() {
   return apiJson("/users/hidden", { headers });
 }
 
-export async function fetchHiddenJobDetails() {
-  const headers = await authHeaders();
-  return apiJson("/users/hidden/jobs", { headers });
-}
-
 export async function hideJob(jobId) {
   const headers = await authHeaders();
   try {

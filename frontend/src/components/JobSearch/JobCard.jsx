@@ -1,5 +1,5 @@
 import React from "react";
-import { Star, CheckCircle, EyeOff } from "lucide-react";
+import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 
 export default function JobCard({
   job,
@@ -12,9 +12,17 @@ export default function JobCard({
   appliedTooltip,
   onHideClick,
   hideTooltip,
+  isHidden = false,
+  onRestoreClick,
+  restoreTooltip,
 }) {
   return (
-    <div className="job-card" onClick={onClick} role="button" tabIndex={0}>
+    <div
+      className={`job-card ${isHidden ? "job-card-hidden" : ""}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+    >
       <div className="jl-icon-col" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
@@ -38,15 +46,27 @@ export default function JobCard({
         >
           <CheckCircle size={18} />
         </button>
-        <button
-          type="button"
-          className="jl-icon-btn jl-hide"
-          title={hideTooltip || "Hide job"}
-          aria-label="Hide job"
-          onClick={() => onHideClick?.(job._id)}
-        >
-          <EyeOff size={18} />
-        </button>
+        {isHidden ? (
+          <button
+            type="button"
+            className="jl-icon-btn jl-restore"
+            title={restoreTooltip || "Restore job"}
+            aria-label="Restore job"
+            onClick={() => onRestoreClick?.(job._id)}
+          >
+            <RotateCcw size={18} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="jl-icon-btn jl-hide"
+            title={hideTooltip || "Hide job"}
+            aria-label="Hide job"
+            onClick={() => onHideClick?.(job._id)}
+          >
+            <EyeOff size={18} />
+          </button>
+        )}
       </div>
 
       <div className="job-content">
@@ -57,6 +77,18 @@ export default function JobCard({
           <p className="job-meta">
             {job.role || ""}{job.role && job.hours ? " • " : ""}{job.hours || ""}
           </p>
+        )}
+        {isHidden && (
+          <button
+            type="button"
+            className="job-restore-action"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRestoreClick?.(job._id);
+            }}
+          >
+            Restore
+          </button>
         )}
       </div>
     </div>

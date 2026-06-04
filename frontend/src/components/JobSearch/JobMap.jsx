@@ -227,6 +227,7 @@ const JobMap = ({
         map: map.current,
         title: job.title || "",
         icon: markerIconForState(window.google, state),
+        opacity: job.isHidden ? 0.5 : 1,
         zIndex: MARKER_STYLES[state]?.zIndex || MARKER_STYLES.normal.zIndex,
       });
       m.addListener("click", () => {

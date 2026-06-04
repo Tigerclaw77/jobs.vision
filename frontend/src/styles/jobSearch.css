@@ -129,6 +129,50 @@
   line-height:1.1;
   white-space:nowrap;
 }
+.show-hidden-toggle{
+  width:100%;
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:8px;
+  padding:9px 12px;
+  border:1px solid var(--stroke);
+  border-radius:10px;
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  cursor:pointer;
+  user-select:none;
+}
+.show-hidden-toggle:hover,
+.show-hidden-toggle:focus-within{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(255,255,255,.24);
+}
+.field-show-hidden .show-hidden-toggle input[type="checkbox"]{
+  appearance:auto;
+  -webkit-appearance:checkbox;
+  flex:0 0 15px;
+  width:15px !important;
+  height:15px !important;
+  min-width:15px !important;
+  max-width:15px !important;
+  margin:0;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:3px !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  transform:none !important;
+  accent-color:#47d7b2;
+}
+.show-hidden-toggle span{
+  color:var(--text) !important;
+  font-size:.9rem;
+  font-weight:700;
+  line-height:1.1;
+  white-space:nowrap;
+}
 .advanced-filter-shell{
   min-width:0;
 }
@@ -338,6 +382,9 @@
   box-sizing:border-box;
   cursor:pointer;
 }
+.job-card-hidden{
+  opacity:.5;
+}
 .jl-icon-col{ display:flex; flex-direction:column; gap:6px; align-items:center; padding-top:2px; width:32px; }
 .jl-icon-btn, .jl-icon-btn::before, .jl-icon-btn::after{ margin:0!important; padding:0!important; border:0!important; background:transparent!important; box-shadow:none!important; border-radius:0!important; }
 .jl-icon-btn{ width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; line-height:0; cursor:pointer; }
@@ -350,10 +397,30 @@
 .jl-check.active svg{ fill: rgba(87,227,137,.20); }
 .jl-hide{ color: rgba(203,213,225,.86); }
 .jl-hide:hover{ color:#fff; }
+.jl-restore{ color: rgba(71,215,178,.95); }
+.jl-restore:hover{ color:#b8fff0; }
 
 .job-content{ min-width:0; }
 .job-title{ margin:0 0 6px 0; line-height:1.25; word-break:break-word; color:#fff !important; }
 .job-company,.job-location,.job-meta{ margin:0; line-height:1.35; color:rgba(255,255,255,.96) !important; }
+.job-restore-action{
+  margin-top:12px !important;
+  padding:7px 11px !important;
+  border:1px solid rgba(71,215,178,.45) !important;
+  border-radius:9px !important;
+  background:rgba(71,215,178,.12) !important;
+  color:#d9fff8 !important;
+  font-size:.9rem !important;
+  font-weight:800;
+  width:auto !important;
+  box-shadow:none !important;
+  transform:none !important;
+}
+.job-restore-action:hover,
+.job-restore-action:focus-visible{
+  background:rgba(71,215,178,.20) !important;
+  border-color:rgba(71,215,178,.68) !important;
+}
 
 /* =========================
    RESPONSIVE
@@ -532,6 +599,7 @@
 .jobsearch-scope .field-location{ grid-column: 1 / 2; }
 .jobsearch-scope .field-radius  { grid-column: 2 / 3; }
 .jobsearch-scope .field-role    { grid-column: 1 / 2; }
+.jobsearch-scope .field-show-hidden{ grid-column: 2 / 3; align-self:end; }
 .jobsearch-scope .filter-grid > .field-checks  { grid-column: 1 / -1; }
 .jobsearch-scope .advanced-filter-shell{ grid-column: 1 / -1; }
 .jobsearch-scope .reset-cell    { grid-column: 1 / -1; justify-self:end; align-self:start; }
@@ -605,6 +673,7 @@
   .jobsearch-scope .field-location,
   .jobsearch-scope .field-radius,
   .jobsearch-scope .field-role,
+  .jobsearch-scope .field-show-hidden,
   .jobsearch-scope .field-checks,
   .jobsearch-scope .advanced-filter-shell{ grid-column: 1 / -1; }
   .advanced-filter-content{ grid-template-columns:1fr; }

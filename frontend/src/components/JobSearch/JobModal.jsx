@@ -36,6 +36,8 @@ export default function JobModal({
   onFavoriteClick,
   onApply,
   onHide,
+  onRestore,
+  isHidden = false,
   onClose,
   isAuthed,
 }) {
@@ -120,7 +122,15 @@ export default function JobModal({
           <button className="btn-secondary" onClick={onClose}>
             Close
           </button>
-          {onHide && (
+          {isHidden && onRestore ? (
+            <button
+              type="button"
+              className="btn-secondary btn-restore-job"
+              onClick={() => onRestore(job._id)}
+            >
+              Restore Job
+            </button>
+          ) : onHide ? (
             <button
               type="button"
               className="btn-secondary btn-hide-job"
@@ -128,7 +138,7 @@ export default function JobModal({
             >
               Hide Job
             </button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

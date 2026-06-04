@@ -7,9 +7,7 @@ import JobModal from "../JobSearch/JobModal";
 import {
   applyToJob,
   fetchFavoriteJobs,
-  fetchHiddenJobDetails,
   removeJobFromFavorites,
-  unhideJob,
 } from "../../utils/api.supabase";
 import { fetchUserJobData } from "../../store/jobSlice";
 
@@ -77,12 +75,8 @@ const CandidateDashboard = () => {
   const [favoriteRows, setFavoriteRows] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [favoritesError, setFavoritesError] = useState("");
-  const [hiddenRows, setHiddenRows] = useState([]);
-  const [hiddenLoading, setHiddenLoading] = useState(true);
-  const [hiddenError, setHiddenError] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [removingJobId, setRemovingJobId] = useState("");
-  const [restoringJobId, setRestoringJobId] = useState("");
 
   const premium = hasPremiumFeatures(user);
   const unlimitedSaves = hasUnlimitedSaves(user);
@@ -91,7 +85,6 @@ const CandidateDashboard = () => {
     () => favoriteRows.map(getFavoriteJobId).filter(Boolean),
     [favoriteRows]
   );
-  const hiddenJobRows = useMemo(() => hiddenRows.map(mapFavoriteJob), [hiddenRows]);
   const savedJobCount =
     favoritesLoading && favoriteRows.length === 0 ? favorites.length : favoriteJobs.length;
   const freeSlotsUsed = Math.min(savedJobCount, SAVE_SLOT_COUNT);
@@ -126,43 +119,6 @@ const CandidateDashboard = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadHiddenJobs() {
-      setHiddenLoading(true);
-      setHiddenError("");
-      try {
-        const rows = await fetchHiddenJobDetails();
-        const nextRows = Array.isArray(rows) ? rows : [];
-        if (mounted) {
-          setHiddenRows(nextRows);
-          dispatch(
-            fetchUserJobData({
-              savedJobs: favoriteIds,
-              appliedJobs,
-              recruiterJobs,
-              hiddenJobs: nextRows.map(getFavoriteJobId).filter(Boolean),
-            })
-          );
-        }
-      } catch (error) {
-        if (mounted) {
-          setHiddenError(error?.message || "Unable to load hidden jobs.");
-        }
-      } finally {
-        if (mounted) setHiddenLoading(false);
-      }
-    }
-
-    loadHiddenJobs();
-    return () => {
-      mounted = false;
-    };
-    // Load once on dashboard entry; favoriteIds/appliedJobs sync is handled by actions below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch]);
-
   const syncFavoriteIds = (nextRows) => {
     dispatch(
       fetchUserJobData({
@@ -190,31 +146,6 @@ const CandidateDashboard = () => {
       setFavoritesError(error?.message || "Unable to remove saved job.");
     } finally {
       setRemovingJobId("");
-    }
-  };
-
-  const restoreHiddenJob = async (jobId) => {
-    if (!jobId) return;
-    setRestoringJobId(jobId);
-    setHiddenError("");
-    try {
-      await unhideJob(jobId);
-      setHiddenRows((prev) => {
-        const next = prev.filter((row) => getFavoriteJobId(row) !== String(jobId));
-        dispatch(
-          fetchUserJobData({
-            savedJobs: favoriteIds,
-            appliedJobs,
-            recruiterJobs,
-            hiddenJobs: next.map(getFavoriteJobId).filter(Boolean),
-          })
-        );
-        return next;
-      });
-    } catch (error) {
-      setHiddenError(error?.message || "We couldn't update this job. Please try again.");
-    } finally {
-      setRestoringJobId("");
     }
   };
 
@@ -316,38 +247,6 @@ const CandidateDashboard = () => {
           </div>
 
           {favoritesLoading && <p className="save-slot-loading">Loading saved jobs...</p>}
-        </section>
-
-        <section className="dashboard-section hidden-jobs-card">
-          <h2>Hidden Jobs</h2>
-          <p className="hidden-jobs-note">
-            Restore a job to show it again in search results and on the map.
-          </p>
-
-          {hiddenError && <p className="save-slot-error">{hiddenError}</p>}
-          {hiddenLoading && <p className="save-slot-loading">Loading hidden jobs...</p>}
-
-          {!hiddenLoading && hiddenJobRows.length === 0 ? (
-            <p className="save-slot-empty-note">No hidden jobs.</p>
-          ) : (
-            <div className="save-slot-list hidden-job-list">
-              {hiddenJobRows.map((job) => (
-                <div key={job._id} className="save-slot-row-button hidden-job-row">
-                  <span className="save-slot-job-text">
-                    {job.title} - {job.company} - {job.location}
-                  </span>
-                  <button
-                    type="button"
-                    className="save-slot-remove"
-                    aria-label={`Restore ${job.title}`}
-                    onClick={() => restoreHiddenJob(job._id)}
-                  >
-                    {restoringJobId === job._id ? "Restoring..." : "Restore"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
         </section>
 
         {premium && (

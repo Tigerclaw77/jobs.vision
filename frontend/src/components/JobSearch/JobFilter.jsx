@@ -208,6 +208,17 @@ export default function JobFilter({
           </select>
         </div>
 
+        <div className="field field-show-hidden">
+          <label className="show-hidden-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(filters.showHiddenJobs)}
+              onChange={(e) => set({ showHiddenJobs: e.target.checked })}
+            />
+            <span>Show Hidden Jobs</span>
+          </label>
+        </div>
+
         <FilterChecks
           legend="Employment Type"
           options={EMPLOYMENT_TYPE_OPTIONS}
