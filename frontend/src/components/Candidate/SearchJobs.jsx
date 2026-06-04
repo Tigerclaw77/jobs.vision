@@ -129,6 +129,7 @@ const SearchJobs = () => {
   }, []);
 
   const filteredJobs = useMemo(() => {
+    const roleIncludesOptometrist = filters.roles.includes("optometrist");
     return jobs.filter((job) => {
       const roleOk = filters.roles.length === 0 || filters.roles.includes(job.role);
       const hoursOk =
@@ -141,6 +142,7 @@ const SearchJobs = () => {
         filters.workArrangements.length === 0 ||
         job.work_arrangements.some((value) => filters.workArrangements.includes(value));
       const opportunityOk =
+        !roleIncludesOptometrist ||
         filters.opportunityTypes.length === 0 ||
         job.opportunity_types.some((value) => filters.opportunityTypes.includes(value));
       const companyOk =
@@ -153,14 +155,23 @@ const SearchJobs = () => {
   const toggleFilter = (key, value) => {
     setFilters((prev) => {
       const current = Array.isArray(prev[key]) ? prev[key] : [];
+      const nextValues = current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value];
+      if (key === "roles") {
+        return {
+          ...prev,
+          roles: nextValues,
+          opportunityTypes: nextValues.includes("optometrist") ? prev.opportunityTypes : [],
+        };
+      }
       return {
         ...prev,
-        [key]: current.includes(value)
-          ? current.filter((item) => item !== value)
-          : [...current, value],
+        [key]: nextValues,
       };
     });
   };
+  const showOpportunityTypes = filters.roles.includes("optometrist");
 
   const handleSaveJob = async (job) => {
     try {
@@ -214,12 +225,14 @@ const SearchJobs = () => {
           onToggle={(value) => toggleFilter("workArrangements", value)}
         />
 
-        <CheckboxGroup
-          legend="Opportunity Type"
-          options={OPPORTUNITY_TYPE_OPTIONS}
-          selected={filters.opportunityTypes}
-          onToggle={(value) => toggleFilter("opportunityTypes", value)}
-        />
+        {showOpportunityTypes && (
+          <CheckboxGroup
+            legend="Opportunity Type"
+            options={OPPORTUNITY_TYPE_OPTIONS}
+            selected={filters.opportunityTypes}
+            onToggle={(value) => toggleFilter("opportunityTypes", value)}
+          />
+        )}
 
         <input
           placeholder="Company"

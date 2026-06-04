@@ -7,7 +7,7 @@
 :root {
   --top-panel-height: 390px;
   --map-panel-height: var(--top-panel-height);
-  --filter-label-control-gap: 14px;
+  --filter-label-control-gap: 12px;
 }
 .jobs-top{
   display:grid;
@@ -60,7 +60,13 @@
 }
 .filter-grid > .field{ min-width:0; }
 .field{ display:flex; flex-direction:column; gap:var(--filter-label-control-gap); min-width:0; }
-.field label{ font-size:.9rem; color:var(--muted); }
+.field label{
+  min-height:1.1rem;
+  margin:0;
+  font-size:.9rem;
+  line-height:1.1;
+  color:var(--muted);
+}
 .field-checks{
   min-width:0;
   margin:0;
@@ -71,9 +77,11 @@
   gap:var(--filter-label-control-gap);
 }
 .field-checks legend{
+  min-height:1.1rem;
   margin:0;
   padding:0;
   font-size:.9rem;
+  line-height:1.1;
   color:var(--muted);
 }
 

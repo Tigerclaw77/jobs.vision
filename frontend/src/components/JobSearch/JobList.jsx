@@ -149,6 +149,11 @@ const normalizeFilterArray = (value) => {
     .map((item) => item.trim())
     .filter(Boolean);
 };
+const normalizeRoleFilters = (value) =>
+  normalizeFilterArray(value)
+    .map((item) => normalizeRole(item) || item)
+    .filter(Boolean);
+const includesOptometristRole = (value) => normalizeRoleFilters(value).includes("optometrist");
 
 function jobValues(job, pluralField, singularField, fallbackField = null) {
   return normalizeMultiValue(
@@ -224,13 +229,11 @@ function filtersFromSearchParams(searchParams) {
   const next = { ...DEFAULT_FILTERS };
   Object.entries(initial).forEach(([key, value]) => {
     if (key === "roles") {
-      next.roles = normalizeFilterArray(value)
-        .map((item) => normalizeRole(item) || item)
-        .filter(Boolean);
+      next.roles = normalizeRoleFilters(value);
     } else if (ARRAY_FILTER_KEYS.has(key)) {
       next[key] = normalizeFilterArray(value);
     } else if (key === "role") {
-      next.roles = normalizeFilterArray(value).map((item) => normalizeRole(item) || item);
+      next.roles = normalizeRoleFilters(value);
     } else if (key === "type") {
       next.employmentTypes = normalizeFilterArray(value);
     } else if (key === "location") {
@@ -241,6 +244,9 @@ function filtersFromSearchParams(searchParams) {
       next[key] = value;
     }
   });
+  if (!includesOptometristRole(next.roles)) {
+    next.opportunityTypes = [];
+  }
 
   return next;
 }
@@ -314,6 +320,12 @@ export default function JobList() {
 
   const updateFilters = (nextFilters) => {
     const normalizedFilters = { ...nextFilters };
+    if ("roles" in normalizedFilters) {
+      normalizedFilters.roles = normalizeRoleFilters(normalizedFilters.roles);
+      if (!includesOptometristRole(normalizedFilters.roles)) {
+        normalizedFilters.opportunityTypes = [];
+      }
+    }
     if ("location" in normalizedFilters) {
       const nextLocation = collapseLocationInput(normalizedFilters.location);
       const previousLocation = cleanLocationInput(filters.location);
@@ -547,13 +559,13 @@ export default function JobList() {
       const qLower = q.trim().toLowerCase();
       const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
       const workArrangementSet = new Set(normalizeFilterArray(workArrangements).map(normalizeType));
-      const opportunitySet = new Set(normalizeFilterArray(opportunityTypes).map(normalizeType));
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
       const roleSet = new Set(
-        normalizeFilterArray(roles)
-          .map((value) => normalizeRole(value) || String(value || "").toLowerCase())
-          .filter(Boolean)
+        normalizeRoleFilters(roles)
       );
+      const opportunitySet = roleSet.has("optometrist")
+        ? new Set(normalizeFilterArray(opportunityTypes).map(normalizeType))
+        : new Set();
 
       const next = (jobs || []).filter((job) => {
         const jobId = String(job._id || job.id || "");

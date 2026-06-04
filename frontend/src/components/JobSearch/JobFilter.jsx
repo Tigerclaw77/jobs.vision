@@ -6,6 +6,7 @@ import {
   PRACTICE_TYPE_OPTIONS,
   ROLE_OPTIONS,
   WORK_ARRANGEMENT_OPTIONS,
+  normalizeRole,
 } from "../../utils/jobTaxonomy";
 
 const RADIUS_OPTIONS = [
@@ -57,13 +58,32 @@ export default function JobFilter({
     Boolean(String(filters.location || "").trim()) ||
     (Number.isFinite(Number(filters.lat)) && Number.isFinite(Number(filters.lng)));
   const canUseRadius = canUseMapSearch && hasLocation;
+  const selectedRoles = Array.isArray(filters.roles)
+    ? filters.roles.map((role) => normalizeRole(role) || role).filter(Boolean)
+    : [];
+  const showOpportunityTypes = selectedRoles.includes("optometrist");
 
   const toggleMulti = (key, value) => {
     const current = Array.isArray(filters[key]) ? filters[key] : [];
+    const nextValues = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+
+    if (key === "roles") {
+      const normalizedRoles = nextValues
+        .map((role) => normalizeRole(role) || role)
+        .filter(Boolean);
+      set({
+        roles: normalizedRoles,
+        opportunityTypes: normalizedRoles.includes("optometrist")
+          ? filters.opportunityTypes || []
+          : [],
+      });
+      return;
+    }
+
     set({
-      [key]: current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value],
+      [key]: nextValues,
     });
   };
 
@@ -227,12 +247,14 @@ export default function JobFilter({
 
           {advancedOpen && (
             <div className="advanced-filter-content">
-              <FilterChecks
-                legend="Opportunity Type"
-                options={OPPORTUNITY_TYPE_OPTIONS}
-                selected={filters.opportunityTypes}
-                onToggle={(value) => toggleMulti("opportunityTypes", value)}
-              />
+              {showOpportunityTypes && (
+                <FilterChecks
+                  legend="Opportunity Type"
+                  options={OPPORTUNITY_TYPE_OPTIONS}
+                  selected={filters.opportunityTypes}
+                  onToggle={(value) => toggleMulti("opportunityTypes", value)}
+                />
+              )}
               <FilterChecks
                 legend="Practice Type"
                 options={PRACTICE_TYPE_OPTIONS}
