@@ -43,6 +43,14 @@ const MARKER_STYLES = {
   normal: { color: "#dc2626", zIndex: 10 },
 };
 
+const LEGEND_ITEMS = [
+  { label: "Job", color: MARKER_STYLES.normal.color },
+  { label: "Featured", color: MARKER_STYLES.featured.color },
+  { label: "Saved", color: MARKER_STYLES.saved.color },
+  { label: "Applied", color: MARKER_STYLES.applied.color },
+  { label: "Hidden", color: "#94a3b8", dim: true },
+];
+
 function markerStateFor(job = {}) {
   if (job.isApplied || job.applied) return "applied";
   if (job.isFavorite || job.isSaved || job.saved) return "saved";
@@ -254,6 +262,14 @@ const JobMap = ({
         className="job-map-canvas"
         data-map-error={loadError || undefined}
       />
+      <div className="map-marker-legend" aria-label="Map marker legend">
+        {LEGEND_ITEMS.map((item) => (
+          <span key={item.label} className={`map-legend-item ${item.dim ? "is-dim" : ""}`}>
+            <span className="map-legend-dot" style={{ backgroundColor: item.color }} />
+            <span>{item.label}</span>
+          </span>
+        ))}
+      </div>
       {emptyMessage && <div className="map-empty-message">{emptyMessage}</div>}
     </div>
   );

@@ -260,7 +260,7 @@ export default function JobFilter({
         />
 
         <FilterChecks
-          legend="Work Arrangement"
+          legend="Work Setting"
           options={WORK_ARRANGEMENT_OPTIONS}
           selected={filters.workArrangements}
           onToggle={(value) => toggleMulti("workArrangements", value)}
