@@ -1,6 +1,6 @@
 // src/components/JobSearch/JobModal.jsx
 import React, { useEffect } from "react";
-import { Star, CheckCircle } from "lucide-react";
+import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import {
   EMPLOYMENT_TYPE_LABELS,
   OPPORTUNITY_TYPE_LABELS,
@@ -19,6 +19,8 @@ export default function JobModal({
   isApplied,
   savedTooltip,
   appliedTooltip,
+  hideTooltip,
+  restoreTooltip,
   onFavoriteClick,
   onApply,
   onHide,
@@ -80,6 +82,27 @@ export default function JobModal({
           >
             <CheckCircle size={20} />
           </button>
+          {isHidden && onRestore ? (
+            <button
+              type="button"
+              className="status-chip hidden-action restore"
+              title={restoreTooltip || "Restore job"}
+              aria-label="Restore job"
+              onClick={() => onRestore(job._id)}
+            >
+              <RotateCcw size={20} />
+            </button>
+          ) : onHide ? (
+            <button
+              type="button"
+              className="status-chip hidden-action hide"
+              title={hideTooltip || "Hide job"}
+              aria-label="Hide job"
+              onClick={() => onHide(job._id)}
+            >
+              <EyeOff size={20} />
+            </button>
+          ) : null}
         </div>
 
         <h3 className="modal-title">{job.title}</h3>
@@ -115,23 +138,6 @@ export default function JobModal({
           <button className="btn-secondary" onClick={onClose}>
             Close
           </button>
-          {isHidden && onRestore ? (
-            <button
-              type="button"
-              className="btn-secondary btn-restore-job"
-              onClick={() => onRestore(job._id)}
-            >
-              Restore Job
-            </button>
-          ) : onHide ? (
-            <button
-              type="button"
-              className="btn-secondary btn-hide-job"
-              onClick={() => onHide(job._id)}
-            >
-              Hide Job
-            </button>
-          ) : null}
         </div>
       </div>
     </div>

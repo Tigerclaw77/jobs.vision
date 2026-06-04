@@ -424,21 +424,23 @@
 .map-marker-legend{
   position:absolute;
   left:10px;
-  bottom:10px;
+  top:10px;
   z-index:3;
   display:flex;
   flex-wrap:wrap;
-  gap:6px 8px;
+  gap:6px 9px;
   align-items:center;
   max-width:calc(100% - 20px);
-  padding:6px 8px;
-  border:1px solid rgba(255,255,255,.18);
+  padding:6px 9px;
+  border:1px solid rgba(255,255,255,.26);
   border-radius:999px;
-  background:rgba(9,14,24,.76);
-  color:#eef2ff;
+  background:rgba(6,10,18,.88);
+  color:#f8fbff;
   font-size:.75rem;
+  font-weight:700;
   line-height:1;
-  box-shadow:0 8px 18px rgba(0,0,0,.22);
+  text-shadow:0 1px 2px rgba(0,0,0,.48);
+  box-shadow:0 8px 18px rgba(0,0,0,.28);
   pointer-events:none;
 }
 .map-legend-item{
@@ -451,10 +453,7 @@
   width:8px;
   height:8px;
   border-radius:50%;
-  box-shadow:0 0 0 1px rgba(255,255,255,.62);
-}
-.map-legend-item.is-dim{
-  opacity:.62;
+  box-shadow:0 0 0 1px rgba(255,255,255,.78);
 }
 .map-empty-message{
   position:absolute;
@@ -748,6 +747,10 @@
 .status-chip.applied{ color: rgba(87,227,137,.85) !important; }
 .status-chip.applied.active{ color: rgba(87,227,137,1) !important; }
 .status-chip.applied.active svg{ fill: rgba(87,227,137,.20); }
+.status-chip.hidden-action.hide{ color: rgba(203,213,225,.86) !important; }
+.status-chip.hidden-action.hide:hover{ color:#fff !important; }
+.status-chip.hidden-action.restore{ color: rgba(71,215,178,.95) !important; }
+.status-chip.hidden-action.restore:hover{ color:#b8fff0 !important; }
 
 /* Actions */
 .modal-actions{
@@ -768,11 +771,6 @@
   background:transparent;
 }
 .btn-secondary:hover{ background:rgba(255,255,255,.07); }
-.btn-hide-job{
-  border-color:rgba(203,213,225,.34);
-  color:#f1f5f9;
-}
-
 /* =========================================================
    JOB SEARCH SCOPE — ONLY this page
    ========================================================= */

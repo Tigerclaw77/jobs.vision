@@ -48,7 +48,6 @@ const LEGEND_ITEMS = [
   { label: "Featured", color: MARKER_STYLES.featured.color },
   { label: "Saved", color: MARKER_STYLES.saved.color },
   { label: "Applied", color: MARKER_STYLES.applied.color },
-  { label: "Hidden", color: "#94a3b8", dim: true },
 ];
 
 function markerStateFor(job = {}) {
@@ -264,7 +263,7 @@ const JobMap = ({
       />
       <div className="map-marker-legend" aria-label="Map marker legend">
         {LEGEND_ITEMS.map((item) => (
-          <span key={item.label} className={`map-legend-item ${item.dim ? "is-dim" : ""}`}>
+          <span key={item.label} className="map-legend-item">
             <span className="map-legend-dot" style={{ backgroundColor: item.color }} />
             <span>{item.label}</span>
           </span>

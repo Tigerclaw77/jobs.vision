@@ -366,22 +366,6 @@ export default function JobList() {
   const hasLocationText = Boolean(normalizedLocation);
   const hasActiveRadius =
     canUseMapSearch && hasLocationText && geocodeStatus === "success" && Boolean(searchCenter);
-  const shouldFitMapToJobs = useMemo(() => {
-    const hasArrayFilter = [
-      filters.roles,
-      filters.employmentTypes,
-      filters.workArrangements,
-      canUseAdvancedOdFilters ? filters.opportunityTypes : [],
-      canUseAdvancedOdFilters ? filters.practiceTypes : [],
-    ].some((value) => normalizeFilterArray(value).length > 0);
-
-    return Boolean(
-      cleanLocationInput(filters.q) ||
-        cleanLocationInput(filters.company) ||
-        cleanLocationInput(filters.location) ||
-        hasArrayFilter
-    );
-  }, [filters, canUseAdvancedOdFilters]);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -695,6 +679,22 @@ export default function JobList() {
       })),
     [filteredJobs, appliedJobs, favorites, hiddenJobs]
   );
+  const shouldFitMapToJobs = useMemo(() => {
+    const hasArrayFilter = [
+      filters.roles,
+      filters.employmentTypes,
+      filters.workArrangements,
+      canUseAdvancedOdFilters ? filters.opportunityTypes : [],
+      canUseAdvancedOdFilters ? filters.practiceTypes : [],
+    ].some((value) => normalizeFilterArray(value).length > 0);
+    const hasNonLocationNarrowing = Boolean(
+      cleanLocationInput(filters.q) || cleanLocationInput(filters.company) || hasArrayFilter
+    );
+    const filterNarrowsVisibleJobs =
+      jobs.length > 0 && filteredJobs.length > 0 && filteredJobs.length < jobs.length;
+
+    return Boolean(hasNonLocationNarrowing && filterNarrowsVisibleJobs);
+  }, [filters, canUseAdvancedOdFilters, jobs.length, filteredJobs.length]);
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
 const removeQuickTag = (tag) => {
@@ -1017,6 +1017,8 @@ const removeQuickTag = (tag) => {
         isHidden={selectedJob && hiddenJobs.has(selectedJob._id)}
         savedTooltip={selectedJob ? savedTooltipFor(selectedJob._id) : ""}
         appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
+        hideTooltip={selectedJob ? hideTooltipFor(selectedJob._id) : ""}
+        restoreTooltip={selectedJob ? restoreTooltipFor(selectedJob._id) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
         onHide={handleHideJob}
