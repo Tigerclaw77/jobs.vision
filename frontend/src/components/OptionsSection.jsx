@@ -1,5 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import PostAddIcon from "@mui/icons-material/PostAdd";
+import WorkIcon from "@mui/icons-material/Work";
 import "../styles/Home.css";
 
 const OptionsSection = ({ user }) => {
@@ -60,24 +63,22 @@ const OptionsSection = ({ user }) => {
       {userRole === "recruiter" && (
         <>
           <Link to="/recruiter/addjob" className="option-card">
-            <img src="/images/post-job.jpg" alt="Post a Job" />
+            <span className="option-card-visual" aria-hidden="true">
+              <PostAddIcon />
+            </span>
             <h3>Post a Job</h3>
           </Link>
           <Link to="/recruiter/dashboard" className="option-card">
-            <img src="/images/edit-jobs.jpg" alt="Manage Jobs" />
+            <span className="option-card-visual" aria-hidden="true">
+              <WorkIcon />
+            </span>
             <h3>Manage Jobs</h3>
           </Link>
-          <Link to="/recruiter/domains" className="option-card">
-            <img src="/images/edit-jobs.jpg" alt="Verify Domains" />
-            <h3>Verify Domains</h3>
-          </Link>
-          <Link to="/recruiter/applications" className="option-card">
-            <img src="/images/browse-jobs.jpg" alt="Applications" />
-            <h3>Applications</h3>
-          </Link>
-          <Link to="/jobs" className="option-card">
-            <img src="/images/browse-jobs.jpg" alt="Browse Jobs" />
-            <h3>Browse Jobs</h3>
+          <Link to="/recruiter/profile" className="option-card">
+            <span className="option-card-visual" aria-hidden="true">
+              <AccountCircleIcon />
+            </span>
+            <h3>Account</h3>
           </Link>
         </>
       )}
