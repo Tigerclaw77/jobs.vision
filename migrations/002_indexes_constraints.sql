@@ -131,6 +131,18 @@ create index if not exists jobs_employment_type_idx
 create index if not exists jobs_work_arrangement_idx
   on public.jobs (work_arrangement);
 
+create index if not exists jobs_opportunity_types_gin_idx
+  on public.jobs using gin (opportunity_types);
+
+create index if not exists jobs_employment_types_gin_idx
+  on public.jobs using gin (employment_types);
+
+create index if not exists jobs_work_arrangements_gin_idx
+  on public.jobs using gin (work_arrangements);
+
+create index if not exists jobs_compensation_type_idx
+  on public.jobs (compensation_type);
+
 create index if not exists jobs_employer_brand_idx
   on public.jobs (employer_brand);
 

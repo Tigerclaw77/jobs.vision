@@ -1,35 +1,14 @@
 import React from "react";
-
-const LABELS = {
-  opportunity_type: {
-    associate_w2: "Associate (W-2)",
-    associate_1099: "Associate (1099)",
-    corporate_employment: "Corporate Employment",
-    corporate_lease: "Corporate Lease",
-    partnership_opportunity: "Partnership Opportunity",
-    practice_acquisition: "Practice Acquisition",
-  },
-  practice_type: {
-    private_practice: "Private Practice",
-    corporate: "Corporate",
-    od_md: "OD/MD",
-  },
-  employment_type: {
-    full_time: "Full-Time",
-    part_time: "Part-Time",
-    per_diem_fill_in: "Per Diem / Fill-In",
-  },
-  work_arrangement: {
-    on_site: "On-Site",
-    hybrid: "Hybrid",
-    remote: "Remote",
-  },
-};
-
-function labelFor(field, value) {
-  if (!value) return "";
-  return LABELS[field]?.[value] || String(value).replace(/_/g, " ");
-}
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  OPPORTUNITY_TYPE_LABELS,
+  PRACTICE_TYPE_LABELS,
+  ROLE_LABELS,
+  WORK_ARRANGEMENT_LABELS,
+  compensationSummary,
+  labelsForValues,
+  normalizeRole,
+} from "../../utils/jobTaxonomy";
 
 const RecruiterJobCard = ({ job, onEdit, onArchive, onUnarchive }) => {
   const handleEdit = () => {
@@ -54,11 +33,18 @@ const RecruiterJobCard = ({ job, onEdit, onArchive, onUnarchive }) => {
     }
   };
 
+  const role = normalizeRole(job.role) || job.role;
+  const opportunityLabels =
+    role === "optometrist"
+      ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
+      : [];
   const details = [
-    ["Opportunity", labelFor("opportunity_type", job.opportunity_type)],
-    ["Practice", labelFor("practice_type", job.practice_type)],
-    ["Employment", labelFor("employment_type", job.employment_type)],
-    ["Work Arrangement", labelFor("work_arrangement", job.work_arrangement)],
+    ["Role", ROLE_LABELS[role] || job.role],
+    ["Opportunity", opportunityLabels.join(", ")],
+    ["Practice", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Employment", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
+    ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
+    ["Compensation", compensationSummary(job)],
   ].filter(([, value]) => value);
 
   return (

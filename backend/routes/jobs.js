@@ -17,18 +17,28 @@ const LOCATION_MAP_ERROR = "We couldn't map this location. Please check the city
 const CANONICAL_ROLES = new Set([
   "optometrist",
   "optician",
-  "ophthalmic technician",
-  "practice manager",
+  "ophthalmic_technician",
+  "optical_lab",
+  "front_desk",
+  "practice_manager",
+  "other",
 ]);
 const ROLE_ALIASES = new Map([
-  ["tech", "ophthalmic technician"],
-  ["technician", "ophthalmic technician"],
-  ["ophthalmic tech", "ophthalmic technician"],
-  ["ophthalmic technician", "ophthalmic technician"],
-  ["manager", "practice manager"],
-  ["practice manager", "practice manager"],
+  ["tech", "ophthalmic_technician"],
+  ["technician", "ophthalmic_technician"],
+  ["ophthalmic tech", "ophthalmic_technician"],
+  ["ophthalmic technician", "ophthalmic_technician"],
+  ["ophthalmic_technician", "ophthalmic_technician"],
+  ["optical lab", "optical_lab"],
+  ["optical_lab", "optical_lab"],
+  ["front desk", "front_desk"],
+  ["front_desk", "front_desk"],
+  ["manager", "practice_manager"],
+  ["practice manager", "practice_manager"],
+  ["practice_manager", "practice_manager"],
   ["optometrist", "optometrist"],
   ["optician", "optician"],
+  ["other", "other"],
 ]);
 const OPPORTUNITY_TYPE_ALIASES = new Map([
   ["associate w2", "associate_w2"],
@@ -56,6 +66,20 @@ const WORK_ARRANGEMENT_ALIASES = new Map([
   ["hybrid", "hybrid"],
   ["remote", "remote"],
 ]);
+const COMPENSATION_TYPE_ALIASES = new Map([
+  ["annual salary", "annual_salary"],
+  ["annual_salary", "annual_salary"],
+  ["salary", "annual_salary"],
+  ["hourly wage", "hourly_wage"],
+  ["hourly_wage", "hourly_wage"],
+  ["hourly", "hourly_wage"],
+  ["per diem", "per_diem"],
+  ["per_diem", "per_diem"],
+  ["production based", "production_based"],
+  ["production_based", "production_based"],
+  ["production", "production_based"],
+  ["other", "other"],
+]);
 
 const PUBLIC_JOB_COLUMN_NAMES = [
   "id",
@@ -71,9 +95,19 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "hours",
   "type",
   "opportunity_type",
+  "opportunity_types",
   "practice_type",
   "employment_type",
+  "employment_types",
   "work_arrangement",
+  "work_arrangements",
+  "compensation_type",
+  "salary_min",
+  "salary_max",
+  "hourly_min",
+  "hourly_max",
+  "daily_rate",
+  "compensation_notes",
   "salary",
   "tag_ids",
   "featured",
@@ -90,6 +124,19 @@ const PUBLIC_JOB_COLUMN_NAMES = [
 const PUBLIC_JOB_COLUMNS_CACHE_MS = 60_000;
 let cachedPublicJobColumns = null;
 let cachedPublicJobColumnsAt = 0;
+const PUBLIC_JOB_COLUMN_FALLBACKS = {
+  opportunity_types: "array[]::text[] as opportunity_types",
+  employment_types: "array[]::text[] as employment_types",
+  work_arrangements: "array[]::text[] as work_arrangements",
+  work_arrangement: "null::text as work_arrangement",
+  compensation_type: "null::text as compensation_type",
+  salary_min: "null::numeric as salary_min",
+  salary_max: "null::numeric as salary_max",
+  hourly_min: "null::numeric as hourly_min",
+  hourly_max: "null::numeric as hourly_max",
+  daily_rate: "null::numeric as daily_rate",
+  compensation_notes: "null::text as compensation_notes",
+};
 
 function isAdmin(user) {
   return String(user?.role || "").toLowerCase() === "admin";
@@ -111,12 +158,11 @@ async function getPublicJobColumns() {
   );
   const available = new Set((result.rows || []).map((row) => row.column_name));
 
-  cachedPublicJobColumns = PUBLIC_JOB_COLUMN_NAMES.map((column) => {
-    if (column === "work_arrangement" && !available.has(column)) {
-      return "null::text as work_arrangement";
-    }
-    return column;
-  }).join(",");
+  cachedPublicJobColumns = PUBLIC_JOB_COLUMN_NAMES.map((column) =>
+    available.has(column) ? column : PUBLIC_JOB_COLUMN_FALLBACKS[column]
+  )
+    .filter(Boolean)
+    .join(",");
   cachedPublicJobColumnsAt = now;
 
   return cachedPublicJobColumns;
@@ -153,11 +199,53 @@ function normalizeOptionalChoice(value, aliases, message, code) {
   throw requestError(400, message, code);
 }
 
+function toInputArray(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    return value.split(",").map((item) => item.trim()).filter(Boolean);
+  }
+  return [value];
+}
+
+function normalizeChoiceList(value, aliases, message, code) {
+  const input = toInputArray(value);
+  if (input === undefined) return undefined;
+
+  const seen = new Set();
+  const normalized = [];
+  for (const item of input) {
+    const raw = String(item || "").trim();
+    if (!raw) continue;
+    const canonical = aliases.get(normalizeChoiceKey(raw));
+    if (!canonical) throw requestError(400, message, code);
+    if (!seen.has(canonical)) {
+      seen.add(canonical);
+      normalized.push(canonical);
+    }
+  }
+  return normalized;
+}
+
+function firstOrNull(values) {
+  return Array.isArray(values) && values.length ? values[0] : null;
+}
+
 function normalizeOpportunityType(value) {
   return normalizeOptionalChoice(
     value,
     OPPORTUNITY_TYPE_ALIASES,
     "Please choose a valid opportunity type.",
+    "invalid_opportunity_type"
+  );
+}
+
+function normalizeOpportunityTypes(value) {
+  return normalizeChoiceList(
+    value,
+    OPPORTUNITY_TYPE_ALIASES,
+    "Please choose valid opportunity types.",
     "invalid_opportunity_type"
   );
 }
@@ -171,12 +259,39 @@ function normalizeEmploymentType(value) {
   );
 }
 
+function normalizeEmploymentTypes(value) {
+  return normalizeChoiceList(
+    value,
+    EMPLOYMENT_TYPE_ALIASES,
+    "Please choose valid employment types.",
+    "invalid_employment_type"
+  );
+}
+
 function normalizeWorkArrangement(value) {
   return normalizeOptionalChoice(
     value,
     WORK_ARRANGEMENT_ALIASES,
     "Please choose a valid work arrangement.",
     "invalid_work_arrangement"
+  );
+}
+
+function normalizeWorkArrangements(value) {
+  return normalizeChoiceList(
+    value,
+    WORK_ARRANGEMENT_ALIASES,
+    "Please choose valid work arrangements.",
+    "invalid_work_arrangement"
+  );
+}
+
+function normalizeCompensationType(value) {
+  return normalizeOptionalChoice(
+    value,
+    COMPENSATION_TYPE_ALIASES,
+    "Please choose a valid compensation type.",
+    "invalid_compensation_type"
   );
 }
 
@@ -337,6 +452,95 @@ function toNullableText(value) {
   return text || null;
 }
 
+function numberOrNull(value, fieldLabel) {
+  if (value === undefined || value === null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    throw requestError(400, `Please enter a valid ${fieldLabel}.`, "invalid_compensation");
+  }
+  return number;
+}
+
+function moneyText(value) {
+  if (value === null || value === undefined) return "";
+  return `$${Number(value).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+function buildCompensationSummary(compensation, legacySalary = null) {
+  if (compensation.compensation_type === "annual_salary") {
+    const min = moneyText(compensation.salary_min);
+    const max = moneyText(compensation.salary_max);
+    if (min && max) return `${min} - ${max}`;
+    if (min) return `From ${min}`;
+    if (max) return `Up to ${max}`;
+  }
+  if (compensation.compensation_type === "hourly_wage") {
+    const min = moneyText(compensation.hourly_min);
+    const max = moneyText(compensation.hourly_max);
+    if (min && max) return `${min} - ${max}/hr`;
+    if (min) return `From ${min}/hr`;
+    if (max) return `Up to ${max}/hr`;
+  }
+  if (compensation.compensation_type === "per_diem") {
+    const daily = moneyText(compensation.daily_rate);
+    if (daily) return `${daily}/day`;
+  }
+  if (compensation.compensation_type === "production_based" || compensation.compensation_type === "other") {
+    return compensation.compensation_notes || null;
+  }
+  return legacySalary ?? null;
+}
+
+function normalizeCompensation(body = {}, existing = {}) {
+  const hasType = Object.prototype.hasOwnProperty.call(body, "compensation_type");
+  const compensation_type = hasType
+    ? normalizeCompensationType(body.compensation_type)
+    : existing.compensation_type || null;
+
+  const compensation = {
+    compensation_type: compensation_type || null,
+    salary_min: null,
+    salary_max: null,
+    hourly_min: null,
+    hourly_max: null,
+    daily_rate: null,
+    compensation_notes: null,
+  };
+
+  if (compensation_type === "annual_salary") {
+    compensation.salary_min = numberOrNull(body.salary_min ?? existing.salary_min, "salary minimum");
+    compensation.salary_max = numberOrNull(body.salary_max ?? existing.salary_max, "salary maximum");
+    if (
+      compensation.salary_min !== null &&
+      compensation.salary_max !== null &&
+      compensation.salary_min > compensation.salary_max
+    ) {
+      throw requestError(400, "Salary max must be greater than salary min.", "invalid_compensation");
+    }
+  } else if (compensation_type === "hourly_wage") {
+    compensation.hourly_min = numberOrNull(body.hourly_min ?? existing.hourly_min, "hourly minimum");
+    compensation.hourly_max = numberOrNull(body.hourly_max ?? existing.hourly_max, "hourly maximum");
+    if (
+      compensation.hourly_min !== null &&
+      compensation.hourly_max !== null &&
+      compensation.hourly_min > compensation.hourly_max
+    ) {
+      throw requestError(400, "Hourly max must be greater than hourly min.", "invalid_compensation");
+    }
+  } else if (compensation_type === "per_diem") {
+    compensation.daily_rate = numberOrNull(body.daily_rate ?? existing.daily_rate, "daily rate");
+  } else if (compensation_type === "production_based" || compensation_type === "other") {
+    compensation.compensation_notes = toNullableText(
+      Object.prototype.hasOwnProperty.call(body, "compensation_notes")
+        ? body.compensation_notes
+        : existing.compensation_notes
+    );
+  }
+
+  compensation.salary = buildCompensationSummary(compensation, body.salary ?? existing.salary ?? null);
+  return compensation;
+}
+
 function stripUnverifiedBrandFromName(employerName, venueBrand, venueName) {
   if (!employerName) return { employerName, venueBrand, venueName, employerBrand: undefined };
 
@@ -475,14 +679,24 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     const coordinates = await resolveJobCoordinates(req.body, { required: true });
     const rawEmploymentType = req.body.employment_type ?? req.body.type;
     const legacyRemoteEmployment = isLegacyRemoteEmployment(rawEmploymentType);
-    const employment_type = legacyRemoteEmployment
-      ? "full_time"
-      : normalizeEmploymentType(rawEmploymentType);
-    const work_arrangement = normalizeWorkArrangement(
-      req.body.work_arrangement ??
+    let employment_types = normalizeEmploymentTypes(
+      req.body.employment_types ??
+        (legacyRemoteEmployment ? ["full_time"] : rawEmploymentType)
+    ) || [];
+    let work_arrangements = normalizeWorkArrangements(
+      req.body.work_arrangements ??
+        req.body.work_arrangement ??
         req.body.onsite_type ??
-        (legacyRemoteEmployment ? "remote" : undefined)
-    );
+        (legacyRemoteEmployment ? ["remote"] : undefined)
+    ) || [];
+    const opportunity_types =
+      role === "optometrist"
+        ? normalizeOpportunityTypes(req.body.opportunity_types ?? req.body.opportunity_type) || []
+        : [];
+    const employment_type = firstOrNull(employment_types);
+    const work_arrangement = firstOrNull(work_arrangements);
+    const opportunity_type = firstOrNull(opportunity_types);
+    const compensation = normalizeCompensation(req.body);
 
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
@@ -534,11 +748,21 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       role,
       hours: req.body.hours ?? null,
       type: employment_type ?? null,
-      opportunity_type: normalizeOpportunityType(req.body.opportunity_type),
+      opportunity_type,
+      opportunity_types,
       practice_type: toNullableText(req.body.practice_type),
       employment_type,
+      employment_types,
       work_arrangement,
-      salary: req.body.salary ?? null,
+      work_arrangements,
+      compensation_type: compensation.compensation_type,
+      salary_min: compensation.salary_min,
+      salary_max: compensation.salary_max,
+      hourly_min: compensation.hourly_min,
+      hourly_max: compensation.hourly_max,
+      daily_rate: compensation.daily_rate,
+      compensation_notes: compensation.compensation_notes,
+      salary: compensation.salary,
       tag_ids: toTagIds(req.body.tag_ids),
       recruiter_id,
       is_archived: false,
@@ -612,9 +836,19 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "hours",
       "type",
       "opportunity_type",
+      "opportunity_types",
       "practice_type",
       "employment_type",
+      "employment_types",
       "work_arrangement",
+      "work_arrangements",
+      "compensation_type",
+      "salary_min",
+      "salary_max",
+      "hourly_min",
+      "hourly_max",
+      "daily_rate",
+      "compensation_notes",
       "salary",
       "tag_ids",
       "employer_name",
@@ -631,6 +865,7 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     }
     if ("role" in updates) updates.role = normalizeRole(updates.role, { required: true });
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
+    const nextRole = updates.role || job.role;
 
     const locationChanged = didLocationChange(req.body, job);
     const coordinateFieldsProvided =
@@ -648,27 +883,59 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       delete updates.longitude;
     }
 
-    if ("opportunity_type" in updates) updates.opportunity_type = normalizeOpportunityType(updates.opportunity_type);
+    if ("opportunity_types" in req.body || "opportunity_type" in req.body || "role" in updates) {
+      const opportunityTypes =
+        nextRole === "optometrist"
+          ? normalizeOpportunityTypes(req.body.opportunity_types ?? req.body.opportunity_type) || []
+          : [];
+      updates.opportunity_types = opportunityTypes;
+      updates.opportunity_type = firstOrNull(opportunityTypes);
+    } else if ("opportunity_type" in updates) {
+      updates.opportunity_type = normalizeOpportunityType(updates.opportunity_type);
+    }
     if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
-    const hasEmploymentInput = "employment_type" in req.body || "type" in req.body;
+    const hasEmploymentInput = "employment_types" in req.body || "employment_type" in req.body || "type" in req.body;
     const rawEmploymentType = req.body.employment_type ?? req.body.type;
     const legacyRemoteEmployment = hasEmploymentInput && isLegacyRemoteEmployment(rawEmploymentType);
     if (hasEmploymentInput) {
-      updates.employment_type = legacyRemoteEmployment
-        ? "full_time"
-        : normalizeEmploymentType(rawEmploymentType);
+      const employmentTypes = normalizeEmploymentTypes(
+        req.body.employment_types ??
+          (legacyRemoteEmployment ? ["full_time"] : rawEmploymentType)
+      ) || [];
+      updates.employment_types = employmentTypes;
+      updates.employment_type = firstOrNull(employmentTypes);
       updates.type = updates.employment_type;
     }
     const hasWorkArrangementInput =
-      "work_arrangement" in req.body || "onsite_type" in req.body || legacyRemoteEmployment;
+      "work_arrangements" in req.body ||
+      "work_arrangement" in req.body ||
+      "onsite_type" in req.body ||
+      legacyRemoteEmployment;
     if (hasWorkArrangementInput) {
-      updates.work_arrangement = normalizeWorkArrangement(
-        req.body.work_arrangement ??
+      const workArrangements = normalizeWorkArrangements(
+        req.body.work_arrangements ??
+          req.body.work_arrangement ??
           req.body.onsite_type ??
-          (legacyRemoteEmployment ? "remote" : undefined)
-      );
+          (legacyRemoteEmployment ? ["remote"] : undefined)
+      ) || [];
+      updates.work_arrangements = workArrangements;
+      updates.work_arrangement = firstOrNull(workArrangements);
     } else if ("work_arrangement" in updates) {
       updates.work_arrangement = normalizeWorkArrangement(updates.work_arrangement);
+    }
+
+    const hasCompensationInput = [
+      "compensation_type",
+      "salary_min",
+      "salary_max",
+      "hourly_min",
+      "hourly_max",
+      "daily_rate",
+      "compensation_notes",
+      "salary",
+    ].some((field) => field in req.body);
+    if (hasCompensationInput) {
+      Object.assign(updates, normalizeCompensation(req.body, job));
     }
 
     let employer_name =

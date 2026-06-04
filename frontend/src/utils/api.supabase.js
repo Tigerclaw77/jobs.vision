@@ -1,5 +1,6 @@
 // src/utils/api.supabase.js
 import { getNeonSession } from "./neonAuthClient";
+import { normalizeMultiValue, normalizeRole } from "./jobTaxonomy";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -49,13 +50,23 @@ function mapJobRow(row = {}) {
     title: row.title || "",
     company: row.employer_name || row.company || row.venue_name || "",
     location: row.location || [row.city, row.state].filter(Boolean).join(", "),
-    role: (row.role || "").toLowerCase(),
+    role: normalizeRole(row.role) || (row.role || "").toLowerCase(),
     hours: (row.hours || "").toString().toLowerCase(),
     type: (row.type || "").toString().toLowerCase(),
     opportunity_type: row.opportunity_type || "",
+    opportunity_types: normalizeMultiValue(row.opportunity_types || row.opportunity_type),
     practice_type: row.practice_type || "",
     employment_type: row.employment_type || "",
+    employment_types: normalizeMultiValue(row.employment_types || row.employment_type || row.type),
     work_arrangement: row.work_arrangement || "",
+    work_arrangements: normalizeMultiValue(row.work_arrangements || row.work_arrangement),
+    compensation_type: row.compensation_type || "",
+    salary_min: row.salary_min,
+    salary_max: row.salary_max,
+    hourly_min: row.hourly_min,
+    hourly_max: row.hourly_max,
+    daily_rate: row.daily_rate,
+    compensation_notes: row.compensation_notes || "",
     featured: row.featured === true,
     salary: row.salary,
     tags: tagsRaw.map((t) => String(t).toLowerCase()),

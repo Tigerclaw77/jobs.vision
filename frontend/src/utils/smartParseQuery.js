@@ -71,10 +71,11 @@ export function smartParseQuery(q = "", lookup = { companies:new Map(), roles:ne
   // --- role synonyms ---
   const ROLE_MAP = [
     { re: /\bopt(om(etrist)?)?\b/, val: "optometrist", label: "Optometrist" },
-    { re: /\boph(th(al(mologist)?)?)?\b/, val: "ophthalmologist", label: "Ophthalmologist" },
-    { re: /\btech(nician)?\b/, val: "technician", label: "Technician" },
-    { re: /\bass(is(ta)?)?nt\b/, val: "assistant", label: "Vision Assistant" },
-    { re: /\bfront\s*desk\b/, val: "front desk", label: "Front Desk" },
+    { re: /\boptician\b/, val: "optician", label: "Optician" },
+    { re: /\bophthalmic\s+tech(nician)?\b|\btech(nician)?\b/, val: "ophthalmic_technician", label: "Ophthalmic Technician" },
+    { re: /\boptical\s+lab\b|\blab\s+tech(nician)?\b/, val: "optical_lab", label: "Optical Lab" },
+    { re: /\bfront\s*desk\b|\breception(ist)?\b/, val: "front_desk", label: "Front Desk" },
+    { re: /\bpractice\s+manager\b|\badministrator\b|\bmanager\b/, val: "practice_manager", label: "Practice Manager" },
   ];
   for (const r of ROLE_MAP) {
     if (r.re.test(raw)) {

@@ -53,9 +53,19 @@ create table if not exists public.jobs (
   hours text,
   type text,
   opportunity_type text,
+  opportunity_types text[] not null default '{}',
   practice_type text,
   employment_type text,
+  employment_types text[] not null default '{}',
   work_arrangement text,
+  work_arrangements text[] not null default '{}',
+  compensation_type text,
+  salary_min numeric(12,2),
+  salary_max numeric(12,2),
+  hourly_min numeric(10,2),
+  hourly_max numeric(10,2),
+  daily_rate numeric(10,2),
+  compensation_notes text,
   salary text,
   tag_ids text[] not null default '{}',
   status text not null default 'active',
@@ -316,6 +326,18 @@ create index if not exists jobs_employment_type_idx
 
 create index if not exists jobs_work_arrangement_idx
   on public.jobs (work_arrangement);
+
+create index if not exists jobs_opportunity_types_gin_idx
+  on public.jobs using gin (opportunity_types);
+
+create index if not exists jobs_employment_types_gin_idx
+  on public.jobs using gin (employment_types);
+
+create index if not exists jobs_work_arrangements_gin_idx
+  on public.jobs using gin (work_arrangements);
+
+create index if not exists jobs_compensation_type_idx
+  on public.jobs (compensation_type);
 
 create index if not exists jobs_employer_brand_idx
   on public.jobs (employer_brand);

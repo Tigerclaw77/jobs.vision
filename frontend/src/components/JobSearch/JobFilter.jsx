@@ -1,32 +1,12 @@
 import React, { useState } from "react";
 import { Navigation } from "lucide-react";
-
-const EMPLOYMENT_TYPE_OPTIONS = [
-  { value: "full_time", label: "Full-Time" },
-  { value: "part_time", label: "Part-Time" },
-  { value: "per_diem_fill_in", label: "Per Diem / Fill-In" },
-];
-
-const OPPORTUNITY_TYPE_OPTIONS = [
-  { value: "associate_w2", label: "Associate (W-2)" },
-  { value: "associate_1099", label: "Associate (1099)" },
-  { value: "corporate_employment", label: "Corporate Employment" },
-  { value: "corporate_lease", label: "Corporate Lease" },
-  { value: "partnership_opportunity", label: "Partnership Opportunity" },
-  { value: "practice_acquisition", label: "Practice Acquisition" },
-];
-
-const WORK_ARRANGEMENT_OPTIONS = [
-  { value: "on_site", label: "On-Site" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "remote", label: "Remote" },
-];
-
-const PRACTICE_TYPE_OPTIONS = [
-  { value: "private_practice", label: "Private Practice" },
-  { value: "corporate", label: "Corporate" },
-  { value: "od_md", label: "OD/MD" },
-];
+import {
+  EMPLOYMENT_TYPE_OPTIONS,
+  OPPORTUNITY_TYPE_OPTIONS,
+  PRACTICE_TYPE_OPTIONS,
+  ROLE_OPTIONS,
+  WORK_ARRANGEMENT_OPTIONS,
+} from "../../utils/jobTaxonomy";
 
 const RADIUS_OPTIONS = [
   { value: 10, label: "10 mi" },
@@ -202,21 +182,6 @@ export default function JobFilter({
           </div>
         )}
 
-        {/* Role + Type */}
-        <div className="field field-role">
-          <label>Role</label>
-          <select
-            value={filters.role || ""}
-            onChange={(e) => set({ role: e.target.value })}
-          >
-            <option value="">All roles</option>
-            <option value="optometrist">Optometrist</option>
-            <option value="optician">Optician</option>
-            <option value="ophthalmic technician">Ophthalmic Technician</option>
-            <option value="practice manager">Practice Manager</option>
-          </select>
-        </div>
-
         <div className="field field-show-hidden">
           <label className="show-hidden-toggle">
             <input
@@ -227,6 +192,13 @@ export default function JobFilter({
             <span>Show Hidden Jobs</span>
           </label>
         </div>
+
+        <FilterChecks
+          legend="Roles"
+          options={ROLE_OPTIONS}
+          selected={filters.roles}
+          onToggle={(value) => toggleMulti("roles", value)}
+        />
 
         <FilterChecks
           legend="Employment Type"

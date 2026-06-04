@@ -1,31 +1,14 @@
 import React from "react";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
-
-const CARD_LABELS = {
-  employment_type: {
-    full_time: "Full-Time",
-    part_time: "Part-Time",
-    per_diem_fill_in: "Per Diem / Fill-In",
-  },
-  work_arrangement: {
-    on_site: "On-Site",
-    hybrid: "Hybrid",
-    remote: "Remote",
-  },
-  opportunity_type: {
-    associate_w2: "Associate (W-2)",
-    associate_1099: "Associate (1099)",
-    corporate_employment: "Corporate Employment",
-    corporate_lease: "Corporate Lease",
-    partnership_opportunity: "Partnership Opportunity",
-    practice_acquisition: "Practice Acquisition",
-  },
-};
-
-function labelFor(field, value) {
-  if (!value) return "";
-  return CARD_LABELS[field]?.[value] || String(value).replace(/_/g, " ");
-}
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  OPPORTUNITY_TYPE_LABELS,
+  ROLE_LABELS,
+  WORK_ARRANGEMENT_LABELS,
+  compensationSummary,
+  labelsForValues,
+  normalizeRole,
+} from "../../utils/jobTaxonomy";
 
 export default function JobCard({
   job,
@@ -42,12 +25,18 @@ export default function JobCard({
   onRestoreClick,
   restoreTooltip,
 }) {
+  const role = normalizeRole(job.role) || job.role;
+  const opportunityLabels =
+    role === "optometrist"
+      ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
+      : [];
   const meta = [
-    job.role,
-    labelFor("employment_type", job.employment_type || job.type),
-    labelFor("work_arrangement", job.work_arrangement),
-    labelFor("opportunity_type", job.opportunity_type),
+    ROLE_LABELS[role] || job.role,
+    ...labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type || job.type),
+    ...labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement),
+    ...opportunityLabels,
     job.hours ? `${job.hours} hrs/wk` : "",
+    compensationSummary(job),
   ].filter(Boolean);
 
   return (

@@ -1,37 +1,16 @@
 // src/components/JobSearch/JobModal.jsx
 import React, { useEffect } from "react";
 import { Star, CheckCircle } from "lucide-react";
-
-const JOB_DETAIL_LABELS = {
-  opportunity_type: {
-    associate_w2: "Associate (W-2)",
-    associate_1099: "Associate (1099)",
-    corporate_employment: "Corporate Employment",
-    corporate_lease: "Corporate Lease",
-    partnership_opportunity: "Partnership Opportunity",
-    practice_acquisition: "Practice Acquisition",
-  },
-  practice_type: {
-    private_practice: "Private Practice",
-    corporate: "Corporate",
-    od_md: "OD/MD",
-  },
-  employment_type: {
-    full_time: "Full-Time",
-    part_time: "Part-Time",
-    per_diem_fill_in: "Per Diem / Fill-In",
-  },
-  work_arrangement: {
-    on_site: "On-Site",
-    hybrid: "Hybrid",
-    remote: "Remote",
-  },
-};
-
-function labelFor(field, value) {
-  if (!value) return "";
-  return JOB_DETAIL_LABELS[field]?.[value] || String(value).replace(/_/g, " ");
-}
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  OPPORTUNITY_TYPE_LABELS,
+  PRACTICE_TYPE_LABELS,
+  ROLE_LABELS,
+  WORK_ARRANGEMENT_LABELS,
+  compensationSummary,
+  labelsForValues,
+  normalizeRole,
+} from "../../utils/jobTaxonomy";
 
 export default function JobModal({
   isOpen,
@@ -56,11 +35,17 @@ export default function JobModal({
 
   if (!isOpen || !job) return null;
 
+  const role = normalizeRole(job.role) || job.role;
+  const opportunityLabels =
+    role === "optometrist"
+      ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
+      : [];
   const jobDetails = [
-    ["Opportunity Type", labelFor("opportunity_type", job.opportunity_type)],
-    ["Practice Type", labelFor("practice_type", job.practice_type)],
-    ["Employment Type", labelFor("employment_type", job.employment_type)],
-    ["Work Arrangement", labelFor("work_arrangement", job.work_arrangement)],
+    ["Opportunity Type", opportunityLabels.join(", ")],
+    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Employment Type", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
+    ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
+    ["Compensation", compensationSummary(job)],
   ].filter(([, value]) => value);
 
   return (
@@ -101,7 +86,7 @@ export default function JobModal({
         {job.company && <p className="modal-company">{job.company}</p>}
         {job.location && <p className="modal-location">{job.location}</p>}
         <p className="modal-rolehours">
-          {(job.role || "optometrist")}
+          {ROLE_LABELS[role] || job.role || "Optometrist"}
           {job.hours ? ` • ${job.hours}` : ""}
         </p>
 

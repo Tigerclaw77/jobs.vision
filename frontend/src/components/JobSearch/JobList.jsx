@@ -20,6 +20,16 @@ import JobMap from "./JobMap";
 import Pagination from "./Pagination";
 
 import { buildLookupFromJobs, smartParseQuery } from "../../utils/smartParseQuery";
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  OPPORTUNITY_TYPE_LABELS,
+  PRACTICE_TYPE_LABELS,
+  ROLE_LABELS,
+  WORK_ARRANGEMENT_LABELS,
+  normalizeMultiValue,
+  normalizeRole,
+  normalizeToken,
+} from "../../utils/jobTaxonomy";
 import "../../styles/jobSearch.css";
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
@@ -121,35 +131,16 @@ async function geocodeAddress(address, apiKey) {
     );
   });
 }
-const TYPE_LABEL = {
-  full_time: "Full-time",
-  part_time: "Part-time",
-  per_diem_fill_in: "Per Diem / Fill-In",
-};
-const OPPORTUNITY_TYPE_LABEL = {
-  associate_w2: "Associate (W-2)",
-  associate_1099: "Associate (1099)",
-  corporate_employment: "Corporate Employment",
-  corporate_lease: "Corporate Lease",
-  partnership_opportunity: "Partnership Opportunity",
-  practice_acquisition: "Practice Acquisition",
-};
-const PRACTICE_TYPE_LABEL = {
-  private_practice: "Private Practice",
-  corporate: "Corporate",
-  od_md: "OD/MD",
-};
-const WORK_ARRANGEMENT_LABEL = {
-  on_site: "On-Site",
-  hybrid: "Hybrid",
-  remote: "Remote",
-};
+const TYPE_LABEL = EMPLOYMENT_TYPE_LABELS;
+const OPPORTUNITY_TYPE_LABEL = OPPORTUNITY_TYPE_LABELS;
+const PRACTICE_TYPE_LABEL = PRACTICE_TYPE_LABELS;
+const WORK_ARRANGEMENT_LABEL = WORK_ARRANGEMENT_LABELS;
 const titleCase = (s = "") =>
   String(s)
     .split(" ")
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ""))
     .join(" ");
-const normalizeType = (value = "") => String(value).trim().toLowerCase().replace(/-/g, "_");
+const normalizeType = normalizeToken;
 const normalizeFilterArray = (value) => {
   if (Array.isArray(value)) return value.filter(Boolean);
   if (!value) return [];
@@ -158,6 +149,13 @@ const normalizeFilterArray = (value) => {
     .map((item) => item.trim())
     .filter(Boolean);
 };
+
+function jobValues(job, pluralField, singularField, fallbackField = null) {
+  return normalizeMultiValue(
+    job?.[pluralField] || job?.[singularField] || (fallbackField ? job?.[fallbackField] : null),
+    normalizeType
+  );
+}
 
 function hasUnlimitedCandidateSaves(user, userRole) {
   if (String(userRole || "").toLowerCase() === "admin") return true;
@@ -179,7 +177,7 @@ const DEFAULT_FILTERS = {
   lat: null,
   lng: null,
   radiusMi: 25,
-  role: "",
+  roles: [],
   employmentTypes: [],
   workArrangements: [],
   opportunityTypes: [],
@@ -189,6 +187,7 @@ const DEFAULT_FILTERS = {
 };
 
 const ARRAY_FILTER_KEYS = new Set([
+  "roles",
   "employmentTypes",
   "workArrangements",
   "opportunityTypes",
@@ -224,8 +223,14 @@ function filtersFromSearchParams(searchParams) {
 
   const next = { ...DEFAULT_FILTERS };
   Object.entries(initial).forEach(([key, value]) => {
-    if (ARRAY_FILTER_KEYS.has(key)) {
+    if (key === "roles") {
+      next.roles = normalizeFilterArray(value)
+        .map((item) => normalizeRole(item) || item)
+        .filter(Boolean);
+    } else if (ARRAY_FILTER_KEYS.has(key)) {
       next[key] = normalizeFilterArray(value);
+    } else if (key === "role") {
+      next.roles = normalizeFilterArray(value).map((item) => normalizeRole(item) || item);
     } else if (key === "type") {
       next.employmentTypes = normalizeFilterArray(value);
     } else if (key === "location") {
@@ -355,7 +360,7 @@ export default function JobList() {
     const { result } = smartParseQuery(filters.q, lookup);
     setFilters((prev) => {
       const next = { ...prev };
-      if (!prev.role && result.role) next.role = result.role;
+      if (!prev.roles?.length && result.role) next.roles = [result.role];
       if (!prev.employmentTypes?.length && result.hours) {
         const parsedType = normalizeType(result.hours);
         if (TYPE_LABEL[parsedType]) next.employmentTypes = [parsedType];
@@ -469,9 +474,10 @@ export default function JobList() {
       const label = lookup.companies.get(lower) || titleCase(filters.company);
       tags.push({ type: "company", value: lower, label });
     }
-    if (filters.role) {
-      tags.push({ type: "role", value: filters.role, label: titleCase(filters.role) });
-    }
+    normalizeFilterArray(filters.roles).forEach((value) => {
+      const roleValue = normalizeRole(value) || value;
+      tags.push({ type: "roles", value: roleValue, label: ROLE_LABELS[roleValue] || titleCase(roleValue) });
+    });
     normalizeFilterArray(filters.employmentTypes).forEach((value) => {
       tags.push({
         type: "employmentTypes",
@@ -522,7 +528,7 @@ export default function JobList() {
     debounceRef.current = setTimeout(() => {
       const {
         q = "",
-        role = "",
+        roles = [],
         employmentTypes = [],
         workArrangements = [],
         opportunityTypes = [],
@@ -543,23 +549,33 @@ export default function JobList() {
       const workArrangementSet = new Set(normalizeFilterArray(workArrangements).map(normalizeType));
       const opportunitySet = new Set(normalizeFilterArray(opportunityTypes).map(normalizeType));
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
+      const roleSet = new Set(
+        normalizeFilterArray(roles)
+          .map((value) => normalizeRole(value) || String(value || "").toLowerCase())
+          .filter(Boolean)
+      );
 
       const next = (jobs || []).filter((job) => {
         const jobId = String(job._id || job.id || "");
         if (jobId && hiddenJobs.has(jobId) && !showHiddenJobs) return false;
+        const roleValue = normalizeRole(job.role) || String(job.role || "").toLowerCase();
+        const employmentValues = jobValues(job, "employment_types", "employment_type", "type");
+        const workArrangementValues = jobValues(job, "work_arrangements", "work_arrangement");
+        const opportunityValues = jobValues(job, "opportunity_types", "opportunity_type");
 
         const hay = [
           job.title,
           job.company,
           job.description,
-          job.role,
+          ROLE_LABELS[roleValue],
+          roleValue,
           job.type,
-          job.employment_type,
-          TYPE_LABEL[normalizeType(job.employment_type || job.type)],
-          job.work_arrangement,
-          WORK_ARRANGEMENT_LABEL[normalizeType(job.work_arrangement)],
-          job.opportunity_type,
-          OPPORTUNITY_TYPE_LABEL[normalizeType(job.opportunity_type)],
+          ...employmentValues,
+          ...employmentValues.map((value) => TYPE_LABEL[value]),
+          ...workArrangementValues,
+          ...workArrangementValues.map((value) => WORK_ARRANGEMENT_LABEL[value]),
+          ...opportunityValues,
+          ...opportunityValues.map((value) => OPPORTUNITY_TYPE_LABEL[value]),
           job.practice_type,
           PRACTICE_TYPE_LABEL[normalizeType(job.practice_type)],
           job.location,
@@ -569,15 +585,14 @@ export default function JobList() {
           .toLowerCase();
 
         const matchQ = !qLower || hay.includes(qLower);
-        const matchRole = !role || (job.role || "").toLowerCase() === role.toLowerCase();
-        const jobEmploymentType = normalizeType(job.employment_type || job.type);
+        const matchRole = roleSet.size === 0 || roleSet.has(roleValue);
         const matchEmployment =
-          employmentSet.size === 0 || employmentSet.has(jobEmploymentType);
+          employmentSet.size === 0 || employmentValues.some((value) => employmentSet.has(value));
         const matchWorkArrangement =
           workArrangementSet.size === 0 ||
-          workArrangementSet.has(normalizeType(job.work_arrangement));
+          workArrangementValues.some((value) => workArrangementSet.has(value));
         const matchOpportunity =
-          opportunitySet.size === 0 || opportunitySet.has(normalizeType(job.opportunity_type));
+          opportunitySet.size === 0 || opportunityValues.some((value) => opportunitySet.has(value));
         const matchPractice =
           practiceSet.size === 0 || practiceSet.has(normalizeType(job.practice_type));
         const matchCompany =
@@ -643,7 +658,6 @@ export default function JobList() {
 const removeQuickTag = (tag) => {
   const next = { ...filters };
   if (tag.type === "company")  next.company  = "";
-  if (tag.type === "role")     next.role     = "";
   if (ARRAY_FILTER_KEYS.has(tag.type)) {
     next[tag.type] = normalizeFilterArray(next[tag.type]).filter(
       (value) => value !== tag.value

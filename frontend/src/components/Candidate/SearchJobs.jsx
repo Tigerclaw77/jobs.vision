@@ -4,40 +4,73 @@ import {
   addJobToFavorites,
   getUserJobInteractions,
 } from "../../utils/api.supabase";
+import {
+  EMPLOYMENT_TYPE_LABELS,
+  EMPLOYMENT_TYPE_OPTIONS,
+  OPPORTUNITY_TYPE_LABELS,
+  OPPORTUNITY_TYPE_OPTIONS,
+  ROLE_LABELS,
+  ROLE_OPTIONS,
+  WORK_ARRANGEMENT_LABELS,
+  WORK_ARRANGEMENT_OPTIONS,
+  labelsForValues,
+  normalizeMultiValue,
+  normalizeRole,
+} from "../../utils/jobTaxonomy";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
   return raw.endsWith("/api") ? raw : `${raw}/api`;
 }
 
-const LABELS = {
-  employment_type: {
-    full_time: "Full-Time",
-    part_time: "Part-Time",
-    per_diem_fill_in: "Per Diem / Fill-In",
-  },
-  work_arrangement: {
-    on_site: "On-Site",
-    hybrid: "Hybrid",
-    remote: "Remote",
-  },
-};
+const employmentTypeValues = EMPLOYMENT_TYPE_OPTIONS.map(({ value }) => value);
+const workArrangementValues = WORK_ARRANGEMENT_OPTIONS.map(({ value }) => value);
+const opportunityTypeValues = OPPORTUNITY_TYPE_OPTIONS.map(({ value }) => value);
 
-function labelFor(field, value) {
-  if (!value) return "";
-  return LABELS[field]?.[value] || String(value).replace(/_/g, " ");
+function CheckboxGroup({ legend, options, selected = [], onToggle }) {
+  return (
+    <fieldset style={styles.checkboxGroup}>
+      <legend style={styles.checkboxLegend}>{legend}</legend>
+      {options.map((option) => (
+        <label key={option.value} style={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={selected.includes(option.value)}
+            onChange={() => onToggle(option.value)}
+          />
+          <span>{option.label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
 }
 
 function mapJob(row = {}) {
+  const employmentTypes = normalizeMultiValue(
+    row.employment_types || row.employment_type || row.type,
+    employmentTypeValues
+  );
+  const workArrangements = normalizeMultiValue(
+    row.work_arrangements || row.work_arrangement,
+    workArrangementValues
+  );
+  const opportunityTypes = normalizeMultiValue(
+    row.opportunity_types || row.opportunity_type,
+    opportunityTypeValues
+  );
+
   return {
     id: row.id || row._id,
     title: row.title || "",
     company: row.employer_name || row.company || row.venue_name || "",
     description: row.description || "",
     hours: row.hours || row.type || "",
-    role: row.role || "",
-    type: row.employment_type || row.type || "",
-    work_arrangement: row.work_arrangement || "",
+    role: normalizeRole(row.role),
+    type: employmentTypes[0] || "",
+    employment_types: employmentTypes,
+    work_arrangement: workArrangements[0] || "",
+    work_arrangements: workArrangements,
+    opportunity_types: opportunityTypes,
     location: row.location || [row.city, row.state].filter(Boolean).join(", "),
   };
 }
@@ -45,10 +78,11 @@ function mapJob(row = {}) {
 const SearchJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [filters, setFilters] = useState({
-    role: "",
+    roles: [],
     hours: "",
-    type: "",
-    work_arrangement: "",
+    employmentTypes: [],
+    workArrangements: [],
+    opportunityTypes: [],
     company: "",
   });
   const [loading, setLoading] = useState(false);
@@ -96,19 +130,37 @@ const SearchJobs = () => {
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
-      const roleOk = !filters.role || job.role === filters.role;
+      const roleOk = filters.roles.length === 0 || filters.roles.includes(job.role);
       const hoursOk =
         !filters.hours ||
         (Number.isFinite(Number(job.hours)) && Number(job.hours) >= Number(filters.hours));
-      const typeOk = !filters.type || job.type === filters.type;
+      const typeOk =
+        filters.employmentTypes.length === 0 ||
+        job.employment_types.some((value) => filters.employmentTypes.includes(value));
       const workArrangementOk =
-        !filters.work_arrangement || job.work_arrangement === filters.work_arrangement;
+        filters.workArrangements.length === 0 ||
+        job.work_arrangements.some((value) => filters.workArrangements.includes(value));
+      const opportunityOk =
+        filters.opportunityTypes.length === 0 ||
+        job.opportunity_types.some((value) => filters.opportunityTypes.includes(value));
       const companyOk =
         !filters.company ||
         job.company.toLowerCase().includes(filters.company.toLowerCase());
-      return roleOk && hoursOk && typeOk && workArrangementOk && companyOk;
+      return roleOk && hoursOk && typeOk && workArrangementOk && opportunityOk && companyOk;
     });
   }, [jobs, filters]);
+
+  const toggleFilter = (key, value) => {
+    setFilters((prev) => {
+      const current = Array.isArray(prev[key]) ? prev[key] : [];
+      return {
+        ...prev,
+        [key]: current.includes(value)
+          ? current.filter((item) => item !== value)
+          : [...current, value],
+      };
+    });
+  };
 
   const handleSaveJob = async (job) => {
     try {
@@ -133,13 +185,12 @@ const SearchJobs = () => {
       <h2>Search Jobs</h2>
 
       <div style={styles.filterContainer}>
-        <select onChange={(e) => setFilters({ ...filters, role: e.target.value })}>
-          <option value="">Select Job Role</option>
-          <option value="optometrist">Optometrist</option>
-          <option value="optician">Optician</option>
-          <option value="ophthalmic technician">Ophthalmic Technician</option>
-          <option value="practice manager">Practice Manager</option>
-        </select>
+        <CheckboxGroup
+          legend="Roles"
+          options={ROLE_OPTIONS}
+          selected={filters.roles}
+          onToggle={(value) => toggleFilter("roles", value)}
+        />
 
         <input
           type="number"
@@ -149,19 +200,26 @@ const SearchJobs = () => {
           onChange={(e) => setFilters({ ...filters, hours: e.target.value })}
         />
 
-        <select onChange={(e) => setFilters({ ...filters, type: e.target.value })}>
-          <option value="">Employment Type</option>
-          <option value="full_time">Full-Time</option>
-          <option value="part_time">Part-Time</option>
-          <option value="per_diem_fill_in">Per Diem / Fill-In</option>
-        </select>
+        <CheckboxGroup
+          legend="Employment Type"
+          options={EMPLOYMENT_TYPE_OPTIONS}
+          selected={filters.employmentTypes}
+          onToggle={(value) => toggleFilter("employmentTypes", value)}
+        />
 
-        <select onChange={(e) => setFilters({ ...filters, work_arrangement: e.target.value })}>
-          <option value="">Work Arrangement</option>
-          <option value="on_site">On-Site</option>
-          <option value="hybrid">Hybrid</option>
-          <option value="remote">Remote</option>
-        </select>
+        <CheckboxGroup
+          legend="Work Arrangement"
+          options={WORK_ARRANGEMENT_OPTIONS}
+          selected={filters.workArrangements}
+          onToggle={(value) => toggleFilter("workArrangements", value)}
+        />
+
+        <CheckboxGroup
+          legend="Opportunity Type"
+          options={OPPORTUNITY_TYPE_OPTIONS}
+          selected={filters.opportunityTypes}
+          onToggle={(value) => toggleFilter("opportunityTypes", value)}
+        />
 
         <input
           placeholder="Company"
@@ -183,9 +241,12 @@ const SearchJobs = () => {
               {job.location && <p><strong>Location:</strong> {job.location}</p>}
               <p><strong>Description:</strong> {job.description}</p>
               <p><strong>Hours:</strong> {job.hours || "Not listed"}</p>
-              <p><strong>Role:</strong> {job.role || "Not listed"}</p>
-              <p><strong>Employment:</strong> {labelFor("employment_type", job.type) || "Not listed"}</p>
-              <p><strong>Work Arrangement:</strong> {labelFor("work_arrangement", job.work_arrangement) || "Not listed"}</p>
+              <p><strong>Role:</strong> {ROLE_LABELS[job.role] || "Not listed"}</p>
+              <p><strong>Employment:</strong> {labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types).join(", ") || "Not listed"}</p>
+              <p><strong>Work Arrangement:</strong> {labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements).join(", ") || "Not listed"}</p>
+              {job.role === "optometrist" && (
+                <p><strong>Opportunity:</strong> {labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types).join(", ") || "Not listed"}</p>
+              )}
 
               <button style={styles.saveButton} onClick={() => handleSaveJob(job)}>Save Job</button>
               <button style={styles.shareButton} onClick={() => handleShareJob(job)}>Share Job</button>
@@ -244,6 +305,25 @@ const styles = {
   },
   error: {
     color: "red",
+  },
+  checkboxGroup: {
+    border: "1px solid #ccc",
+    borderRadius: "5px",
+    padding: "8px 10px",
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  checkboxLegend: {
+    padding: "0 6px",
+    fontWeight: 600,
+  },
+  checkboxLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
+    cursor: "pointer",
   },
 };
 

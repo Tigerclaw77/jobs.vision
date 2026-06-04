@@ -564,6 +564,7 @@ const hybridTitles = new Set([
 ]);
 
 const associate1099Titles = new Set([
+  "Therapeutic Optometrist",
   "Optician - Community Eye Clinic",
   "Ophthalmic Technician - Dry Eye and Specialty Testing",
 ]);
@@ -602,12 +603,97 @@ function hoursFor(job) {
   return job.employment_type === "part_time" ? "24" : "40";
 }
 
+function canonicalRoleFor(job) {
+  if (job.role === "ophthalmic technician") return "ophthalmic_technician";
+  if (job.role === "practice manager") return "practice_manager";
+  return job.role;
+}
+
+function opportunityTypesFor(job) {
+  return canonicalRoleFor(job) === "optometrist" ? [opportunityTypeFor(job)] : [];
+}
+
+function employmentTypesFor(job) {
+  const types = [employmentTypeFor(job)];
+  if (job.title === "Optician - Independent Optical") types.push("full_time");
+  if (job.title === "Optometrist - Multi-Location Group") types.push("part_time");
+  return [...new Set(types)];
+}
+
+function workArrangementsFor(job) {
+  const arrangements = [workArrangementFor(job)];
+  if (hybridTitles.has(job.title)) arrangements.push("on_site");
+  return [...new Set(arrangements)];
+}
+
+function parseMoneyRange(salary = "") {
+  const numbers = String(salary)
+    .match(/\d[\d,]*/g)
+    ?.map((value) => Number(value.replace(/,/g, "")))
+    .filter(Number.isFinite) || [];
+  return {
+    min: numbers[0] ?? null,
+    max: numbers[1] ?? null,
+  };
+}
+
+function compensationFor(job) {
+  const range = parseMoneyRange(job.salary);
+  if (perDiemFillInTitles.has(job.title)) {
+    return {
+      compensation_type: "per_diem",
+      salary_min: null,
+      salary_max: null,
+      hourly_min: null,
+      hourly_max: null,
+      daily_rate: canonicalRoleFor(job) === "optometrist" ? 650 : 275,
+      compensation_notes: null,
+    };
+  }
+  if (job.title === "Optometrist - Multi-Location Group") {
+    return {
+      compensation_type: "production_based",
+      salary_min: null,
+      salary_max: null,
+      hourly_min: null,
+      hourly_max: null,
+      daily_rate: null,
+      compensation_notes: "Base + production",
+    };
+  }
+  if (/per hour/i.test(job.salary)) {
+    return {
+      compensation_type: "hourly_wage",
+      salary_min: null,
+      salary_max: null,
+      hourly_min: range.min,
+      hourly_max: range.max,
+      daily_rate: null,
+      compensation_notes: null,
+    };
+  }
+  return {
+    compensation_type: "annual_salary",
+    salary_min: range.min,
+    salary_max: range.max,
+    hourly_min: null,
+    hourly_max: null,
+    daily_rate: null,
+    compensation_notes: null,
+  };
+}
+
 const jobs = rawJobs.map((job) => ({
   ...job,
-  opportunity_type: opportunityTypeFor(job),
+  role: canonicalRoleFor(job),
+  opportunity_types: opportunityTypesFor(job),
+  opportunity_type: opportunityTypesFor(job)[0] || null,
   practice_type: practiceTypeFor(job),
-  employment_type: employmentTypeFor(job),
-  work_arrangement: workArrangementFor(job),
+  employment_types: employmentTypesFor(job),
+  employment_type: employmentTypesFor(job)[0],
+  work_arrangements: workArrangementsFor(job),
+  work_arrangement: workArrangementsFor(job)[0],
+  ...compensationFor(job),
 }));
 
 function assertSeedData() {
@@ -624,11 +710,19 @@ function assertSeedData() {
   const allowedPracticeTypes = new Set(["private_practice", "corporate", "od_md"]);
   const allowedEmploymentTypes = new Set(["full_time", "part_time", "per_diem_fill_in"]);
   const allowedWorkArrangements = new Set(["on_site", "hybrid", "remote"]);
+  const allowedCompensationTypes = new Set([
+    "annual_salary",
+    "hourly_wage",
+    "per_diem",
+    "production_based",
+    "other",
+  ]);
   const distributions = {
     opportunity_type: {},
     practice_type: {},
     employment_type: {},
     work_arrangement: {},
+    compensation_type: {},
   };
 
   const counts = jobs.reduce((acc, job) => {
@@ -636,34 +730,45 @@ function assertSeedData() {
     if (!job.employer.startsWith("[DEMO]")) {
       throw new Error(`Employer must start with [DEMO]: ${job.employer}`);
     }
-    if (!allowedOpportunityTypes.has(job.opportunity_type)) {
+    if (job.role === "optometrist" && !allowedOpportunityTypes.has(job.opportunity_type)) {
       throw new Error(`Invalid opportunity_type for ${job.title}: ${job.opportunity_type}`);
+    }
+    if (job.role !== "optometrist" && (job.opportunity_type || job.opportunity_types.length)) {
+      throw new Error(`Non-optometrist seed job cannot have opportunity_type: ${job.title}`);
     }
     if (!allowedPracticeTypes.has(job.practice_type)) {
       throw new Error(`Invalid practice_type for ${job.title}: ${job.practice_type}`);
     }
-    if (!allowedEmploymentTypes.has(job.employment_type)) {
+    if (!job.employment_types.every((type) => allowedEmploymentTypes.has(type))) {
       throw new Error(`Invalid employment_type for ${job.title}: ${job.employment_type}`);
     }
-    if (!allowedWorkArrangements.has(job.work_arrangement)) {
+    if (!job.work_arrangements.every((type) => allowedWorkArrangements.has(type))) {
       throw new Error(`Invalid work_arrangement for ${job.title}: ${job.work_arrangement}`);
     }
-    distributions.opportunity_type[job.opportunity_type] =
-      (distributions.opportunity_type[job.opportunity_type] || 0) + 1;
+    if (!allowedCompensationTypes.has(job.compensation_type)) {
+      throw new Error(`Invalid compensation_type for ${job.title}: ${job.compensation_type}`);
+    }
+    job.opportunity_types.forEach((type) => {
+      distributions.opportunity_type[type] = (distributions.opportunity_type[type] || 0) + 1;
+    });
     distributions.practice_type[job.practice_type] =
       (distributions.practice_type[job.practice_type] || 0) + 1;
-    distributions.employment_type[job.employment_type] =
-      (distributions.employment_type[job.employment_type] || 0) + 1;
-    distributions.work_arrangement[job.work_arrangement] =
-      (distributions.work_arrangement[job.work_arrangement] || 0) + 1;
+    job.employment_types.forEach((type) => {
+      distributions.employment_type[type] = (distributions.employment_type[type] || 0) + 1;
+    });
+    job.work_arrangements.forEach((type) => {
+      distributions.work_arrangement[type] = (distributions.work_arrangement[type] || 0) + 1;
+    });
+    distributions.compensation_type[job.compensation_type] =
+      (distributions.compensation_type[job.compensation_type] || 0) + 1;
     return acc;
   }, {});
 
   const expected = {
     optometrist: 10,
     optician: 10,
-    "ophthalmic technician": 10,
-    "practice manager": 10,
+    ophthalmic_technician: 10,
+    practice_manager: 10,
   };
 
   for (const [role, count] of Object.entries(expected)) {
@@ -692,6 +797,11 @@ function assertSeedData() {
       throw new Error(`Expected at least one seed job with work_arrangement=${type}.`);
     }
   }
+  for (const type of ["annual_salary", "hourly_wage", "per_diem", "production_based"]) {
+    if (!distributions.compensation_type[type]) {
+      throw new Error(`Expected at least one seed job with compensation_type=${type}.`);
+    }
+  }
 
   const featuredHoustonJobs = jobs.filter(
     (job) =>
@@ -710,9 +820,19 @@ async function ensureSeedColumns() {
   await query("alter table public.jobs add column if not exists source text");
   await query("alter table public.jobs add column if not exists seed_batch text");
   await query("alter table public.jobs add column if not exists opportunity_type text");
+  await query("alter table public.jobs add column if not exists opportunity_types text[] not null default '{}'");
   await query("alter table public.jobs add column if not exists practice_type text");
   await query("alter table public.jobs add column if not exists employment_type text");
+  await query("alter table public.jobs add column if not exists employment_types text[] not null default '{}'");
   await query("alter table public.jobs add column if not exists work_arrangement text");
+  await query("alter table public.jobs add column if not exists work_arrangements text[] not null default '{}'");
+  await query("alter table public.jobs add column if not exists compensation_type text");
+  await query("alter table public.jobs add column if not exists salary_min numeric(12,2)");
+  await query("alter table public.jobs add column if not exists salary_max numeric(12,2)");
+  await query("alter table public.jobs add column if not exists hourly_min numeric(10,2)");
+  await query("alter table public.jobs add column if not exists hourly_max numeric(10,2)");
+  await query("alter table public.jobs add column if not exists daily_rate numeric(10,2)");
+  await query("alter table public.jobs add column if not exists compensation_notes text");
   await query("alter table public.jobs add column if not exists featured boolean not null default false");
 }
 
@@ -742,9 +862,19 @@ async function seedJobs() {
         hours,
         type,
         opportunity_type,
+        opportunity_types,
         practice_type,
         employment_type,
+        employment_types,
         work_arrangement,
+        work_arrangements,
+        compensation_type,
+        salary_min,
+        salary_max,
+        hourly_min,
+        hourly_max,
+        daily_rate,
+        compensation_notes,
         salary,
         tag_ids,
         status,
@@ -760,8 +890,9 @@ async function seedJobs() {
       )
       values (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17, $18::text[], 'active', false, $19, false,
-        now(), now(), now(), $20, $21, now()
+        $11, $12, $13, $14::text[], $15, $16, $17::text[], $18, $19::text[],
+        $20, $21, $22, $23, $24, $25, $26, $27, $28::text[],
+        'active', false, $29, false, now(), now(), now(), $30, $31, now()
       )
     `;
 
@@ -780,9 +911,19 @@ async function seedJobs() {
         hoursFor(job),
         job.employment_type,
         job.opportunity_type,
+        job.opportunity_types,
         job.practice_type,
         job.employment_type,
+        job.employment_types,
         job.work_arrangement,
+        job.work_arrangements,
+        job.compensation_type,
+        job.salary_min,
+        job.salary_max,
+        job.hourly_min,
+        job.hourly_max,
+        job.daily_rate,
+        job.compensation_notes,
         job.salary,
         job.tags,
         job.featured === true,

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
   FormControl,
   FormHelperText,
   Grid,
   InputLabel,
+  ListItemText,
   MenuItem,
   Select,
   Stack,
@@ -15,6 +17,18 @@ import {
 } from "@mui/material";
 
 import { createJob, updateJob } from "../utils/api";
+import {
+  COMPENSATION_TYPE_OPTIONS,
+  EMPLOYMENT_TYPE_OPTIONS,
+  OPPORTUNITY_TYPE_OPTIONS,
+  PRACTICE_TYPE_OPTIONS,
+  ROLE_OPTIONS,
+  WORK_ARRANGEMENT_OPTIONS,
+  compensationSummary,
+  labelsForValues,
+  normalizeMultiValue,
+  normalizeRole,
+} from "../utils/jobTaxonomy";
 import "../styles/jobForm.css";
 
 // Draft storage key
@@ -28,13 +42,18 @@ const defaultValues = {
   company: "",
   location: "",
   role_type: "optometrist",
-  opportunity_type: "",
+  opportunity_types: [],
   practice_type: "",
-  employment_type: "",
-  work_arrangement: "",
+  employment_types: [],
+  work_arrangements: [],
   hours_per_week: "",
+  compensation_type: "",
   salary_min: "",
   salary_max: "",
+  hourly_min: "",
+  hourly_max: "",
+  daily_rate: "",
+  compensation_notes: "",
   description: "",
   tags: [],
 };
@@ -45,21 +64,6 @@ function splitLocation(location = "") {
     city: parts[0] || "",
     state: parts[1] || "",
   };
-}
-
-function normalizeRoleValue(value = "") {
-  const normalized = String(value).trim().toLowerCase().replace(/[_-]+/g, " ");
-  const aliases = {
-    tech: "ophthalmic technician",
-    technician: "ophthalmic technician",
-    "ophthalmic tech": "ophthalmic technician",
-    manager: "practice manager",
-    "practice manager": "practice manager",
-    optometrist: "optometrist",
-    optician: "optician",
-    "ophthalmic technician": "ophthalmic technician",
-  };
-  return aliases[normalized] || "";
 }
 
 function normalizeOptionValue(value = "", aliases = {}) {
@@ -188,6 +192,62 @@ function parseSalaryRange(salary) {
   };
 }
 
+function numberOrNull(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function compensationPayload(values) {
+  const base = {
+    compensation_type: values.compensation_type || null,
+    salary_min: null,
+    salary_max: null,
+    hourly_min: null,
+    hourly_max: null,
+    daily_rate: null,
+    compensation_notes: null,
+  };
+
+  if (values.compensation_type === "annual_salary") {
+    base.salary_min = numberOrNull(values.salary_min);
+    base.salary_max = numberOrNull(values.salary_max);
+  } else if (values.compensation_type === "hourly_wage") {
+    base.hourly_min = numberOrNull(values.hourly_min);
+    base.hourly_max = numberOrNull(values.hourly_max);
+  } else if (values.compensation_type === "per_diem") {
+    base.daily_rate = numberOrNull(values.daily_rate);
+  } else if (["production_based", "other"].includes(values.compensation_type)) {
+    base.compensation_notes = values.compensation_notes.trim() || null;
+  }
+
+  return {
+    ...base,
+    salary: compensationSummary(base) || null,
+  };
+}
+
+function normalizeDraftValues(raw = {}) {
+  const role = normalizeRole(raw.role_type || raw.role) || defaultValues.role_type;
+  return {
+    ...defaultValues,
+    ...raw,
+    role_type: role,
+    opportunity_types:
+      role === "optometrist"
+        ? normalizeMultiValue(raw.opportunity_types || raw.opportunity_type, normalizeOpportunityValue)
+        : [],
+    employment_types: normalizeMultiValue(
+      raw.employment_types || raw.employment_type || raw.type,
+      normalizeEmploymentValue
+    ),
+    work_arrangements: normalizeMultiValue(
+      raw.work_arrangements || raw.work_arrangement || raw.onsite_type,
+      normalizeWorkArrangementValue
+    ),
+  };
+}
+
 function valuesFromJob(job = {}) {
   const salary = parseSalaryRange(job.salary);
   const numericHours = Number(job.hours);
@@ -196,57 +256,35 @@ function valuesFromJob(job = {}) {
     title: job.title || "",
     company: job.employer_name || job.company || "",
     location: job.location || [job.city, job.state].filter(Boolean).join(", "),
-    role_type: normalizeRoleValue(job.role) || "",
-    opportunity_type: normalizeOpportunityValue(job.opportunity_type) || "",
+    role_type: normalizeRole(job.role) || "",
+    opportunity_types:
+      normalizeRole(job.role) === "optometrist"
+        ? normalizeMultiValue(job.opportunity_types || job.opportunity_type, normalizeOpportunityValue)
+        : [],
     practice_type: job.practice_type || "",
-    employment_type: normalizeEmploymentValue(job.employment_type || job.type) || "",
-    work_arrangement:
-      normalizeWorkArrangementValue(
+    employment_types: normalizeMultiValue(
+      job.employment_types || job.employment_type || job.type,
+      normalizeEmploymentValue
+    ),
+    work_arrangements: normalizeMultiValue(
+      job.work_arrangements ||
         job.work_arrangement ||
-          job.onsite_type ||
-          (job.employment_type === "remote" || job.type === "remote" ? "remote" : "")
-      ) || "",
+        job.onsite_type ||
+        (job.employment_type === "remote" || job.type === "remote" ? "remote" : ""),
+      normalizeWorkArrangementValue
+    ),
     hours_per_week: job.hours && !Number.isNaN(numericHours) ? String(job.hours) : "",
-    salary_min: salary.salary_min,
-    salary_max: salary.salary_max,
+    compensation_type: job.compensation_type || "",
+    salary_min: job.salary_min ?? salary.salary_min,
+    salary_max: job.salary_max ?? salary.salary_max,
+    hourly_min: job.hourly_min ?? "",
+    hourly_max: job.hourly_max ?? "",
+    daily_rate: job.daily_rate ?? "",
+    compensation_notes: job.compensation_notes || "",
     description: job.description || "",
     tags: Array.isArray(job.tag_ids) ? job.tag_ids : Array.isArray(job.tags) ? job.tags : [],
   };
 }
-
-const roleOptions = [
-  { value: "optometrist", label: "Optometrist" },
-  { value: "optician", label: "Optician" },
-  { value: "ophthalmic technician", label: "Ophthalmic Technician" },
-  { value: "practice manager", label: "Practice Manager" },
-];
-
-const employmentOptions = [
-  { value: "full_time", label: "Full-Time" },
-  { value: "part_time", label: "Part-Time" },
-  { value: "per_diem_fill_in", label: "Per Diem / Fill-In" },
-];
-
-const opportunityOptions = [
-  { value: "associate_w2", label: "Associate (W-2)" },
-  { value: "associate_1099", label: "Associate (1099)" },
-  { value: "corporate_employment", label: "Corporate Employment" },
-  { value: "corporate_lease", label: "Corporate Lease" },
-  { value: "partnership_opportunity", label: "Partnership Opportunity" },
-  { value: "practice_acquisition", label: "Practice Acquisition" },
-];
-
-const practiceOptions = [
-  { value: "private_practice", label: "Private Practice" },
-  { value: "corporate", label: "Corporate" },
-  { value: "od_md", label: "OD/MD" },
-];
-
-const workArrangementOptions = [
-  { value: "on_site", label: "On-Site" },
-  { value: "hybrid", label: "Hybrid" },
-  { value: "remote", label: "Remote" },
-];
 
 function validate(values) {
   const errors = {};
@@ -268,7 +306,62 @@ function validate(values) {
   if (values.hours_per_week && Number.isNaN(Number(values.hours_per_week))) {
     errors.hours_per_week = "Enter a number.";
   }
+  ["hourly_min", "hourly_max", "daily_rate"].forEach((field) => {
+    if (values[field] && Number.isNaN(Number(values[field]))) {
+      errors[field] = "Enter a number.";
+    }
+  });
+  if (values.hourly_min && values.hourly_max && Number(values.hourly_min) > Number(values.hourly_max)) {
+    errors.hourly_max = "Max must be >= Min.";
+  }
+  if (values.compensation_type === "annual_salary" && !values.salary_min && !values.salary_max) {
+    errors.salary_min = "Enter at least one salary value.";
+  }
+  if (values.compensation_type === "hourly_wage" && !values.hourly_min && !values.hourly_max) {
+    errors.hourly_min = "Enter at least one hourly value.";
+  }
+  if (values.compensation_type === "per_diem" && !values.daily_rate) {
+    errors.daily_rate = "Enter a daily rate.";
+  }
+  if (
+    ["production_based", "other"].includes(values.compensation_type) &&
+    !values.compensation_notes.trim()
+  ) {
+    errors.compensation_notes = "Enter compensation details.";
+  }
   return errors;
+}
+
+function MultiSelectField({ label, labelId, value, onChange, options }) {
+  return (
+    <FormControl fullWidth>
+      <InputLabel id={labelId}>{label}</InputLabel>
+      <Select
+        labelId={labelId}
+        multiple
+        label={label}
+        value={value || []}
+        onChange={onChange}
+        renderValue={(selected) => (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {labelsForValues(
+              options.reduce((acc, option) => ({ ...acc, [option.value]: option.label }), {}),
+              selected
+            ).map((labelText) => (
+              <Chip key={labelText} label={labelText} size="small" />
+            ))}
+          </Box>
+        )}
+      >
+        {options.map((opt) => (
+          <MenuItem key={opt.value} value={opt.value}>
+            <Checkbox checked={(value || []).includes(opt.value)} />
+            <ListItemText primary={opt.label} />
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
 }
 
 export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
@@ -277,7 +370,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
   const [values, setValues] = useState(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
-      return raw ? { ...defaultValues, ...JSON.parse(raw) } : defaultValues;
+      return raw ? normalizeDraftValues(JSON.parse(raw)) : defaultValues;
     } catch {
       return defaultValues;
     }
@@ -306,6 +399,34 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
   const handleChange = (field) => (e) => {
     const v = e?.target?.value ?? e;
     setValues((prev) => ({ ...prev, [field]: v }));
+  };
+
+  const handleRoleChange = (e) => {
+    const role = e?.target?.value || "";
+    setValues((prev) => ({
+      ...prev,
+      role_type: role,
+      opportunity_types: role === "optometrist" ? prev.opportunity_types : [],
+    }));
+  };
+
+  const handleMultiChange = (field) => (e) => {
+    const v = e?.target?.value ?? [];
+    setValues((prev) => ({ ...prev, [field]: Array.isArray(v) ? v : String(v).split(",") }));
+  };
+
+  const handleCompensationTypeChange = (e) => {
+    const compensationType = e?.target?.value || "";
+    setValues((prev) => ({
+      ...prev,
+      compensation_type: compensationType,
+      salary_min: "",
+      salary_max: "",
+      hourly_min: "",
+      hourly_max: "",
+      daily_rate: "",
+      compensation_notes: "",
+    }));
   };
 
   const addTag = (e) => {
@@ -358,14 +479,11 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
     setMessage("");
 
     const { city, state } = splitLocation(values.location);
-    const salary =
-      values.salary_min && values.salary_max
-        ? `${Number(values.salary_min)} - ${Number(values.salary_max)}`
-        : values.salary_min
-        ? `From ${Number(values.salary_min)}`
-        : values.salary_max
-        ? `Up to ${Number(values.salary_max)}`
-        : null;
+    const opportunityTypes =
+      values.role_type === "optometrist" ? values.opportunity_types || [] : [];
+    const employmentTypes = values.employment_types || [];
+    const workArrangements = values.work_arrangements || [];
+    const compensation = compensationPayload(values);
 
     const payload = {
       title: values.title.trim(),
@@ -375,13 +493,16 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       city,
       state,
       role: values.role_type,
-      type: values.employment_type || null,
-      opportunity_type: values.opportunity_type || null,
+      type: employmentTypes[0] || null,
+      opportunity_type: opportunityTypes[0] || null,
+      opportunity_types: opportunityTypes,
       practice_type: values.practice_type || null,
-      employment_type: values.employment_type || null,
-      work_arrangement: values.work_arrangement || null,
+      employment_type: employmentTypes[0] || null,
+      employment_types: employmentTypes,
+      work_arrangement: workArrangements[0] || null,
+      work_arrangements: workArrangements,
       hours: values.hours_per_week ? String(Number(values.hours_per_week)) : null,
-      salary,
+      ...compensation,
       description: values.description.trim(),
       tag_ids: values.tags,
     };
@@ -470,9 +591,9 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
               labelId="role-type-label"
               label="Role*"
               value={values.role_type}
-              onChange={handleChange("role_type")}
+              onChange={handleRoleChange}
             >
-              {roleOptions.map((opt) => (
+              {ROLE_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>
@@ -483,42 +604,26 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <FormControl fullWidth>
-            <InputLabel id="employment-type-label">Employment Type</InputLabel>
-            <Select
-              labelId="employment-type-label"
-              label="Employment Type"
-              value={values.employment_type}
-              onChange={handleChange("employment_type")}
-            >
-              <MenuItem value="">Optional</MenuItem>
-              {employmentOptions.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectField
+            label="Employment Type"
+            labelId="employment-type-label"
+            value={values.employment_types}
+            onChange={handleMultiChange("employment_types")}
+            options={EMPLOYMENT_TYPE_OPTIONS}
+          />
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <FormControl fullWidth>
-            <InputLabel id="opportunity-type-label">Opportunity Type</InputLabel>
-            <Select
-              labelId="opportunity-type-label"
+        {values.role_type === "optometrist" && (
+          <Grid item xs={12} md={6}>
+            <MultiSelectField
               label="Opportunity Type"
-              value={values.opportunity_type}
-              onChange={handleChange("opportunity_type")}
-            >
-              <MenuItem value="">Optional</MenuItem>
-              {opportunityOptions.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
+              labelId="opportunity-type-label"
+              value={values.opportunity_types}
+              onChange={handleMultiChange("opportunity_types")}
+              options={OPPORTUNITY_TYPE_OPTIONS}
+            />
+          </Grid>
+        )}
 
         <Grid item xs={12} md={6}>
           <FormControl fullWidth>
@@ -530,7 +635,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
               onChange={handleChange("practice_type")}
             >
               <MenuItem value="">Optional</MenuItem>
-              {practiceOptions.map((opt) => (
+              {PRACTICE_TYPE_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </MenuItem>
@@ -540,22 +645,13 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
         </Grid>
 
         <Grid item xs={12} md={6}>
-          <FormControl fullWidth>
-            <InputLabel id="work-arrangement-label">Work Arrangement</InputLabel>
-            <Select
-              labelId="work-arrangement-label"
-              label="Work Arrangement"
-              value={values.work_arrangement}
-              onChange={handleChange("work_arrangement")}
-            >
-              <MenuItem value="">Optional</MenuItem>
-              {workArrangementOptions.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <MultiSelectField
+            label="Work Arrangement"
+            labelId="work-arrangement-label"
+            value={values.work_arrangements}
+            onChange={handleMultiChange("work_arrangements")}
+            options={WORK_ARRANGEMENT_OPTIONS}
+          />
         </Grid>
 
         <Grid item xs={12} md={4}>
@@ -570,29 +666,105 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
           />
         </Grid>
 
-        <Grid item xs={6} md={4}>
-          <TextField
-            label="Salary Min"
-            fullWidth
-            value={values.salary_min}
-            onChange={handleChange("salary_min")}
-            error={!!errors.salary_min}
-            helperText={errors.salary_min}
-            inputProps={{ inputMode: "numeric" }}
-          />
+        <Grid item xs={12} md={4}>
+          <FormControl fullWidth>
+            <InputLabel id="compensation-type-label">Compensation Type</InputLabel>
+            <Select
+              labelId="compensation-type-label"
+              label="Compensation Type"
+              value={values.compensation_type}
+              onChange={handleCompensationTypeChange}
+            >
+              <MenuItem value="">Optional</MenuItem>
+              {COMPENSATION_TYPE_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </Grid>
 
-        <Grid item xs={6} md={4}>
-          <TextField
-            label="Salary Max"
-            fullWidth
-            value={values.salary_max}
-            onChange={handleChange("salary_max")}
-            error={!!errors.salary_max}
-            helperText={errors.salary_max}
-            inputProps={{ inputMode: "numeric" }}
-          />
-        </Grid>
+        {values.compensation_type === "annual_salary" && (
+          <>
+            <Grid item xs={6} md={4}>
+              <TextField
+                label="Salary Min"
+                fullWidth
+                value={values.salary_min}
+                onChange={handleChange("salary_min")}
+                error={!!errors.salary_min}
+                helperText={errors.salary_min}
+                inputProps={{ inputMode: "numeric" }}
+              />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <TextField
+                label="Salary Max"
+                fullWidth
+                value={values.salary_max}
+                onChange={handleChange("salary_max")}
+                error={!!errors.salary_max}
+                helperText={errors.salary_max}
+                inputProps={{ inputMode: "numeric" }}
+              />
+            </Grid>
+          </>
+        )}
+
+        {values.compensation_type === "hourly_wage" && (
+          <>
+            <Grid item xs={6} md={4}>
+              <TextField
+                label="Hourly Min"
+                fullWidth
+                value={values.hourly_min}
+                onChange={handleChange("hourly_min")}
+                error={!!errors.hourly_min}
+                helperText={errors.hourly_min}
+                inputProps={{ inputMode: "numeric" }}
+              />
+            </Grid>
+            <Grid item xs={6} md={4}>
+              <TextField
+                label="Hourly Max"
+                fullWidth
+                value={values.hourly_max}
+                onChange={handleChange("hourly_max")}
+                error={!!errors.hourly_max}
+                helperText={errors.hourly_max}
+                inputProps={{ inputMode: "numeric" }}
+              />
+            </Grid>
+          </>
+        )}
+
+        {values.compensation_type === "per_diem" && (
+          <Grid item xs={12} md={4}>
+            <TextField
+              label="Daily Rate"
+              fullWidth
+              value={values.daily_rate}
+              onChange={handleChange("daily_rate")}
+              error={!!errors.daily_rate}
+              helperText={errors.daily_rate}
+              inputProps={{ inputMode: "numeric" }}
+            />
+          </Grid>
+        )}
+
+        {["production_based", "other"].includes(values.compensation_type) && (
+          <Grid item xs={12} md={8}>
+            <TextField
+              label="Compensation Notes"
+              fullWidth
+              value={values.compensation_notes}
+              onChange={handleChange("compensation_notes")}
+              error={!!errors.compensation_notes}
+              helperText={errors.compensation_notes}
+            />
+          </Grid>
+        )}
 
         <Grid item xs={12}>
           <TextField
