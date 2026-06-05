@@ -11,6 +11,13 @@ import {
 import ProfileCompletionModule from "../Profile/ProfileCompletionModule";
 import "../../styles/Profile.css";
 
+const RECRUITER_PROFILE_COMPLETION_TASKS = [
+  "profile:recruiter:company-name",
+  "profile:recruiter:company-description",
+  "profile:recruiter:company-website",
+  "profile:recruiter:company-logo",
+];
+
 const RecruiterProfile = () => {
   const { user, token, userRole } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -263,7 +270,12 @@ const RecruiterProfile = () => {
 
             <aside className="profile-sidebar">
               <section className="profile-card">
-                <ProfileCompletionModule completion={completion} includeOptional />
+                <ProfileCompletionModule
+                  completion={completion}
+                  includeOptional
+                  displayTaskIds={RECRUITER_PROFILE_COMPLETION_TASKS}
+                  showNote={false}
+                />
               </section>
 
               <section className="profile-card">

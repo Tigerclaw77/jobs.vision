@@ -13,12 +13,18 @@ export default function ProfileCompletionModule({
   completion,
   compact = false,
   includeOptional = true,
+  displayTaskIds = null,
+  showNote = true,
 }) {
   if (!completion || completion.score === null || completion.score === undefined) return null;
 
-  const tasks = includeOptional
+  const rawTasks = includeOptional
     ? completion.tasks || []
     : completion.attentionTasks || [];
+  const allowedTaskIds = Array.isArray(displayTaskIds) ? new Set(displayTaskIds) : null;
+  const tasks = allowedTaskIds
+    ? rawTasks.filter((task) => allowedTaskIds.has(task.id))
+    : rawTasks;
   const groupedTasks = severityOrder
     .map((severity) => ({
       severity,
@@ -43,7 +49,7 @@ export default function ProfileCompletionModule({
         </span>
       </div>
 
-      {!compact && (
+      {!compact && showNote && (
         <p className="profile-completion-note">
           These prompts are guidance only. Payments, job posting, and editing stay available.
         </p>
@@ -92,7 +98,7 @@ export default function ProfileCompletionModule({
           ))}
         </div>
       ) : (
-        <p className="profile-empty">No critical or recommended profile items need attention.</p>
+        <p className="profile-empty">Recommended profile details are complete.</p>
       )}
     </section>
   );

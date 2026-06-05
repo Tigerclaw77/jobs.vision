@@ -1,5 +1,5 @@
 .profile-page {
-  width: min(940px, 94vw);
+  width: min(900px, 94vw);
   margin: 0 auto 42px;
   color: #f8fafc;
 }
@@ -99,7 +99,7 @@
 
 .profile-layout {
   display: grid;
-  grid-template-columns: minmax(0, 620px) minmax(248px, 270px);
+  grid-template-columns: minmax(0, 540px) minmax(270px, 296px);
   justify-content: center;
   gap: 16px;
   align-items: start;
@@ -150,10 +150,10 @@
 
 .profile-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 280px));
+  grid-template-columns: repeat(2, minmax(0, 252px));
   justify-content: start;
-  gap: 14px;
-  max-width: 574px;
+  gap: 12px;
+  max-width: 516px;
 }
 
 .profile-field {
@@ -164,7 +164,7 @@
 
 .profile-field.full {
   grid-column: 1 / -1;
-  max-width: 574px;
+  max-width: 516px;
 }
 
 .profile-field label,
@@ -201,7 +201,8 @@
 }
 
 .profile-field textarea {
-  min-height: 72px;
+  min-height: 66px;
+  line-height: 1.35;
   resize: vertical;
 }
 
@@ -219,7 +220,7 @@
 .profile-check-list {
   display: grid;
   gap: 9px;
-  max-width: 574px;
+  max-width: 516px;
 }
 
 .profile-check {
@@ -267,11 +268,11 @@
 }
 
 .profile-task.recommended {
-  border-left-color: #fbbf24;
+  border-left-color: #38bdf8;
 }
 
 .profile-task.optional {
-  border-left-color: #38bdf8;
+  border-left-color: #94a3b8;
 }
 
 .profile-task strong {
@@ -316,7 +317,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
-  max-width: 574px;
+  max-width: 516px;
 }
 
 .profile-interest-pill {
@@ -359,7 +360,7 @@
 
 .profile-completion-label {
   display: block;
-  color: #bae6fd;
+  color: #e0f2fe;
   font-size: 0.74rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -369,16 +370,16 @@
 .profile-completion-topline strong {
   display: block;
   color: #ffffff;
-  font-size: 1.85rem;
+  font-size: 1.72rem;
   line-height: 1.05;
 }
 
 .profile-completion-status {
   justify-self: start;
-  border: 1px solid rgba(45, 212, 191, 0.3);
+  border: 1px solid rgba(125, 211, 252, 0.3);
   border-radius: 999px;
-  color: #ccfbf1;
-  background: rgba(20, 184, 166, 0.14);
+  color: #e0f2fe;
+  background: rgba(14, 165, 233, 0.13);
   padding: 6px 9px;
   font-size: 0.8rem;
   font-weight: 900;
@@ -408,7 +409,7 @@
 }
 
 .profile-completion-group-title {
-  color: #bae6fd;
+  color: #e0f2fe;
   font-size: 0.74rem;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -417,7 +418,7 @@
 
 .profile-completion-list {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -428,12 +429,12 @@
   grid-template-columns: 18px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  border: 1px solid transparent;
+  border: 1px solid rgba(125, 211, 252, 0.14);
   border-radius: 9px;
   color: #f8fafc;
   text-decoration: none;
-  background: transparent;
-  padding: 6px 7px;
+  background: rgba(15, 39, 64, 0.4);
+  padding: 7px 8px;
 }
 
 .profile-completion-task:hover {
@@ -463,11 +464,11 @@
 }
 
 .profile-task-check.recommended {
-  border-color: #fbbf24;
+  border-color: #7dd3fc;
 }
 
 .profile-task-check.optional {
-  border-color: #38bdf8;
+  border-color: #cbd5e1;
 }
 
 .profile-task-check.completed {
