@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 
 /* Normalize possible lat/lng shapes */
 function getPosition(job) {
@@ -296,29 +297,15 @@ const JobMap = ({
         }`}
         aria-label="Map marker legend"
       >
-        <button
-          type="button"
-          className="map-legend-toggle"
-          aria-expanded={!legendCollapsed}
-          title={legendCollapsed ? "Show map legend" : "Collapse map legend"}
-          onClick={() => setLegendCollapsed((value) => !value)}
-        >
-          <span className="map-legend-dot-stack" aria-hidden="true">
-            {LEGEND_ITEMS.map((item) => (
-              <span
-                key={item.label}
-                className="map-legend-dot"
-                style={{ backgroundColor: item.color }}
-              />
-            ))}
-          </span>
-          <span className="map-legend-toggle-label">
-            {legendCollapsed ? "Legend" : "Collapse"}
-          </span>
-          <span className="map-legend-chevron" aria-hidden="true">
-            {legendCollapsed ? ">" : "<"}
-          </span>
-        </button>
+        <span className="map-legend-dot-stack" aria-hidden="true">
+          {LEGEND_ITEMS.map((item) => (
+            <span
+              key={item.label}
+              className="map-legend-dot"
+              style={{ backgroundColor: item.color }}
+            />
+          ))}
+        </span>
         <div className="map-legend-items" aria-hidden={legendCollapsed}>
           {LEGEND_ITEMS.map((item) => (
             <span key={item.label} className="map-legend-item">
@@ -327,6 +314,20 @@ const JobMap = ({
             </span>
           ))}
         </div>
+        <button
+          type="button"
+          className="map-legend-toggle"
+          aria-label={legendCollapsed ? "Show map legend" : "Collapse map legend"}
+          aria-expanded={!legendCollapsed}
+          title={legendCollapsed ? "Show map legend" : "Collapse map legend"}
+          onClick={() => setLegendCollapsed((value) => !value)}
+        >
+          {legendCollapsed ? (
+            <ChevronsRight size={15} aria-hidden="true" />
+          ) : (
+            <ChevronsLeft size={15} aria-hidden="true" />
+          )}
+        </button>
       </div>
       {emptyMessage && <div className="map-empty-message">{emptyMessage}</div>}
     </div>

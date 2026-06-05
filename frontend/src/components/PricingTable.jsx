@@ -6,38 +6,38 @@ import "../styles/PricingTable.css";
 const RECRUITER_PLANS = [
   {
     key: "staff",
-    name: "Staff",
-    headline: "Solve churn without overspending.",
+    name: "Staff Position",
+    headline: "Post support-team openings without overspending.",
     firstMonth: 79,
     renewal: 49,
     bullets: [
       "Front desk, techs, assistants",
       "30-day listing, basic visibility",
-      "Email notifications on applies",
+      "Email notifications for candidate interest",
     ],
   },
   {
     key: "manager",
-    name: "Manager",
-    headline: "Keep your clinic organized & profitable.",
+    name: "Manager Position",
+    headline: "Post leadership openings for your optical or clinic team.",
     firstMonth: 149,
     renewal: 99,
     bullets: [
       "Office/optical managers",
-      "Featured placement & analytics",
+      "30-day listing with enhanced visibility",
       "Email + dashboard notifications",
     ],
   },
   {
     key: "doctor",
-    name: "Doctor",
-    headline: "Protect $50k+ monthly revenue from walking out the door.",
+    name: "Doctor Position",
+    headline: "Post high-impact optometrist openings with stronger visibility.",
     firstMonth: 299,
     renewal: 149,
     bullets: [
-      "Highest-impact roles",
-      "Top placement & full analytics",
-      "Priority applicant alerts",
+      "Optometrist-focused listing",
+      "30-day listing with strongest visibility",
+      "Priority candidate interest alerts",
     ],
   },
 ];
@@ -123,7 +123,7 @@ const PricingTable = ({ user }) => {
               className="seg-btn"
               onClick={() => setActiveTab("recruiter")}
             >
-              Recruiter plans
+              Post a Job
             </button>
             <button
               type="button"
@@ -134,7 +134,7 @@ const PricingTable = ({ user }) => {
               className="seg-btn"
               onClick={() => setActiveTab("candidate")}
             >
-              Candidate plans
+              Find a Job
             </button>
           </div>
         </div>
@@ -175,14 +175,14 @@ const PricingTable = ({ user }) => {
                           <span className="currency">$</span>
                           <span className="amount">{p.firstMonth}</span>
                         </span>
-                        <span className="period">first month</span>
+                        <span className="period">first 30 days</span>
                       </div>
                       <div className="price-line">
                         <span className="price small">
                           <span className="currency">$</span>
                           <span className="amount">{p.renewal}</span>
                         </span>
-                        <span className="period">per month thereafter</span>
+                        <span className="period">every 30 days thereafter</span>
                       </div>
                     </div>
 
@@ -200,10 +200,10 @@ const PricingTable = ({ user }) => {
                         onClick={() => startCheckout(p, "recruiter")}
                         disabled={loadingPlan === p.key}
                       >
-                        {loadingPlan === p.key ? "Starting..." : "Get started"}
+                        {loadingPlan === p.key ? "Starting..." : "Post this listing"}
                       </button>
                       <p className="fineprint">
-                        30-day listing, cancel anytime. Prices shown in USD.
+                        Recurring 30-day listing cycle. Cancel anytime. Prices shown in USD.
                       </p>
                     </div>
                   </div>

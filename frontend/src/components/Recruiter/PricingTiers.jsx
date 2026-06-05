@@ -3,22 +3,22 @@ import React from "react";
 const PricingTiers = () => {
   return (
     <div style={styles.container}>
-      <h2>Job Posting Plans</h2>
+      <h2>Job Posting Options</h2>
       <div style={styles.tiers}>
         <div style={styles.tier}>
-          <h3>Staff</h3>
-          <p>$79 first month</p>
-          <p>$49 renewal</p>
+          <h3>Staff Position</h3>
+          <p>$79 first 30 days</p>
+          <p>$49 every 30 days thereafter</p>
         </div>
         <div style={styles.tier}>
-          <h3>Manager</h3>
-          <p>$149 first month</p>
-          <p>$99 renewal</p>
+          <h3>Manager Position</h3>
+          <p>$149 first 30 days</p>
+          <p>$99 every 30 days thereafter</p>
         </div>
         <div style={styles.tier}>
-          <h3>Doctor</h3>
-          <p>$299 first month</p>
-          <p>$149 renewal</p>
+          <h3>Doctor Position</h3>
+          <p>$299 first 30 days</p>
+          <p>$149 every 30 days thereafter</p>
         </div>
       </div>
     </div>
