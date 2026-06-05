@@ -1,6 +1,6 @@
 // src/components/Header.jsx
 import React, { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logout as logoutRedux } from "../store/authSlice";
 import { fetchNotifications, clearNotifications } from "../store/notificationsSlice";
@@ -68,6 +68,7 @@ const Header = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -79,6 +80,11 @@ const Header = () => {
   });
 
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setDropdownOpen(false);
+    setDrawerOpen(false);
+  }, [location.pathname, location.search]);
 
   // Resize listener
   useEffect(() => {
@@ -127,7 +133,11 @@ const Header = () => {
     }
   }, [dispatch, session, user?.id, profile?.id]);
 
-  const openLogoutModal = () => setShowLogoutModal(true);
+  const openLogoutModal = () => {
+    setDropdownOpen(false);
+    setDrawerOpen(false);
+    setShowLogoutModal(true);
+  };
   const closeLogoutModal = () => setShowLogoutModal(false);
 
   const handleLogout = async () => {
