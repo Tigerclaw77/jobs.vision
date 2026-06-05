@@ -31,15 +31,37 @@ const OptionsSection = ({ user }) => {
             Register as a Candidate
           </button>
           <Link to="/recruiter/register" className="option-card">
-            <img src="/images/RegisterRecruiter.png" alt="Recruiter" />
+            <img
+              src="/images/register-recruiter-card.webp"
+              alt="Recruiter"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+            />
             <h3>Register as a Recruiter</h3>
           </Link>
           <Link to="/candidate/register" className="option-card">
-            <img src="/images/RegisterCandidate.png" alt="Candidate" />
+            <img
+              src="/images/register-candidate-card.webp"
+              alt="Candidate"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+            />
             <h3>Register as a Candidate</h3>
           </Link>
           <Link to="/jobs" className="option-card">
-            <img src="/images/SearchJobs.png" alt="Browse Jobs" />
+            <img
+              src="/images/search-jobs-card.webp"
+              alt="Browse Jobs"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+            />
             <h3>Browse Jobs</h3>
           </Link>
         </>
@@ -48,15 +70,36 @@ const OptionsSection = ({ user }) => {
       {userRole === "admin" && (
         <>
           <Link to="/admin" className="option-card">
-            <img src="/images/admin-dashboard.png" alt="Admin Dashboard" />
+            <img
+              src="/images/admin-dashboard-card.webp"
+              alt="Admin Dashboard"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+            />
             <h3>Admin Dashboard</h3>
           </Link>
           <Link to="/users" className="option-card">
-            <img src="/images/manage-users.png" alt="Manage Users" />
+            <img
+              src="/images/manage-users-card.webp"
+              alt="Manage Users"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+            />
             <h3>Manage Users</h3>
           </Link>
           <Link to="/admin/manual-overrides" className="option-card">
-            <img src="/images/manage-users.png" alt="Manual Overrides" />
+            <img
+              src="/images/manage-users-card.webp"
+              alt="Manual Overrides"
+              width="360"
+              height="360"
+              loading="eager"
+              decoding="async"
+            />
             <h3>Manual Overrides</h3>
           </Link>
         </>
