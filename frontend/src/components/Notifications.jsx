@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchNotifications,
@@ -7,21 +8,21 @@ import {
   markAllRead,
   deleteAllNotifications,
 } from "../store/notificationsSlice";
+import ProfileCompletionModule from "./Profile/ProfileCompletionModule";
 import "../styles/Notifications.css";
+import "../styles/Profile.css";
 
 const Notifications = () => {
   const dispatch = useDispatch();
   const notifications = useSelector((state) => state.notifications.items);
+  const profileCompletion = useSelector((state) => state.notifications.profileCompletion);
   const loading = useSelector((state) => state.notifications.loading);
   const error = useSelector((state) => state.notifications.error);
-
   const user = useSelector((state) => state.auth.user);
-
 
   useEffect(() => {
     dispatch(fetchNotifications());
-    console.log("🔍 Logged in user ID:", user?._id || user?.id || "No user found");
-  }, [dispatch, user]);
+  }, [dispatch, user?.id]);
 
   return (
     <div className="notifications-container">
@@ -36,19 +37,38 @@ const Notifications = () => {
       {loading && <p>Loading...</p>}
       {error && <p className="error">{error}</p>}
 
+      {profileCompletion?.score !== undefined && profileCompletion?.score !== null && (
+        <div className="notifications-completion-card">
+          <ProfileCompletionModule
+            completion={profileCompletion}
+            compact
+            includeOptional={false}
+          />
+        </div>
+      )}
+
       <div className="notifications-list">
         {notifications.map((notif) => (
-          <div key={notif._id} className={`notification-item ${notif.isRead ? "read" : "unread"}`}>
-            <div className="notification-content" onClick={() => dispatch(markNotificationRead(notif._id))}>
+          <div
+            key={notif.id}
+            className={`notification-item ${notif.isRead ? "read" : "unread"} ${notif.severity || ""}`}
+          >
+            <div
+              className="notification-content"
+              onClick={() => dispatch(markNotificationRead(notif.id))}
+            >
               {!notif.isRead && <span className="unread-dot"></span>}
-              <span>{notif.message}</span>
+              <span className="notification-message">{notif.message}</span>
               {notif.link && (
-                <a href={notif.link} className="notif-link">View</a>
+                <Link to={notif.link} className="notif-link">
+                  {notif.actionLabel || "View"}
+                </Link>
               )}
             </div>
             <button
               className="delete-button"
-              onClick={() => dispatch(deleteNotification(notif._id))}
+              onClick={() => dispatch(deleteNotification(notif.id))}
+              aria-label="Delete notification"
             >
               &times;
             </button>

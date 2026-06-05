@@ -276,6 +276,71 @@ input:focus, textarea:focus, select:focus {
   color: #334155;
 }
 
+.recruiter-profile-completion-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(12, 74, 110, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
+.dashboard-container .profile-completion-module {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-container .profile-completion-module.compact {
+  gap: 8px;
+}
+
+.dashboard-container .profile-completion-label {
+  color: #64748b;
+}
+
+.dashboard-container .profile-completion-topline strong {
+  color: #102033;
+  font-size: 1.8rem;
+}
+
+.dashboard-container .profile-completion-status {
+  color: #075985;
+  background: rgba(224, 242, 254, 0.9);
+  border-color: rgba(14, 116, 144, 0.2);
+}
+
+.dashboard-container .profile-completion-status.critical {
+  color: #991b1b;
+  background: rgba(254, 226, 226, 0.9);
+  border-color: rgba(185, 28, 28, 0.22);
+}
+
+.dashboard-container .profile-completion-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.dashboard-container .profile-completion-task {
+  color: #102033;
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(12, 74, 110, 0.14);
+}
+
+.dashboard-container .profile-task-check.critical {
+  color: #991b1b;
+}
+
+.dashboard-container .profile-task-check.recommended {
+  color: #92400e;
+}
+
+.profile-completion-banner-link {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .recruiter-capacity-banner {
   margin-top: 0;
 }
@@ -437,6 +502,15 @@ input:focus, textarea:focus, select:focus {
 
   .recruiter-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .recruiter-profile-completion-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-completion-banner-link {
+    white-space: normal;
   }
 
   .save-slot-row-button {

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   archiveJob,
+  fetchUserProfile,
   fetchRecruiterApplications,
   fetchRecruiterJobs,
   unarchiveJob,
@@ -12,6 +13,9 @@ import AddJob from "./AddJob";
 import AccessGate from "../auth/AccessGate";
 import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 import JobTabs from "./JobTabs";
+import ProfileCompletionModule from "../Profile/ProfileCompletionModule";
+import { recruiterCompletionSummary, shapeProfileForm } from "../Profile/profileUtils";
+import "../../styles/Profile.css";
 
 const PLAN_LABELS = {
   staff: "Staff",
@@ -58,6 +62,7 @@ const RecruiterDashboard = () => {
     expired: [],
   });
   const [applications, setApplications] = useState([]);
+  const [profileCompletion, setProfileCompletion] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,9 +86,10 @@ const RecruiterDashboard = () => {
     setLoading(true);
     setDashboardError("");
 
-    const [jobsResult, applicationsResult] = await Promise.allSettled([
+    const [jobsResult, applicationsResult, profileResult] = await Promise.allSettled([
       fetchRecruiterJobs(),
       fetchRecruiterApplications(),
+      fetchUserProfile(),
     ]);
 
     if (jobsResult.status === "fulfilled") {
@@ -107,8 +113,21 @@ const RecruiterDashboard = () => {
       setApplications([]);
     }
 
+    if (profileResult.status === "fulfilled") {
+      const apiCompletion = profileResult.value?.profileCompletion;
+      if (apiCompletion?.score !== undefined && apiCompletion?.score !== null) {
+        setProfileCompletion(apiCompletion);
+      } else {
+        setProfileCompletion(
+          recruiterCompletionSummary(shapeProfileForm(profileResult.value?.profile, user))
+        );
+      }
+    } else {
+      setProfileCompletion(null);
+    }
+
     setLoading(false);
-  }, [categorizeJobs]);
+  }, [categorizeJobs, user]);
 
   const recruiterEntitlement = user?.entitlements?.recruiter || null;
   const isAdmin = String(userRole || user?.userRole || "").toLowerCase() === "admin";
@@ -223,6 +242,19 @@ const RecruiterDashboard = () => {
             </p>
           </div>
         </section>
+
+        {profileCompletion && (
+          <div className="recruiter-profile-completion-banner">
+            <ProfileCompletionModule
+              completion={profileCompletion}
+              compact
+              includeOptional={false}
+            />
+            <Link to="/recruiter/profile" className="profile-completion-banner-link">
+              Review profile
+            </Link>
+          </div>
+        )}
 
         {atSlotCapacity && !isAdmin && (
           <div className="upgrade-banner recruiter-capacity-banner">

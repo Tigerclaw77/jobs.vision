@@ -22,7 +22,10 @@ export const fetchNotifications = createAsyncThunk(
       const list = Array.isArray(res.data)
         ? res.data
         : res.data?.notifications ?? res.data?.items ?? [];
-      return list.map(normalize);
+      return {
+        items: list.map(normalize),
+        profileCompletion: res.data?.profileCompletion || null,
+      };
     } catch (err) {
       return rejectWithValue(
         err?.response?.data?.message || "Error fetching notifications"
@@ -98,12 +101,14 @@ const notificationsSlice = createSlice({
     loading: false,
     error: null,
     hasUnreadNotifications: false,
+    profileCompletion: null,
   },
   reducers: {
     clearNotifications(state) {
       state.items = [];
       state.hasUnreadNotifications = false;
       state.error = null;
+      state.profileCompletion = null;
     },
   },
   extraReducers: (builder) => {
@@ -115,7 +120,8 @@ const notificationsSlice = createSlice({
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload;
+        state.items = action.payload.items || [];
+        state.profileCompletion = action.payload.profileCompletion || null;
         state.hasUnreadNotifications = state.items.some((n) => !n.isRead);
       })
       .addCase(fetchNotifications.rejected, (state, action) => {

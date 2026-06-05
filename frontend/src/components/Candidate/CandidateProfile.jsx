@@ -1,67 +1,47 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Navigate } from "react-router-dom";
 import { fetchUserProfile, updateUserProfile } from "../../utils/api";
 import { login } from "../../store/authSlice";
+import {
+  joinInterests,
+  profileSavePayload,
+  shapeProfileForm,
+  splitInterests,
+} from "../Profile/profileUtils";
+import "../../styles/Profile.css";
 
 const CandidateProfile = () => {
   const { user, token, userRole } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: user?.profile?.firstName || user?.firstName || "",
-    lastName: user?.profile?.lastName || user?.lastName || "",
-    email: user?.email || "",
-  });
-
-  const [errors, setErrors] = useState({});
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const loadedUserIdRef = useRef(null);
+  const [form, setForm] = useState(() => shapeProfileForm(user?.profile, user));
+  const [interestsText, setInterestsText] = useState(() =>
+    joinInterests(user?.profile?.specialtyInterests || user?.profile?.specialty_interests)
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     async function loadProfile() {
       if (!user) {
-        setLoadingProfile(false);
+        setLoading(false);
         return;
       }
-      if (loadedUserIdRef.current === user.id) {
-        setLoadingProfile(false);
-        return;
-      }
-      loadedUserIdRef.current = user.id;
 
       try {
         const res = await fetchUserProfile();
         if (!mounted) return;
-
-        const profile = res.profile || {};
-        setFormData({
-          firstName: profile.firstName || user?.firstName || "",
-          lastName: profile.lastName || user?.lastName || "",
-          email: res.email || user?.email || "",
-        });
-
-        dispatch(
-          login({
-            token,
-            userRole: userRole || res.userRole || res.role || user?.userRole,
-            user: {
-              ...user,
-              email: res.email || user.email,
-              userRole: res.userRole || res.role || user.userRole,
-              profile,
-              firstName: profile.firstName || user.firstName,
-              lastName: profile.lastName || user.lastName,
-            },
-          })
-        );
+        const next = shapeProfileForm(res.profile, user);
+        setForm(next);
+        setInterestsText(joinInterests(next.specialtyInterests));
       } catch (err) {
-        console.error("Error loading profile:", err);
+        if (mounted) setError(err?.message || "Failed to load profile.");
       } finally {
-        if (mounted) setLoadingProfile(false);
+        if (mounted) setLoading(false);
       }
     }
 
@@ -69,112 +49,199 @@ const CandidateProfile = () => {
     return () => {
       mounted = false;
     };
-  }, [dispatch, token, user, userRole]);
+  }, [user]);
 
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
+  if (!user) return <Navigate to="/login" />;
 
-  if (loadingProfile) {
-    return <p>Loading profile...</p>;
-  }
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" })); // clear field error
-  };
-
-  const validate = () => {
-    const errs = {};
-    if (!formData.firstName.trim()) errs.firstName = "First name is required";
-    if (!formData.lastName.trim()) errs.lastName = "Last name is required";
-    return errs;
+  const handleChange = (field) => (event) => {
+    const value =
+      event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setStatus("");
+    setError("");
   };
 
   const handleSave = async () => {
-    const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      return;
-    }
+    setSaving(true);
+    setStatus("");
+    setError("");
 
     try {
-      const res = await updateUserProfile({
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-      });
-
+      const payload = {
+        ...profileSavePayload(form),
+        specialtyInterests: splitInterests(interestsText),
+      };
+      const res = await updateUserProfile(payload);
+      const next = shapeProfileForm(res.profile, user);
+      setForm(next);
+      setInterestsText(joinInterests(next.specialtyInterests));
       dispatch(
         login({
           token,
-          userRole: userRole || user?.userRole,
+          userRole: userRole || res.userRole || res.role || user?.userRole,
           user: {
             ...user,
+            email: res.email || user.email,
+            userRole: res.userRole || res.role || user.userRole,
             profile: res.profile,
-            firstName: res.profile?.firstName || user?.firstName,
-            lastName: res.profile?.lastName || user?.lastName,
+            firstName: res.profile?.firstName || user.firstName,
+            lastName: res.profile?.lastName || user.lastName,
           },
         })
       );
-
-      alert("Profile updated successfully.");
-      setIsEditing(false);
+      setStatus("Profile saved.");
     } catch (err) {
-      console.error("❌ Error updating profile:", err);
-      alert("Failed to update profile.");
+      setError(err?.response?.data?.error || "Failed to save profile.");
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div>
-      <h2>Candidate Profile</h2>
+    <main className="profile-page">
+      <section className="profile-hero">
+        <div>
+          <p className="profile-eyebrow">Candidate Account</p>
+          <h1>Candidate Profile</h1>
+          <p>
+            Manage contact information and future alert preferences. Saved jobs and
+            searches remain separate candidate workflows, but this structure is ready
+            for future email and SMS alerts.
+          </p>
+        </div>
+        <div className="profile-save-row">
+          <button className="profile-save-button" onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Profile"}
+          </button>
+          <Link to="/candidate/dashboard" className="profile-secondary-link">
+            Dashboard
+          </Link>
+        </div>
+      </section>
 
-      {isEditing ? (
-        <div>
-          <label>
-            First Name:
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-            />
-            {errors.firstName && (
-              <span style={{ color: "red" }}>{errors.firstName}</span>
-            )}
-          </label>
-          <br />
-          <label>
-            Last Name:
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-            />
-            {errors.lastName && (
-              <span style={{ color: "red" }}>{errors.lastName}</span>
-            )}
-          </label>
-          <br />
-          <label>
-            Email (readonly):
-            <input type="email" value={formData.email} readOnly />
-          </label>
-          <br />
-          <button onClick={handleSave}>Save</button>
-          <button onClick={() => setIsEditing(false)}>Cancel</button>
-        </div>
+      {loading ? (
+        <div className="profile-card">Loading profile...</div>
       ) : (
-        <div>
-          <p><strong>First Name:</strong> {formData.firstName || "N/A"}</p>
-          <p><strong>Last Name:</strong> {formData.lastName || "N/A"}</p>
-          <p><strong>Email:</strong> {user.email}</p>
-          <button onClick={() => setIsEditing(true)}>Edit Profile</button>
-        </div>
+        <>
+          <div className={`profile-status ${error ? "error" : ""}`}>
+            {error || status}
+          </div>
+          <div className="profile-layout">
+            <div className="profile-main">
+              <section className="profile-card" id="contact-information">
+                <h2>Contact Information</h2>
+                <div className="profile-grid">
+                  <div className="profile-field">
+                    <label htmlFor="firstName">First Name</label>
+                    <input
+                      id="firstName"
+                      value={form.firstName}
+                      onChange={handleChange("firstName")}
+                    />
+                  </div>
+                  <div className="profile-field">
+                    <label htmlFor="lastName">Last Name</label>
+                    <input
+                      id="lastName"
+                      value={form.lastName}
+                      onChange={handleChange("lastName")}
+                    />
+                  </div>
+                  <div className="profile-field">
+                    <label htmlFor="email">Email</label>
+                    <input id="email" value={form.email} readOnly />
+                  </div>
+                  <div className="profile-field">
+                    <label htmlFor="phone">Phone</label>
+                    <input
+                      id="phone"
+                      value={form.phone}
+                      onChange={handleChange("phone")}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="profile-card" id="alert-preferences">
+                <h2>Alert Preferences</h2>
+                <div className="profile-check-list">
+                  <label className="profile-check">
+                    <input
+                      type="checkbox"
+                      checked={form.emailNotifications}
+                      onChange={handleChange("emailNotifications")}
+                    />
+                    <span>Email alerts</span>
+                  </label>
+                  <label className="profile-check">
+                    <input
+                      type="checkbox"
+                      checked={form.smsNotifications}
+                      onChange={handleChange("smsNotifications")}
+                    />
+                    <span>SMS alerts</span>
+                  </label>
+                  <label className="profile-check">
+                    <input
+                      type="checkbox"
+                      checked={form.savedSearchAlerts}
+                      onChange={handleChange("savedSearchAlerts")}
+                    />
+                    <span>Saved search alerts</span>
+                  </label>
+                  <label className="profile-check">
+                    <input
+                      type="checkbox"
+                      checked={form.weeklySummaryEmails}
+                      onChange={handleChange("weeklySummaryEmails")}
+                    />
+                    <span>Weekly matching emails</span>
+                  </label>
+                </div>
+                <p className="profile-help">AI matching and SMS delivery are not connected yet.</p>
+              </section>
+
+              <section className="profile-card" id="specialty-interests">
+                <h2>Specialty Interests / Tags</h2>
+                <div className="profile-field full">
+                  <label htmlFor="specialtyInterests">Interests</label>
+                  <input
+                    id="specialtyInterests"
+                    value={interestsText}
+                    onChange={(event) => setInterestsText(event.target.value)}
+                    placeholder="dry eye, pediatrics, scleral lenses"
+                  />
+                  <span className="profile-help">
+                    Comma-separated interests prepare the profile for future alerts.
+                  </span>
+                </div>
+              </section>
+            </div>
+
+            <aside className="profile-sidebar">
+              <section className="profile-card">
+                <h2>Candidate Shortcuts</h2>
+                <ul className="profile-link-list">
+                  <li><Link to="/jobs">Browse jobs</Link></li>
+                  <li><Link to="/candidate/dashboard">Saved jobs</Link></li>
+                  <li><Link to="/candidate/dashboard">Application summary</Link></li>
+                </ul>
+              </section>
+              <section className="profile-card">
+                <h2>Future Alert Areas</h2>
+                <div className="profile-pill-row">
+                  <span className="profile-pill">Saved searches</span>
+                  <span className="profile-pill">Saved jobs</span>
+                  <span className="profile-pill">Email alerts</span>
+                  <span className="profile-pill">SMS alerts</span>
+                </div>
+              </section>
+            </aside>
+          </div>
+        </>
       )}
-    </div>
+    </main>
   );
 };
 

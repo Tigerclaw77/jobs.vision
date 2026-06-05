@@ -5,18 +5,19 @@ import RecruiterProfile from "./Recruiter/RecruiterProfile"; // Import Recruiter
 import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 
 const Profile = () => {
-  const { user } = useEffectiveAuth();
+  const { role, user } = useEffectiveAuth();
+  const activeRole = role || user?.userRole;
 
   // Conditional rendering based on userRole
-  if (user?.userRole === "candidate") {
+  if (activeRole === "candidate") {
     return <CandidateProfile />;
   }
 
-  if (user?.userRole === "admin") {
+  if (activeRole === "admin") {
     return <AdminProfile />;
   }
 
-  if (user?.userRole === "recruiter") {
+  if (activeRole === "recruiter") {
     return <RecruiterProfile />;
   }
 

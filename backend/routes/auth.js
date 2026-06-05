@@ -4,6 +4,7 @@ const { requireAuth } = require("../middleware/auth.js");
 const { one } = require("../services/db.js");
 const { getUserEntitlements } = require("../services/entitlements.js");
 const { upsertProfileForAuthUser } = require("../services/profileBootstrap.js");
+const { getProfileSelectList, shapeProfile } = require("../services/profileDetails.js");
 
 const router = express.Router();
 
@@ -18,13 +19,13 @@ router.get("/me", requireAuth, async (req, res) => {
     let profile = null;
 
     // Pull canonical role/email from profiles so callers can rely on it
-    const data = await one(
-      "select id, email, role from public.profiles where id = $1",
-      [req.user.id]
-    );
+    const selectList = await getProfileSelectList();
+    const data = await one(`select ${selectList} from public.profiles where id = $1`, [
+      req.user.id,
+    ]);
 
     if (data) {
-      profile = data;
+      profile = shapeProfile(data).profile;
       // Keep flat role in sync if DB has it
       if (data.role && data.role !== req.user.role) {
         req.user.role = data.role;
