@@ -468,3 +468,93 @@
   border-color: rgba(103, 232, 249, 0.62);
   color: #e0f2fe;
 }
+
+/* Homepage visual balance: lighter frosted pricing surfaces */
+.pricing-root.is-glass {
+  --glass-alpha: 0.72;
+  --brand: #0f766e;
+  --ink: #0f172a;
+  --ink-2: #1e293b;
+  --ink-3: #475569;
+  --muted: #64748b;
+}
+
+.pricing-root.is-glass .seg-tabs {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(240, 253, 250, 0.52)),
+    rgba(255, 255, 255, 0.48);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 12px 30px rgba(15, 39, 64, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+.pricing-root.is-glass .seg-tabs .seg-btn {
+  color: #334155;
+}
+
+.pricing-root.is-glass .seg-tabs .seg-btn[aria-selected="true"] {
+  color: #042f2e;
+}
+
+.pricing-root.is-glass .seg-tabs .seg-thumb {
+  background: linear-gradient(135deg, #99f6e4, #5eead4);
+  border-color: rgba(20, 184, 166, 0.42);
+  box-shadow:
+    0 12px 26px rgba(20, 184, 166, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.pricing-root.is-glass .card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(240, 249, 255, 0.58)),
+    rgba(255, 255, 255, 0.46) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  color: #0f172a;
+  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+  backdrop-filter: blur(18px) saturate(140%) !important;
+  box-shadow:
+    0 18px 44px rgba(15, 39, 64, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+}
+
+.pricing-root.is-glass .card:hover {
+  border-color: rgba(20, 184, 166, 0.42) !important;
+  box-shadow:
+    0 22px 52px rgba(15, 39, 64, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+}
+
+.pricing-root.is-glass .card-head .title,
+.pricing-root.is-glass .price,
+.pricing-root.is-glass .price.small .amount {
+  color: #0f172a;
+}
+
+.pricing-root.is-glass .card-head .subtitle,
+.pricing-root.is-glass .period,
+.pricing-root.is-glass .fineprint {
+  color: #475569;
+}
+
+.pricing-root.is-glass .bullets li {
+  color: #1e293b;
+}
+
+.pricing-root.is-glass .bullets li::marker {
+  color: #0f766e;
+}
+
+.pricing-root.is-glass .btn.primary {
+  background: linear-gradient(135deg, #14b8a6, #0ea5e9);
+  color: #042f2e;
+  box-shadow: 0 12px 26px rgba(14, 165, 233, 0.22);
+}
+
+.pricing-root.is-glass .btn.ghost {
+  background: rgba(255, 255, 255, 0.58);
+  border-color: rgba(20, 184, 166, 0.44);
+  color: #0f2740;
+}
