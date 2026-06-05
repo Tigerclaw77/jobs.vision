@@ -18,6 +18,13 @@ const RECRUITER_PROFILE_COMPLETION_TASKS = [
   "profile:recruiter:company-logo",
 ];
 
+const RECRUITER_PROFILE_COMPLETION_LABELS = {
+  "profile:recruiter:company-name": "Company Name",
+  "profile:recruiter:company-description": "Company Description",
+  "profile:recruiter:company-website": "Company Website",
+  "profile:recruiter:company-logo": "Company Logo",
+};
+
 const RecruiterProfile = () => {
   const { user, token, userRole } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -124,8 +131,20 @@ const RecruiterProfile = () => {
           <div className={`profile-status ${error ? "error" : ""}`}>
             {error || status}
           </div>
-          <div className="profile-layout">
+          <div className="profile-layout recruiter-profile-layout">
             <div className="profile-main">
+              <section className="profile-card profile-completion-card">
+                <ProfileCompletionModule
+                  completion={completion}
+                  includeOptional
+                  displayTaskIds={RECRUITER_PROFILE_COMPLETION_TASKS}
+                  labelOverrides={RECRUITER_PROFILE_COMPLETION_LABELS}
+                  showNote={false}
+                  showTaskDetails={false}
+                  collapseWhenComplete
+                />
+              </section>
+
               <section className="profile-card" id="company-information">
                 <h2>Company Information</h2>
                 <div className="profile-grid">
@@ -266,19 +285,8 @@ const RecruiterProfile = () => {
                 </div>
                 <p className="profile-help">SMS delivery is not connected yet.</p>
               </section>
-            </div>
 
-            <aside className="profile-sidebar">
-              <section className="profile-card">
-                <ProfileCompletionModule
-                  completion={completion}
-                  includeOptional
-                  displayTaskIds={RECRUITER_PROFILE_COMPLETION_TASKS}
-                  showNote={false}
-                />
-              </section>
-
-              <section className="profile-card">
+              <section className="profile-card profile-contact-methods-card">
                 <h2>Contact Methods</h2>
                 <div className="profile-pill-row">
                   {form.applicationUseAccountEmail && form.email && (
@@ -295,7 +303,7 @@ const RecruiterProfile = () => {
                     )}
                 </div>
               </section>
-            </aside>
+            </div>
           </div>
         </>
       )}

@@ -14,7 +14,10 @@ export default function ProfileCompletionModule({
   compact = false,
   includeOptional = true,
   displayTaskIds = null,
+  labelOverrides = {},
   showNote = true,
+  showTaskDetails = true,
+  collapseWhenComplete = false,
 }) {
   if (!completion || completion.score === null || completion.score === undefined) return null;
 
@@ -32,10 +35,26 @@ export default function ProfileCompletionModule({
       tasks: tasks.filter((task) => task.severity === severity),
     }))
     .filter((group) => group.tasks.length > 0);
+  const scopedAttentionCount = tasks.filter((task) => task.severity !== "optional").length;
+  const statusCount = allowedTaskIds ? scopedAttentionCount : completion.attentionCount;
+  const hasCritical = allowedTaskIds
+    ? tasks.some((task) => task.severity === "critical")
+    : completion.criticalCount;
   const attentionText =
-    completion.attentionCount > 0
-      ? `${completion.attentionCount} item${completion.attentionCount === 1 ? "" : "s"} need attention`
+    statusCount > 0
+      ? `${statusCount} item${statusCount === 1 ? "" : "s"} need attention`
       : "Candidate contact details are ready";
+
+  if (collapseWhenComplete && groupedTasks.length === 0) {
+    return (
+      <section className={`profile-completion-module complete ${compact ? "compact" : ""}`}>
+        <div className="profile-complete-badge">
+          <span className="profile-complete-mark" aria-hidden="true" />
+          <strong>Profile Complete</strong>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={`profile-completion-module ${compact ? "compact" : ""}`}>
@@ -44,7 +63,7 @@ export default function ProfileCompletionModule({
           <span className="profile-completion-label">Profile Completion</span>
           <strong>{completion.score}%</strong>
         </div>
-        <span className={`profile-completion-status ${completion.criticalCount ? "critical" : ""}`}>
+        <span className={`profile-completion-status ${hasCritical ? "critical" : ""}`}>
           {attentionText}
         </span>
       </div>
@@ -73,8 +92,15 @@ export default function ProfileCompletionModule({
                         aria-hidden="true"
                       />
                       <span>
-                        <strong>{task.actionLabel || task.incompleteLabel || task.label}</strong>
-                        {!compact && <small>{task.whyItMatters || task.message}</small>}
+                        <strong>
+                          {labelOverrides[task.id] ||
+                            task.actionLabel ||
+                            task.incompleteLabel ||
+                            task.label}
+                        </strong>
+                        {!compact && showTaskDetails && (
+                          <small>{task.whyItMatters || task.message}</small>
+                        )}
                       </span>
                     </>
                   );

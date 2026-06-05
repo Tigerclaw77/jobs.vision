@@ -105,6 +105,21 @@
   align-items: start;
 }
 
+.recruiter-profile-layout {
+  grid-template-columns: minmax(0, 760px);
+}
+
+.recruiter-profile-layout .profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 350px));
+  gap: 14px 20px;
+  max-width: 720px;
+}
+
+.recruiter-profile-layout .profile-field.full,
+.recruiter-profile-layout .profile-check-list {
+  max-width: 720px;
+}
+
 .profile-main,
 .profile-sidebar {
   display: grid;
@@ -176,6 +191,7 @@
 
 .profile-field input,
 .profile-field textarea {
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   border: 1px solid rgba(203, 213, 225, 0.95);
@@ -190,19 +206,23 @@
 #companyWebsite,
 #companyLogoUrl,
 #applicationEmail {
-  max-width: 340px;
+  width: min(100%, 350px);
+  max-width: 350px;
 }
 
 #companyLocation {
-  max-width: 300px;
+  width: min(100%, 350px);
+  max-width: 350px;
 }
 
 #applicationPhone {
-  max-width: 240px;
+  width: min(100%, 250px);
+  max-width: 250px;
 }
 
 #applicationWebsite {
-  max-width: 360px;
+  width: min(100%, 500px);
+  max-width: 500px;
 }
 
 .profile-field input::placeholder,
@@ -472,6 +492,38 @@
   color: #ffffff;
 }
 
+.profile-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  border: 1px solid rgba(45, 212, 191, 0.34);
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.14);
+  color: #ffffff;
+  padding: 8px 12px;
+}
+
+.profile-complete-mark {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #14b8a6;
+}
+
+.profile-complete-mark::after {
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid #052e2b;
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
 .profile-task-check {
   position: relative;
   width: 15px;
@@ -534,5 +586,16 @@
   .profile-check-list,
   .profile-interest-grid {
     max-width: none;
+  }
+
+  #companyName,
+  #companyWebsite,
+  #companyLogoUrl,
+  #applicationEmail,
+  #companyLocation,
+  #applicationPhone,
+  #applicationWebsite {
+    width: 100%;
+    max-width: 100%;
   }
 }
