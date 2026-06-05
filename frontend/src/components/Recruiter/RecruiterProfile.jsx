@@ -172,7 +172,7 @@ const RecruiterProfile = () => {
                 </div>
               </section>
 
-              <section className="profile-card" id="application-preferences">
+              <section className="profile-card emphasis" id="application-preferences">
                 <h2>Application Preferences</h2>
                 <div className="profile-check-list">
                   <label className="profile-check">

@@ -11,6 +11,19 @@ import {
 } from "../Profile/profileUtils";
 import "../../styles/Profile.css";
 
+const SPECIALTY_INTEREST_OPTIONS = [
+  "Dry Eye",
+  "Pediatrics",
+  "Scleral Lenses",
+  "Myopia Management",
+  "Vision Therapy",
+  "Contact Lenses",
+  "Optical Sales",
+  "Bilingual Spanish",
+];
+
+const normalizeInterest = (value) => String(value || "").trim().toLowerCase();
+
 const CandidateProfile = () => {
   const { user, token, userRole } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
@@ -57,6 +70,20 @@ const CandidateProfile = () => {
     const value =
       event.target.type === "checkbox" ? event.target.checked : event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
+    setStatus("");
+    setError("");
+  };
+
+  const selectedInterestSet = new Set(splitInterests(interestsText).map(normalizeInterest));
+
+  const toggleSpecialtyInterest = (interest) => {
+    const current = splitInterests(interestsText);
+    const normalized = normalizeInterest(interest);
+    const exists = current.some((item) => normalizeInterest(item) === normalized);
+    const next = exists
+      ? current.filter((item) => normalizeInterest(item) !== normalized)
+      : [...current, interest];
+    setInterestsText(next.join(", "));
     setStatus("");
     setError("");
   };
@@ -203,17 +230,37 @@ const CandidateProfile = () => {
               </section>
 
               <section className="profile-card" id="specialty-interests">
-                <h2>Specialty Interests / Tags</h2>
+                <h2>Specialty Interests</h2>
+                <p className="profile-section-intro">
+                  Choose common interests or add your own. These preferences prepare
+                  future alerts without changing today&apos;s job search behavior.
+                </p>
+                <div className="profile-interest-grid" aria-label="Specialty interest options">
+                  {SPECIALTY_INTEREST_OPTIONS.map((interest) => {
+                    const selected = selectedInterestSet.has(normalizeInterest(interest));
+                    return (
+                      <button
+                        type="button"
+                        key={interest}
+                        className={`profile-interest-pill ${selected ? "selected" : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleSpecialtyInterest(interest)}
+                      >
+                        {interest}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="profile-field full">
-                  <label htmlFor="specialtyInterests">Interests</label>
+                  <label htmlFor="specialtyInterests">Custom interests</label>
                   <input
                     id="specialtyInterests"
                     value={interestsText}
                     onChange={(event) => setInterestsText(event.target.value)}
-                    placeholder="dry eye, pediatrics, scleral lenses"
+                    placeholder="Add interests separated by commas"
                   />
                   <span className="profile-help">
-                    Comma-separated interests prepare the profile for future alerts.
+                    Selected interests are saved as profile preferences for future alerts.
                   </span>
                 </div>
               </section>
