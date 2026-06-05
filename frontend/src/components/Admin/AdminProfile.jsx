@@ -86,11 +86,9 @@ const AdminProfile = () => {
     <main className="profile-page">
       <section className="profile-hero">
         <div>
-          <p className="profile-eyebrow">Admin Account</p>
           <h1>Admin Profile</h1>
           <p>
-            Keep admin account information and notification preferences in the same
-            profile system candidates and recruiters use.
+            Manage account information and notification preferences.
           </p>
         </div>
         <div className="profile-save-row">

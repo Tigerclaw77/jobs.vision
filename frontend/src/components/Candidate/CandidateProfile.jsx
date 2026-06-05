@@ -128,12 +128,9 @@ const CandidateProfile = () => {
     <main className="profile-page">
       <section className="profile-hero">
         <div>
-          <p className="profile-eyebrow">Candidate Account</p>
           <h1>Candidate Profile</h1>
           <p>
-            Manage contact information and future alert preferences. Saved jobs and
-            searches remain separate candidate workflows, but this structure is ready
-            for future email and SMS alerts.
+            Manage contact information, alert preferences, and specialty interests.
           </p>
         </div>
         <div className="profile-save-row">

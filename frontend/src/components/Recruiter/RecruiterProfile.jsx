@@ -94,12 +94,10 @@ const RecruiterProfile = () => {
     <main className="profile-page">
       <section className="profile-hero">
         <div>
-          <p className="profile-eyebrow">Recruiter Account</p>
           <h1>Recruiter Profile</h1>
           <p>
-            Manage your company information, candidate contact methods, and account
-            preferences. These details prepare future job posting defaults without
-            turning jobs.vision into an applicant tracking system.
+            Manage company information, candidate contact methods, and notification
+            preferences.
           </p>
         </div>
         <div className="profile-save-row">
