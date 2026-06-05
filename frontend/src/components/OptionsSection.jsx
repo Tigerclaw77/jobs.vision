@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import WorkIcon from "@mui/icons-material/Work";
+import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import "../styles/Home.css";
 
 const OptionsSection = ({ user }) => {
@@ -86,11 +87,15 @@ const OptionsSection = ({ user }) => {
       {userRole === "candidate" && (
         <>
           <Link to="/jobs" className="option-card">
-            <img src="/images/SearchJobs.png" alt="Browse Jobs" />
+            <span className="option-card-visual candidate-action" aria-hidden="true">
+              <TravelExploreIcon />
+            </span>
             <h3>Browse Jobs</h3>
           </Link>
           <Link to="/candidate/profile" className="option-card">
-            <img src="/images/update-profile.jpg" alt="Update Profile" />
+            <span className="option-card-visual profile-action" aria-hidden="true">
+              <AccountCircleIcon />
+            </span>
             <h3>Update Profile</h3>
           </Link>
         </>

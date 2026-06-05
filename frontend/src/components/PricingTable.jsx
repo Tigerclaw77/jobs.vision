@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createStripeCheckout } from "../utils/api";
 import "../styles/PricingTable.css";
@@ -75,9 +75,17 @@ const CANDIDATE_PLANS = [
 ];
 
 const PricingTable = ({ user }) => {
-  const [activeTab, setActiveTab] = useState("recruiter"); // recruiter | candidate
+  const defaultAudience = useMemo(() => {
+    const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
+    return role === "recruiter" ? "recruiter" : "candidate";
+  }, [user?.accountRole, user?.role, user?.userRole]);
+  const [activeTab, setActiveTab] = useState(defaultAudience); // recruiter | candidate
   const [loadingPlan, setLoadingPlan] = useState("");
   const nav = useNavigate();
+
+  useEffect(() => {
+    setActiveTab(defaultAudience);
+  }, [defaultAudience]);
 
   const isRecruiter = activeTab === "recruiter";
   const plans = isRecruiter ? RECRUITER_PLANS : CANDIDATE_PLANS;
@@ -155,12 +163,6 @@ const PricingTable = ({ user }) => {
               <article
                 key={p.key}
                 className={cardClass}
-                style={{
-                  background: "rgba(255,255,255,.5)",
-                  backdropFilter: "blur(10px) saturate(120%)",
-                  WebkitBackdropFilter: "blur(10px) saturate(120%)",
-                  border: "1px solid rgba(229,231,235,.9)",
-                }}
               >
                 <header className="card-head">
                   <h3 className="title">{p.name}</h3>
