@@ -106,12 +106,32 @@
   border: 1px solid rgba(147, 197, 253, 0.45);
 }
 
+.recruiter-job-form-card .recruiter-job-tag-chip.MuiChip-root {
+  color: #0f172a !important;
+  background: rgba(248, 250, 252, 0.96) !important;
+  border: 1px solid rgba(186, 230, 253, 0.95) !important;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.recruiter-job-form-card .recruiter-job-tag-chip .MuiChip-label {
+  color: #0f172a !important;
+}
+
 .recruiter-job-form-card .MuiChip-deleteIcon {
   color: rgba(255, 255, 255, 0.82);
 }
 
+.recruiter-job-form-card .recruiter-job-tag-chip .MuiChip-deleteIcon {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+
 .recruiter-job-form-card .MuiChip-deleteIcon:hover {
   color: #ffffff;
+}
+
+.recruiter-job-form-card .recruiter-job-tag-chip .MuiChip-deleteIcon:hover {
+  color: #0f172a !important;
 }
 
 .recruiter-job-form-actions {

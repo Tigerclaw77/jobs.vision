@@ -35,7 +35,6 @@ export default function JobCard({
     ...labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type || job.type),
     ...labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement),
     ...opportunityLabels,
-    job.hours ? `${job.hours} hrs/wk` : "",
     compensationSummary(job),
   ].filter(Boolean);
 

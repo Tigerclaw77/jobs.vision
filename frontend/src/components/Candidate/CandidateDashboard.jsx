@@ -50,7 +50,6 @@ function mapFavoriteJob(favorite) {
     company: job.employer_name || job.company || job.venue_name || "Unknown Employer",
     location: job.location || [job.city, job.state].filter(Boolean).join(", ") || "Location not listed",
     role: job.role || "",
-    hours: job.hours || "",
     type: job.type || "",
     opportunity_type: job.opportunity_type || "",
     practice_type: job.practice_type || "",

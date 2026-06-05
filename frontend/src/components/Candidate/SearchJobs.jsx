@@ -88,7 +88,6 @@ function mapJob(row = {}) {
     title: row.title || "",
     company: row.employer_name || row.company || row.venue_name || "",
     description: row.description || "",
-    hours: row.hours || row.type || "",
     role: normalizeRole(row.role),
     type: employmentTypes[0] || "",
     employment_types: employmentTypes,
@@ -103,7 +102,6 @@ const SearchJobs = () => {
   const [jobs, setJobs] = useState([]);
   const [filters, setFilters] = useState({
     roles: [],
-    hours: "",
     employmentTypes: [],
     workArrangements: [],
     opportunityTypes: [],
@@ -156,9 +154,6 @@ const SearchJobs = () => {
     const roleIncludesOptometrist = filters.roles.includes("optometrist");
     return jobs.filter((job) => {
       const roleOk = filters.roles.length === 0 || filters.roles.includes(job.role);
-      const hoursOk =
-        !filters.hours ||
-        (Number.isFinite(Number(job.hours)) && Number(job.hours) >= Number(filters.hours));
       const typeOk =
         filters.employmentTypes.length === 0 ||
         job.employment_types.some((value) => filters.employmentTypes.includes(value));
@@ -172,7 +167,7 @@ const SearchJobs = () => {
       const companyOk =
         !filters.company ||
         job.company.toLowerCase().includes(filters.company.toLowerCase());
-      return roleOk && hoursOk && typeOk && workArrangementOk && opportunityOk && companyOk;
+      return roleOk && typeOk && workArrangementOk && opportunityOk && companyOk;
     });
   }, [jobs, filters]);
 
@@ -227,14 +222,6 @@ const SearchJobs = () => {
           onToggle={(value) => toggleFilter("roles", value)}
         />
 
-        <input
-          type="number"
-          min="0"
-          placeholder="Minimum hours/week"
-          value={filters.hours}
-          onChange={(e) => setFilters({ ...filters, hours: e.target.value })}
-        />
-
         <CheckboxGroup
           legend="Employment Type"
           options={EMPLOYMENT_TYPE_OPTIONS}
@@ -277,7 +264,6 @@ const SearchJobs = () => {
               <h3>{job.title} at {job.company || "Unknown employer"}</h3>
               {job.location && <p><strong>Location:</strong> {job.location}</p>}
               <p><strong>Description:</strong> {job.description}</p>
-              <p><strong>Hours:</strong> {job.hours || "Not listed"}</p>
               <p><strong>Role:</strong> {ROLE_LABELS[job.role] || "Not listed"}</p>
               <p><strong>Employment:</strong> {labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types).join(", ") || "Not listed"}</p>
               <p><strong>Work Arrangement:</strong> {labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements).join(", ") || "Not listed"}</p>

@@ -37,7 +37,6 @@ const RecommendedJobs = () => {
         {recommendedJobs.map((job) => (
           <li key={job._id} style={styles.jobItem}>
             <h3>{job.title} at {job.company}</h3>
-            <p><strong>Hours:</strong> {job.hours}</p>
             <p><strong>Job Role:</strong> {job.jobRole}</p>
             <p><strong>Practice Mode:</strong> {job.practiceMode}</p>
           </li>

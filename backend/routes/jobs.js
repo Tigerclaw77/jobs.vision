@@ -746,7 +746,7 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       latitude: coordinates.latitude,
       longitude: coordinates.longitude,
       role,
-      hours: req.body.hours ?? null,
+      hours: null,
       type: employment_type ?? null,
       opportunity_type,
       opportunity_types,
@@ -833,7 +833,6 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "latitude",
       "longitude",
       "role",
-      "hours",
       "type",
       "opportunity_type",
       "opportunity_types",
@@ -863,6 +862,7 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key];
     }
+    updates.hours = null;
     if ("role" in updates) updates.role = normalizeRole(updates.role, { required: true });
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
     const nextRole = updates.role || job.role;

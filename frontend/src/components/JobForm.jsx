@@ -18,6 +18,11 @@ import {
 
 import { createJob, updateJob } from "../utils/api";
 import {
+  JOB_TAG_OPTIONS,
+  canonicalizeJobTagInput,
+  displayJobTagLabel,
+} from "../constants/jobTagTaxonomy";
+import {
   COMPENSATION_TYPE_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
@@ -46,7 +51,6 @@ const defaultValues = {
   practice_type: "",
   employment_types: [],
   work_arrangements: [],
-  hours_per_week: "",
   compensation_type: "",
   salary_min: "",
   salary_max: "",
@@ -228,10 +232,13 @@ function compensationPayload(values) {
 }
 
 function normalizeDraftValues(raw = {}) {
+  const draftValues = { ...raw };
+  delete draftValues.hours;
+  delete draftValues.hours_per_week;
   const role = normalizeRole(raw.role_type || raw.role) || defaultValues.role_type;
   return {
     ...defaultValues,
-    ...raw,
+    ...draftValues,
     role_type: role,
     opportunity_types:
       role === "optometrist"
@@ -250,7 +257,6 @@ function normalizeDraftValues(raw = {}) {
 
 function valuesFromJob(job = {}) {
   const salary = parseSalaryRange(job.salary);
-  const numericHours = Number(job.hours);
   return {
     ...defaultValues,
     title: job.title || "",
@@ -273,7 +279,6 @@ function valuesFromJob(job = {}) {
         (job.employment_type === "remote" || job.type === "remote" ? "remote" : ""),
       normalizeWorkArrangementValue
     ),
-    hours_per_week: job.hours && !Number.isNaN(numericHours) ? String(job.hours) : "",
     compensation_type: job.compensation_type || "",
     salary_min: job.salary_min ?? salary.salary_min,
     salary_max: job.salary_max ?? salary.salary_max,
@@ -302,9 +307,6 @@ function validate(values) {
     const min = Number(values.salary_min);
     const max = Number(values.salary_max);
     if (min > max) errors.salary_max = "Max must be ≥ Min.";
-  }
-  if (values.hours_per_week && Number.isNaN(Number(values.hours_per_week))) {
-    errors.hours_per_week = "Enter a number.";
   }
   ["hourly_min", "hourly_max", "daily_rate"].forEach((field) => {
     if (values[field] && Number.isNaN(Number(values[field]))) {
@@ -434,8 +436,9 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       e.preventDefault();
       const raw = e.target.value.trim();
       if (!raw) return;
-      if (!values.tags.includes(raw)) {
-        setValues((p) => ({ ...p, tags: [...p.tags, raw] }));
+      const tagId = canonicalizeJobTagInput(raw);
+      if (tagId && !values.tags.includes(tagId)) {
+        setValues((p) => ({ ...p, tags: [...p.tags, tagId] }));
       }
       e.target.value = "";
     }
@@ -501,7 +504,6 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
       employment_types: employmentTypes,
       work_arrangement: workArrangements[0] || null,
       work_arrangements: workArrangements,
-      hours: values.hours_per_week ? String(Number(values.hours_per_week)) : null,
       ...compensation,
       description: values.description.trim(),
       tag_ids: values.tags,
@@ -625,7 +627,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
           </Grid>
         )}
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <FormControl fullWidth>
             <InputLabel id="practice-type-label">Practice Type</InputLabel>
             <Select
@@ -644,25 +646,13 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <MultiSelectField
-            label="Work Arrangement"
-            labelId="work-arrangement-label"
+            label="Work Setting"
+            labelId="work-setting-label"
             value={values.work_arrangements}
             onChange={handleMultiChange("work_arrangements")}
             options={WORK_ARRANGEMENT_OPTIONS}
-          />
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          <TextField
-            label="Hours per week"
-            fullWidth
-            value={values.hours_per_week}
-            onChange={handleChange("hours_per_week")}
-            error={!!errors.hours_per_week}
-            helperText={errors.hours_per_week}
-            inputProps={{ inputMode: "numeric" }}
           />
         </Grid>
 
@@ -687,7 +677,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
 
         {values.compensation_type === "annual_salary" && (
           <>
-            <Grid item xs={6} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Salary Min"
                 fullWidth
@@ -698,7 +688,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
                 inputProps={{ inputMode: "numeric" }}
               />
             </Grid>
-            <Grid item xs={6} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Salary Max"
                 fullWidth
@@ -714,7 +704,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
 
         {values.compensation_type === "hourly_wage" && (
           <>
-            <Grid item xs={6} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Hourly Min"
                 fullWidth
@@ -725,7 +715,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
                 inputProps={{ inputMode: "numeric" }}
               />
             </Grid>
-            <Grid item xs={6} md={4}>
+            <Grid item xs={12} md={6}>
               <TextField
                 label="Hourly Max"
                 fullWidth
@@ -740,7 +730,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
         )}
 
         {values.compensation_type === "per_diem" && (
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={6}>
             <TextField
               label="Daily Rate"
               fullWidth
@@ -754,7 +744,7 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
         )}
 
         {["production_based", "other"].includes(values.compensation_type) && (
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12}>
             <TextField
               label="Compensation Notes"
               fullWidth
@@ -783,13 +773,20 @@ export default function JobForm({ jobToEdit = null, onCreated, onSuccess }) {
           </Typography>
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, mb: 1 }}>
             {values.tags.map((t) => (
-              <Chip key={t} label={t} onDelete={() => removeTag(t)} />
+              <Chip
+                key={t}
+                className="recruiter-job-tag-chip"
+                label={displayJobTagLabel(t)}
+                title={t}
+                onDelete={() => removeTag(t)}
+              />
             ))}
           </Stack>
           <TextField
-            placeholder="e.g., pediatrics, scleral lenses, bilingual"
+            placeholder="e.g., pediatrics, scleral lenses, bilingual Spanish"
             fullWidth
             onKeyDown={addTag}
+            helperText={`Manual tags are saved now. Future AI suggestions will use ${JOB_TAG_OPTIONS.length} approved taxonomy tags, and recruiters can still override them.`}
           />
         </Grid>
 

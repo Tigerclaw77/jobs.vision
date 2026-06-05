@@ -110,7 +110,6 @@ export default function JobModal({
         {job.location && <p className="modal-location">{job.location}</p>}
         <p className="modal-rolehours">
           {ROLE_LABELS[role] || job.role || "Optometrist"}
-          {job.hours ? ` • ${job.hours}` : ""}
         </p>
 
         {jobDetails.length > 0 && (
