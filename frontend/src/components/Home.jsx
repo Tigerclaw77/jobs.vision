@@ -11,6 +11,8 @@ const Home = () => {
   const reduxUser = useSelector((state) => state.auth.user);
   const { user: effectiveUser } = useEffectiveAuth();
   const user = effectiveUser ?? reduxUser;
+  const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
+  const isKnownSingleRole = role === "candidate" || role === "recruiter";
 
   // ✅ Mark roles that start a new wrapped line so they don’t show a dot
   useEffect(() => {
@@ -69,7 +71,7 @@ const Home = () => {
       {/* 🔹 Option Cards and Pricing */}
       <div className="component-wrapper">
         <OptionsSection user={user} />
-        <PricingTable user={user} />
+        <PricingTable user={user} showAudienceToggle={!isKnownSingleRole} />
       </div>
     </div>
   );

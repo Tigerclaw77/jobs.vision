@@ -281,6 +281,11 @@ body {
       linear-gradient(135deg, rgba(8, 145, 178, 0.78), rgba(20, 184, 166, 0.6));
   }
 
+  .option-card-visual.saved-action {
+    background:
+      linear-gradient(135deg, rgba(14, 116, 144, 0.74), rgba(59, 130, 246, 0.58));
+  }
+
   .option-card-visual.profile-action {
     background:
       linear-gradient(135deg, rgba(30, 64, 175, 0.76), rgba(124, 58, 237, 0.58));

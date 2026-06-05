@@ -1,13 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
 import PostAddIcon from "@mui/icons-material/PostAdd";
 import WorkIcon from "@mui/icons-material/Work";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import "../styles/Home.css";
 
 const OptionsSection = ({ user }) => {
-  const userRole = user?.userRole;
+  const userRole = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
   const isGuest =
     user === null ||
     user === undefined ||
@@ -92,11 +93,17 @@ const OptionsSection = ({ user }) => {
             </span>
             <h3>Browse Jobs</h3>
           </Link>
+          <Link to="/candidate/dashboard" className="option-card">
+            <span className="option-card-visual saved-action" aria-hidden="true">
+              <BookmarkIcon />
+            </span>
+            <h3>Saved Jobs</h3>
+          </Link>
           <Link to="/candidate/profile" className="option-card">
             <span className="option-card-visual profile-action" aria-hidden="true">
               <AccountCircleIcon />
             </span>
-            <h3>Update Profile</h3>
+            <h3>Profile</h3>
           </Link>
         </>
       )}

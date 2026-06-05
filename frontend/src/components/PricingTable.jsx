@@ -74,7 +74,7 @@ const CANDIDATE_PLANS = [
   },
 ];
 
-const PricingTable = ({ user }) => {
+const PricingTable = ({ user, showAudienceToggle = true }) => {
   const defaultAudience = useMemo(() => {
     const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
     return role === "recruiter" ? "recruiter" : "candidate";
@@ -89,6 +89,8 @@ const PricingTable = ({ user }) => {
 
   const isRecruiter = activeTab === "recruiter";
   const plans = isRecruiter ? RECRUITER_PLANS : CANDIDATE_PLANS;
+  const panelId = isRecruiter ? "panel-recruiter" : "panel-candidate";
+  const tabId = isRecruiter ? "tab-recruiter" : "tab-candidate";
 
   const startCheckout = async (plan, audience) => {
     const registerPath = audience === "recruiter" ? "/recruiter/register" : "/candidate/register";
@@ -111,47 +113,53 @@ const PricingTable = ({ user }) => {
 
   return (
     <div className="pricing-root is-glass">
-      <section className="pricing-section">
+      <section
+        className={`pricing-section ${
+          showAudienceToggle ? "" : "no-audience-toggle"
+        }`}
+      >
         {/* Segmented control */}
-        <div className="seg-wrap">
-          <div
-            className={`seg-tabs ${
-              isRecruiter ? "is-recruiter" : "is-candidate"
-            }`}
-            role="tablist"
-            aria-label="Pricing audience"
-          >
-            <div className="seg-thumb" aria-hidden="true" />
-            <button
-              type="button"
-              role="tab"
-              aria-selected={isRecruiter}
-              aria-controls="panel-recruiter"
-              id="tab-recruiter"
-              className="seg-btn"
-              onClick={() => setActiveTab("recruiter")}
+        {showAudienceToggle && (
+          <div className="seg-wrap">
+            <div
+              className={`seg-tabs ${
+                isRecruiter ? "is-recruiter" : "is-candidate"
+              }`}
+              role="tablist"
+              aria-label="Pricing audience"
             >
-              Post a Job
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={!isRecruiter}
-              aria-controls="panel-candidate"
-              id="tab-candidate"
-              className="seg-btn"
-              onClick={() => setActiveTab("candidate")}
-            >
-              Find a Job
-            </button>
+              <div className="seg-thumb" aria-hidden="true" />
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isRecruiter}
+                aria-controls="panel-recruiter"
+                id="tab-recruiter"
+                className="seg-btn"
+                onClick={() => setActiveTab("recruiter")}
+              >
+                Post a Job
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!isRecruiter}
+                aria-controls="panel-candidate"
+                id="tab-candidate"
+                className="seg-btn"
+                onClick={() => setActiveTab("candidate")}
+              >
+                Find a Job
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Panels */}
         <div
-          id={isRecruiter ? "panel-recruiter" : "panel-candidate"}
-          role="tabpanel"
-          aria-labelledby={isRecruiter ? "tab-recruiter" : "tab-candidate"}
+          id={panelId}
+          role={showAudienceToggle ? "tabpanel" : undefined}
+          aria-labelledby={showAudienceToggle ? tabId : undefined}
           className="card-grid"
         >
           {plans.map((p) => {
