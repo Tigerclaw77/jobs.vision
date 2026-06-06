@@ -166,6 +166,7 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
             const cardClass = [
               "card",
               isRecruiter ? "recruiter" : "candidate",
+              `plan-${p.key}`,
             ].join(" ");
             return (
               <article

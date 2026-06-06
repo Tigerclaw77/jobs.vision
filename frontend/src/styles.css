@@ -1,8 +1,19 @@
 :root {
-  --heading-color: #1a1a2e;
-  --body-text-color: #2c2c2c;
-  --primary-color: #005a78;
-  --secondary-color: #0085b2;
+  --jv-primary: #087e8b;
+  --jv-secondary: #5fb7b2;
+  --jv-card-teal: #a9e4de;
+  --jv-card-teal-strong: #78cdc5;
+  --jv-accent: #e76f51;
+  --jv-premium: #7b4dd8;
+  --jv-success: #1fa971;
+  --jv-background: #f1faf7;
+  --jv-glass: #ddf3ef;
+  --jv-surface: #f7fbfa;
+  --jv-text: #142337;
+  --heading-color: var(--jv-text);
+  --body-text-color: var(--jv-text);
+  --primary-color: var(--jv-primary);
+  --secondary-color: var(--jv-secondary);
 }
 
 /* Layout shell */
@@ -185,14 +196,14 @@ input:focus, textarea:focus, select:focus {
 }
 
 .dashboard-container a {
-  color: #005a78;
+  color: var(--jv-primary);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .dashboard-container a:hover {
-  color: #0085b2;
+  color: var(--jv-secondary);
 }
 
 .premium-highlight {
@@ -422,11 +433,11 @@ input:focus, textarea:focus, select:focus {
   font-size: 0.92rem;
   border-radius: 8px;
   color: #fff;
-  background: #005a78;
+  background: var(--jv-primary);
 }
 
 .save-slot-remove:hover {
-  background: #0085b2;
+  background: var(--jv-secondary);
 }
 
 .save-slot-error {
