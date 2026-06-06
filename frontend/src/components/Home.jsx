@@ -1,20 +1,33 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import "../styles/Home.css";
-import OptionsSection from "./OptionsSection";
 import PricingTable from "./PricingTable";
 import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 
-const Home = () => {
-  console.log("✅ Home.jsx is rendering");
+const ROLE_COVERAGE = [
+  "Ophthalmology",
+  "Optometry",
+  "Optical",
+  "Technicians",
+  "Nurses",
+  "Practice Teams",
+];
 
+const Home = () => {
   const reduxUser = useSelector((state) => state.auth.user);
   const { user: effectiveUser } = useEffectiveAuth();
   const user = effectiveUser ?? reduxUser;
   const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
   const isKnownSingleRole = role === "candidate" || role === "recruiter";
 
-  // ✅ Mark roles that start a new wrapped line so they don’t show a dot
+  const heroLinks = useMemo(() => {
+    const postPath = role === "recruiter" || role === "admin" ? "/recruiter/addjob" : "/recruiter/register";
+    const seekerPath = role === "candidate" || role === "admin" ? "/candidate/dashboard" : "/jobs";
+    return { postPath, seekerPath };
+  }, [role]);
+
+  // Mark specialties that start a new wrapped line so they do not show a dot.
   useEffect(() => {
     const root = document.getElementById("roles-line");
     if (!root) return;
@@ -50,28 +63,60 @@ const Home = () => {
 
   return (
     <div className="home">
-      {/* 🔹 Semi-transparent veil over background image */}
       <div className="content-veil" />
 
-      {/* 🔹 Banner Text */}
-      <p className="banner-text-upper">
-        Connecting Eyecare Professionals with New Opportunities
-      </p>
+      <section className="marketplace-hero" aria-labelledby="home-marketplace-title">
+        <p className="hero-kicker">jobs.vision marketplace</p>
+        <h1 id="home-marketplace-title" className="hero-title">
+          Find Work. Find Your Team.
+        </h1>
+        <p className="hero-copy">
+          A focused marketplace for ophthalmology, optometry, optical, and practice teams.
+        </p>
+        <div className="hero-actions" aria-label="Primary homepage actions">
+          <Link to="/jobs" className="hero-cta hero-cta-primary">
+            Browse Jobs
+          </Link>
+          <Link to={heroLinks.postPath} className="hero-cta hero-cta-secondary">
+            Post a Job
+          </Link>
+        </div>
+      </section>
 
-      <p className="banner-text-lower roles" id="roles-line">
-        <span>Doctors</span>
-        <span>Opticians</span>
-        <span>Techs</span>
-        <span>Receptionists</span>
-        <span>Office Managers</span>
-        <span>Billers</span>
-        <span>Support Staff</span>
-      </p>
+      <div className="banner-text-lower roles marketplace-specialties" id="roles-line">
+        {ROLE_COVERAGE.map((label) => (
+          <span key={label}>{label}</span>
+        ))}
+      </div>
 
-      {/* 🔹 Option Cards and Pricing */}
       <div className="component-wrapper">
-        <OptionsSection user={user} />
-        <PricingTable user={user} showAudienceToggle={!isKnownSingleRole} />
+        <section className="marketplace-section marketplace-paths" aria-label="Marketplace paths">
+          <article className="marketplace-path-card path-card-seekers">
+            <p className="path-label">For Job Seekers</p>
+            <h2>Search focused eye care openings.</h2>
+            <p>
+              Browse roles across clinical, optical, surgical, and practice operations.
+            </p>
+            <Link to={heroLinks.seekerPath} className="path-link">
+              {role === "candidate" || role === "admin" ? "Open Candidate Dashboard" : "Browse Jobs"}
+            </Link>
+          </article>
+
+          <article className="marketplace-path-card path-card-employers">
+            <p className="path-label">For Employers</p>
+            <h2>Post openings for eye care teams.</h2>
+            <p>
+              Reach people looking for medical, optical, and administrative roles in eye care.
+            </p>
+            <Link to={heroLinks.postPath} className="path-link">
+              {role === "recruiter" || role === "admin" ? "Post a Job" : "Start Hiring"}
+            </Link>
+          </article>
+        </section>
+
+        <section className="marketplace-section marketplace-pricing" aria-label="Pricing">
+          <PricingTable user={user} showAudienceToggle={!isKnownSingleRole} />
+        </section>
       </div>
     </div>
   );
