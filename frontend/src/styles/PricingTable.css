@@ -407,8 +407,8 @@
   box-shadow:
     0 14px 34px rgba(2, 8, 23, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(128%);
+  backdrop-filter: blur(8px) saturate(128%);
 }
 
 .pricing-root.is-glass .seg-tabs .seg-btn {
@@ -435,8 +435,8 @@
     rgba(10, 37, 64, 0.58) !important;
   border: 1px solid rgba(191, 219, 254, 0.3) !important;
   color: #f8fafc;
-  -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
-  backdrop-filter: blur(18px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(128%) !important;
+  backdrop-filter: blur(8px) saturate(128%) !important;
   box-shadow:
     0 20px 50px rgba(2, 8, 23, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
@@ -486,14 +486,14 @@
 
 .pricing-root.is-glass .seg-tabs {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(240, 253, 250, 0.52)),
-    rgba(255, 255, 255, 0.48);
-  border-color: rgba(255, 255, 255, 0.72);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(240, 253, 250, 0.26)),
+    rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.5);
   box-shadow:
-    0 12px 30px rgba(15, 39, 64, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  backdrop-filter: blur(16px) saturate(140%);
+    0 12px 28px rgba(15, 39, 64, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  -webkit-backdrop-filter: blur(8px) saturate(128%);
+  backdrop-filter: blur(8px) saturate(128%);
 }
 
 .pricing-root.is-glass .seg-tabs .seg-btn {
@@ -505,31 +505,31 @@
 }
 
 .pricing-root.is-glass .seg-tabs .seg-thumb {
-  background: linear-gradient(135deg, #99f6e4, #5eead4);
-  border-color: rgba(20, 184, 166, 0.42);
+  background: linear-gradient(135deg, #5eead4, #2dd4bf);
+  border-color: rgba(20, 184, 166, 0.5);
   box-shadow:
-    0 12px 26px rgba(20, 184, 166, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 12px 26px rgba(20, 184, 166, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .pricing-root.is-glass .card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(240, 249, 255, 0.58)),
-    rgba(255, 255, 255, 0.46) !important;
-  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(240, 249, 255, 0.26)),
+    rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.52) !important;
   color: #0f172a;
-  -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
-  backdrop-filter: blur(18px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(128%) !important;
+  backdrop-filter: blur(8px) saturate(128%) !important;
   box-shadow:
-    0 18px 44px rgba(15, 39, 64, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+    0 18px 42px rgba(15, 39, 64, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.56) !important;
 }
 
 .pricing-root.is-glass .card:hover {
   border-color: rgba(20, 184, 166, 0.42) !important;
   box-shadow:
-    0 22px 52px rgba(15, 39, 64, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+    0 22px 48px rgba(15, 39, 64, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.64) !important;
 }
 
 .pricing-root.is-glass .card-head .title,
@@ -559,7 +559,9 @@
 }
 
 .pricing-root.is-glass .btn.ghost {
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.32);
   border-color: rgba(20, 184, 166, 0.44);
   color: #0f2740;
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
+  backdrop-filter: blur(6px) saturate(120%);
 }
