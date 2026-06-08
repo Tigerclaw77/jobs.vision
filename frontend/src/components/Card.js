@@ -1,28 +1,31 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useAuth } from "./auth/AuthProvider";
 
 const ProtectedRoute = ({ children, allowedUserRoles = [] }) => {
-  const { token, userRole } = useSelector((state) => state.auth);
+  const { session, role, loading, loadingProfile } = useAuth();
+  const currentUserRole = String(role || "").toLowerCase();
 
-  // Dev mode override (optional, depends on how you want to use this)
-  const isDevMode = process.env.REACT_APP_DEV_MODE === "true";
+  if (loading || (session && loadingProfile && !currentUserRole)) {
+    return null;
+  }
 
-  const currentUserRole = isDevMode ? "admin" : userRole;
-
-  // ✅ 1. Check for token (not just role)
-  if (!token && !isDevMode) {
-    console.warn("No token found. Redirecting to login...");
+  if (!session) {
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ 2. Role restriction (optional: default to ["candidate", "recruiter", "admin"] if no roles specified)
-  if (allowedUserRoles.length > 0 && !allowedUserRoles.includes(currentUserRole)) {
-    console.warn(`Unauthorized role (${currentUserRole}). Redirecting to unauthorized...`);
+  const allowedRoles = allowedUserRoles.map((item) =>
+    String(item || "").toLowerCase()
+  );
+
+  if (
+    allowedRoles.length > 0 &&
+    currentUserRole !== "admin" &&
+    !allowedRoles.includes(currentUserRole)
+  ) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  // ✅ 3. Render protected content
   return children;
 };
 

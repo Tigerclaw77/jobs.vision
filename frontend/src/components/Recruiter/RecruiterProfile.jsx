@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserProfile, updateUserProfile } from "../../utils/api";
 import { login } from "../../store/authSlice";
+import { useAuth } from "../auth/AuthProvider";
 import {
   profileSavePayload,
   recruiterCompletionSummary,
@@ -26,9 +27,37 @@ const RECRUITER_PROFILE_COMPLETION_LABELS = {
 };
 
 const RecruiterProfile = () => {
-  const { user, token, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, token, userRole } = useSelector((state) => state.auth);
+  const {
+    session,
+    user: authUser,
+    account,
+    profile,
+    role: authRole,
+    loading: authLoading,
+    loadingProfile,
+  } = useAuth();
   const dispatch = useDispatch();
-  const [form, setForm] = useState(() => shapeProfileForm(user?.profile, user));
+  const profileUser = useMemo(
+    () =>
+      reduxUser || {
+        ...(authUser || {}),
+        id: profile?.id || account?.profile?.id || account?.id || authUser?.id || null,
+        email:
+          profile?.email ||
+          account?.profile?.email ||
+          account?.email ||
+          authUser?.email ||
+          "",
+        userRole:
+          authRole || profile?.role || account?.profile?.role || account?.role || "recruiter",
+        profile: profile || account?.profile || null,
+      },
+    [reduxUser, authUser, profile, account, authRole]
+  );
+  const [form, setForm] = useState(() =>
+    shapeProfileForm(profileUser?.profile, profileUser)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
@@ -38,7 +67,7 @@ const RecruiterProfile = () => {
     let mounted = true;
 
     async function loadProfile() {
-      if (!user) {
+      if (!session) {
         setLoading(false);
         return;
       }
@@ -46,7 +75,7 @@ const RecruiterProfile = () => {
       try {
         const res = await fetchUserProfile();
         if (!mounted) return;
-        const next = shapeProfileForm(res.profile, user);
+        const next = shapeProfileForm(res.profile, profileUser);
         setForm(next);
       } catch (err) {
         if (mounted) setError(err?.message || "Failed to load profile.");
@@ -59,9 +88,13 @@ const RecruiterProfile = () => {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [session, profileUser]);
 
-  if (!user) return <Navigate to="/login" />;
+  if (authLoading || (session && loadingProfile && !profileUser?.userRole)) {
+    return <div className="profile-card">Loading profile...</div>;
+  }
+
+  if (!session) return <Navigate to="/login" replace />;
 
   const completion = recruiterCompletionSummary(form);
 
@@ -80,19 +113,19 @@ const RecruiterProfile = () => {
 
     try {
       const res = await updateUserProfile(profileSavePayload(form));
-      const next = shapeProfileForm(res.profile, user);
+      const next = shapeProfileForm(res.profile, profileUser);
       setForm(next);
       dispatch(
         login({
           token,
-          userRole: userRole || res.userRole || res.role || user?.userRole,
+          userRole: userRole || res.userRole || res.role || profileUser?.userRole,
           user: {
-            ...user,
-            email: res.email || user.email,
-            userRole: res.userRole || res.role || user.userRole,
+            ...profileUser,
+            email: res.email || profileUser.email,
+            userRole: res.userRole || res.role || profileUser.userRole,
             profile: res.profile,
-            firstName: res.profile?.firstName || user.firstName,
-            lastName: res.profile?.lastName || user.lastName,
+            firstName: res.profile?.firstName || profileUser.firstName,
+            lastName: res.profile?.lastName || profileUser.lastName,
           },
         })
       );

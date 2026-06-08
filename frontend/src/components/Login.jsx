@@ -8,7 +8,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { login as loginRedux } from "../store/authSlice";
 import { fetchUserJobData } from "../store/jobSlice";
 import { getRoleTier } from "../utils/getRoleTier";
-import { useAdminViewMode } from "./auth/AdminViewModeProvider";
+import { useAuth } from "./auth/AuthProvider";
 import GlassTextField from "../components/ui/GlassTextField";
 import {
   Button,
@@ -67,9 +67,16 @@ export default function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isRealAdmin, effectiveRole } = useAdminViewMode();
+  const {
+    session: activeSession,
+    user: activeUser,
+    account: activeAccount,
+    profile: activeProfile,
+    role: activeRole,
+    loading: authLoading,
+    loadingProfile,
+  } = useAuth();
   const nextPath = searchParams.get("next") || null;
-  const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
 
   const [formError, setFormError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
@@ -110,41 +117,60 @@ export default function Login() {
     return () => clearInterval(t);
   }, [resendCooldown]);
 
-  // 🔁 If a session already exists (or appears), leave /login immediately.
+  // If a real session already exists, leave /login immediately.
+  // Admin View Mode may preview guest UI, but it must not make an
+  // authenticated user eligible to see a public-only auth page.
   useEffect(() => {
-    let mounted = true;
+    if (authLoading || (activeSession && loadingProfile && !activeRole)) {
+      setRedirecting(true);
+      return;
+    }
 
-    const redirectIfAuthed = async () => {
-      if (viewingAsGuest) {
-        setRedirecting(false);
-        return;
-      }
+    if (activeSession && activeRole) {
+      navigate(chooseDest(activeRole, nextPath), { replace: true });
+      return;
+    }
 
-      const { session } = await getNeonSession();
-      if (!mounted) return;
-      if (session) {
-        const { role } = await getRoleTier();
-        navigate(chooseDest(role, nextPath), { replace: true });
-        return;
-      }
-      setRedirecting(false); // only render form when truly signed out
-    };
+    if (activeSession && !activeRole) {
+      navigate("/unauthorized", {
+        replace: true,
+        state: {
+          authDebug: {
+            authenticatedUserId:
+              activeProfile?.id ||
+              activeAccount?.profile?.id ||
+              activeAccount?.id ||
+              activeUser?.id ||
+              null,
+            authenticatedEmail:
+              activeProfile?.email ||
+              activeAccount?.profile?.email ||
+              activeAccount?.email ||
+              activeUser?.email ||
+              null,
+            authenticatedRole: null,
+            route: "/login",
+            requiredRoles: ["known authenticated role"],
+            requiredTiers: [],
+            authorizationResult: "missing_role",
+          },
+        },
+      });
+      return;
+    }
 
-    redirectIfAuthed();
-
-    const sub = neonAuth.onAuthStateChange((_event, session) => {
-      if (session) redirectIfAuthed();
-    });
-
-    const onPageShow = () => redirectIfAuthed(); // handles browser back/forward cache
-    window.addEventListener("pageshow", onPageShow);
-
-    return () => {
-      mounted = false;
-      sub.data?.subscription?.unsubscribe?.();
-      window.removeEventListener("pageshow", onPageShow);
-    };
-  }, [navigate, nextPath, viewingAsGuest]);
+    setRedirecting(false);
+  }, [
+    authLoading,
+    activeSession,
+    loadingProfile,
+    activeRole,
+    activeProfile,
+    activeAccount,
+    activeUser,
+    navigate,
+    nextPath,
+  ]);
 
   const bootstrapReduxAfterSignIn = async (session) => {
     const { user: neonUser } = await getNeonUser();

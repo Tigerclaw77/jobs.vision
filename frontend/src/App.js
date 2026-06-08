@@ -47,7 +47,11 @@ import Footer from "./components/Footer";
 
 // 🔑 Single source of truth for auth/session/profile
 import AuthProvider, { useAuth } from "./components/auth/AuthProvider";
-import { AdminViewModeProvider, useAdminViewMode } from "./components/auth/AdminViewModeProvider";
+import { AdminViewModeProvider } from "./components/auth/AdminViewModeProvider";
+import {
+  AdminAuthDiagnosticsPanel,
+  AuthDiagnosticsProvider,
+} from "./components/auth/AuthDiagnostics";
 
 import "./styles.css";
 import "./styles/forms.css";
@@ -112,27 +116,70 @@ function AutoFillPatch() {
  * - If not logged in, renders children.
  */
 function PublicOnlyRoute({ children }) {
-  const { session, loading, role } = useAuth();
-  const { isRealAdmin, effectiveRole } = useAdminViewMode();
+  const { session, user, account, profile, loading, loadingProfile, role } = useAuth();
   const { search } = useLocation();
-  const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
   const nextPath = new URLSearchParams(search).get("next");
+  const metadata = {
+    ...(user?.app_metadata || {}),
+    ...(user?.user_metadata || {}),
+  };
+  const authorizationRole = String(
+    role ||
+      profile?.role ||
+      account?.profile?.role ||
+      account?.role ||
+      metadata.role ||
+      metadata.accountRole ||
+      metadata.userRole ||
+      ""
+  ).toLowerCase();
 
-  if (loading) return <RouteLoading message="Loading..." />;
-  if (session && String(role || "").toLowerCase() === "admin" && nextPath?.startsWith("/admin")) {
-    return <Navigate to={nextPath} replace />;
+  if (loading || (session && loadingProfile && !authorizationRole)) {
+    return <RouteLoading message="Loading..." />;
   }
-  if (session && !viewingAsGuest) {
-    // Authenticated role is the real account/profile role.
-    // Preview role is only used here for non-admin preview navigation.
-    // ProtectedRoute still authorizes with the authenticated role.
-    const routeRole = isRealAdmin && effectiveRole && effectiveRole !== "admin" ? effectiveRole : role;
+
+  if (session && !authorizationRole) {
+    return (
+      <Navigate
+        to="/unauthorized"
+        replace
+        state={{
+          authDebug: {
+            authenticatedUserId:
+              profile?.id || account?.profile?.id || account?.id || user?.id || null,
+            authenticatedEmail:
+              profile?.email ||
+              account?.profile?.email ||
+              account?.email ||
+              user?.email ||
+              null,
+            authenticatedRole: null,
+            route: "/login",
+            requiredRoles: ["known authenticated role"],
+            requiredTiers: [],
+            authorizationResult: "missing_role",
+          },
+        }}
+      />
+    );
+  }
+
+  if (session) {
+    // Authenticated role: real account/profile role from AuthProvider.
+    // Preview role: Admin View Mode presentation only, never public/login routing.
+    // Authorization role: same real role used by ProtectedRoute.
     const dest =
-      routeRole === "recruiter"
+      authorizationRole === "admin" && nextPath?.startsWith("/admin")
+        ? nextPath
+        : authorizationRole === "recruiter" && nextPath?.startsWith("/recruiter")
+        ? nextPath
+        : authorizationRole === "candidate" && nextPath?.startsWith("/candidate")
+        ? nextPath
+        : authorizationRole === "recruiter"
         ? "/recruiter/dashboard"
-        : routeRole === "candidate"
+        : authorizationRole === "candidate"
         ? "/candidate/dashboard"
-        : routeRole === "admin"
+        : authorizationRole === "admin"
         ? "/admin"
         : "/";
     return <Navigate to={dest} replace />;
@@ -203,16 +250,18 @@ function AppShell() {
 
   return (
     <Router>
-      <div className="App">
-        <Header />
+      <AuthDiagnosticsProvider>
+        <div className="App">
+          <Header />
+          <AdminAuthDiagnosticsPanel />
 
-        {/* Controllers */}
-        <RouteDimming />
-        <AutoFillPatch />
-        <div className="bg-dimmer" />
+          {/* Controllers */}
+          <RouteDimming />
+          <AutoFillPatch />
+          <div className="bg-dimmer" />
 
-        <div className="main-content">
-          <Routes>
+          <div className="main-content">
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
 
@@ -431,11 +480,12 @@ function AppShell() {
             />
 
             <Route path="/manual-override" element={<ManualOverride />} />
-          </Routes>
-        </div>
+            </Routes>
+          </div>
 
-        <Footer />
-      </div>
+          <Footer />
+        </div>
+      </AuthDiagnosticsProvider>
     </Router>
   );
 }

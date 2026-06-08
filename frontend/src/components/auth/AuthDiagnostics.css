@@ -1,0 +1,52 @@
+.auth-diagnostics-panel {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1400;
+  width: min(360px, calc(100vw - 28px));
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.auth-diagnostics-panel details {
+  border: 1px solid rgba(125, 211, 252, 0.38);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.32);
+  overflow: hidden;
+}
+
+.auth-diagnostics-panel summary {
+  cursor: pointer;
+  padding: 9px 12px;
+  color: #e0f2fe;
+  font-weight: 800;
+  list-style-position: inside;
+}
+
+.auth-diagnostics-panel dl {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.auth-diagnostics-panel dl div {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.auth-diagnostics-panel dt {
+  color: #bae6fd;
+  font-weight: 700;
+}
+
+.auth-diagnostics-panel dd {
+  min-width: 0;
+  margin: 0;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}

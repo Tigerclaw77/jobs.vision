@@ -1,4 +1,3 @@
-import { useSelector } from "react-redux";
 import { useAuth } from "./AuthProvider";
 import { useAdminViewMode } from "./AdminViewModeProvider";
 
@@ -116,33 +115,40 @@ function buildEntitlements(role, plan) {
   return null;
 }
 
-function roleFromState(auth, authState) {
-  return (
-    auth.role ||
-    authState.userRole ||
-    authState.user?.userRole ||
-    authState.user?.role ||
-    authState.user?.accountRole ||
-    null
-  );
-}
-
 export function useEffectiveAuth() {
   const auth = useAuth();
-  const authState = useSelector((state) => state.auth || {});
   const viewMode = useAdminViewMode();
 
-  const realRole = String(roleFromState(auth, authState) || "").toLowerCase();
-  const realUser = authState.user || auth.user || null;
+  const realRole = String(
+    auth.role ||
+      auth.profile?.role ||
+      auth.account?.profile?.role ||
+      auth.account?.role ||
+      ""
+  ).toLowerCase();
   const realTier =
-    authState.user?.tier ||
     auth.tier ||
-    authState.user?.entitlements?.tier ||
+    auth.account?.tier ||
+    auth.account?.entitlements?.tier ||
     auth.entitlements?.tier ||
     null;
-  const realEntitlements = authState.user?.entitlements || auth.entitlements || null;
-  const realIsAuthenticated =
-    !!auth.session || !!authState.isAuthenticated || !!authState.token || !!authState.user;
+  const realEntitlements =
+    auth.entitlements || auth.account?.entitlements || null;
+  // AuthProvider's real Neon session is the only sign-in source of truth.
+  // Redux/localStorage may cache user details, but must not decide auth state.
+  const realIsAuthenticated = !!auth.session;
+  const realUser = auth.session
+    ? {
+        ...(auth.user || {}),
+        id: auth.account?.id || auth.profile?.id || auth.user?.id || null,
+        email: auth.account?.email || auth.profile?.email || auth.user?.email || null,
+        userRole: realRole || null,
+        role: realRole || null,
+        accountRole: realRole || null,
+        tier: realTier,
+        entitlements: realEntitlements,
+      }
+    : null;
 
   if (!viewMode.isRealAdmin || viewMode.mode === "admin") {
     return {

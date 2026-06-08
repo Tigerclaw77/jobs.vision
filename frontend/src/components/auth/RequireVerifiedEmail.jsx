@@ -1,10 +1,16 @@
-import { useSelector } from "react-redux";
 import { Navigate } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
 
 const RequireVerifiedEmail = ({ children }) => {
-  const user = useSelector((state) => state.auth.user);
+  const { session, user, loading } = useAuth();
 
-  if (!user?.isVerified) {
+  if (loading) return null;
+
+  if (!session) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user?.email_confirmed_at) {
     return <Navigate to="/email-verification" replace />;
   }
 

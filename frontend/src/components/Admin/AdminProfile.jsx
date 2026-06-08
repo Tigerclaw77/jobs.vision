@@ -1,15 +1,44 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserProfile, updateUserProfile } from "../../utils/api";
 import { login } from "../../store/authSlice";
 import { profileSavePayload, roleLabel, shapeProfileForm } from "../Profile/profileUtils";
+import { useAuth } from "../auth/AuthProvider";
 import "../../styles/Profile.css";
 
 const AdminProfile = () => {
-  const { user, token, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, token, userRole } = useSelector((state) => state.auth);
+  const {
+    session,
+    user: authUser,
+    account,
+    profile,
+    role: authRole,
+    loading: authLoading,
+    loadingProfile,
+  } = useAuth();
   const dispatch = useDispatch();
-  const [form, setForm] = useState(() => shapeProfileForm(user?.profile, user));
+  const profileUser = useMemo(
+    () =>
+      reduxUser || {
+        ...(authUser || {}),
+        id: profile?.id || account?.profile?.id || account?.id || authUser?.id || null,
+        email:
+          profile?.email ||
+          account?.profile?.email ||
+          account?.email ||
+          authUser?.email ||
+          "",
+        userRole:
+          authRole || profile?.role || account?.profile?.role || account?.role || "admin",
+        profile: profile || account?.profile || null,
+      },
+    [reduxUser, authUser, profile, account, authRole]
+  );
+  const [form, setForm] = useState(() =>
+    shapeProfileForm(profileUser?.profile, profileUser)
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
@@ -19,7 +48,7 @@ const AdminProfile = () => {
     let mounted = true;
 
     async function loadProfile() {
-      if (!user) {
+      if (!session) {
         setLoading(false);
         return;
       }
@@ -27,7 +56,7 @@ const AdminProfile = () => {
       try {
         const res = await fetchUserProfile();
         if (!mounted) return;
-        setForm(shapeProfileForm(res.profile, user));
+        setForm(shapeProfileForm(res.profile, profileUser));
       } catch (err) {
         if (mounted) setError(err?.message || "Failed to load profile.");
       } finally {
@@ -39,9 +68,13 @@ const AdminProfile = () => {
     return () => {
       mounted = false;
     };
-  }, [user]);
+  }, [session, profileUser]);
 
-  if (!user) return <Navigate to="/login" />;
+  if (authLoading || (session && loadingProfile && !profileUser?.userRole)) {
+    return <div className="profile-card">Loading profile...</div>;
+  }
+
+  if (!session) return <Navigate to="/login" replace />;
 
   const handleChange = (field) => (event) => {
     const value =
@@ -58,19 +91,19 @@ const AdminProfile = () => {
 
     try {
       const res = await updateUserProfile(profileSavePayload(form));
-      const next = shapeProfileForm(res.profile, user);
+      const next = shapeProfileForm(res.profile, profileUser);
       setForm(next);
       dispatch(
         login({
           token,
-          userRole: userRole || res.userRole || res.role || user?.userRole,
+          userRole: userRole || res.userRole || res.role || profileUser?.userRole,
           user: {
-            ...user,
-            email: res.email || user.email,
-            userRole: res.userRole || res.role || user.userRole,
+            ...profileUser,
+            email: res.email || profileUser.email,
+            userRole: res.userRole || res.role || profileUser.userRole,
             profile: res.profile,
-            firstName: res.profile?.firstName || user.firstName,
-            lastName: res.profile?.lastName || user.lastName,
+            firstName: res.profile?.firstName || profileUser.firstName,
+            lastName: res.profile?.lastName || profileUser.lastName,
           },
         })
       );
@@ -166,7 +199,7 @@ const AdminProfile = () => {
             <aside className="profile-sidebar">
               <section className="profile-card">
                 <h2>Admin Status</h2>
-                <p><strong>Role:</strong> {roleLabel(userRole || user?.userRole || "admin")}</p>
+                <p><strong>Role:</strong> {roleLabel(userRole || profileUser?.userRole || "admin")}</p>
                 <p><strong>Email:</strong> {form.email || "N/A"}</p>
               </section>
               <section className="profile-card">

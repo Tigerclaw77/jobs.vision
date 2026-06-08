@@ -1,7 +1,8 @@
 // src/ProtectedRoute.jsx
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./components/auth/AuthProvider";
+import { useAuthDiagnostics } from "./components/auth/AuthDiagnostics";
 
 /**
  * Route guard:
@@ -18,6 +19,7 @@ export default function ProtectedRoute({
   allowedTiers = [],
 }) {
   const loc = useLocation();
+  const { setAuthCheck } = useAuthDiagnostics();
   const {
     session,
     user,
@@ -57,6 +59,89 @@ export default function ProtectedRoute({
       ""
   ).toLowerCase();
 
+  const allowedRolesKey = allowedUserRoles
+    .map((r) => String(r || "").toLowerCase())
+    .join("|");
+  const allowedTiersKey = allowedTiers
+    .map((t) => String(t || "").toLowerCase())
+    .join("|");
+  const normalizedAllowedRoles = useMemo(
+    () => (allowedRolesKey ? allowedRolesKey.split("|") : []),
+    [allowedRolesKey]
+  );
+  const normalizedAllowedTiers = useMemo(
+    () => (allowedTiersKey ? allowedTiersKey.split("|") : []),
+    [allowedTiersKey]
+  );
+  const authenticatedUserId =
+    profile?.id || account?.profile?.id || account?.id || user?.id || null;
+  const authenticatedEmail =
+    profile?.email ||
+    account?.profile?.email ||
+    account?.email ||
+    user?.email ||
+    null;
+  const route = loc.pathname + loc.search;
+  const isAdmin = authorizationRole === "admin";
+  const roleAllowed =
+    isAdmin ||
+    normalizedAllowedRoles.length === 0 ||
+    normalizedAllowedRoles.includes(authorizationRole);
+  const tierAllowed =
+    isAdmin ||
+    normalizedAllowedTiers.length === 0 ||
+    (authorizationTier
+      ? normalizedAllowedTiers.includes(authorizationTier)
+      : false);
+
+  let authorizationResult = "authorized";
+  if (loading || (session && loadingProfile && !authorizationRole)) {
+    authorizationResult = "loading";
+  } else if (!session) {
+    authorizationResult = "login_required";
+  } else if (!authorizationRole) {
+    authorizationResult = "missing_role";
+  } else if (isAdmin) {
+    authorizationResult = "authorized_admin";
+  } else if (!roleAllowed) {
+    authorizationResult = "denied_role";
+  } else if (!tierAllowed) {
+    authorizationResult = "denied_tier";
+  }
+
+  const requiredRoles = useMemo(
+    () =>
+      normalizedAllowedRoles.length > 0
+        ? normalizedAllowedRoles
+        : ["authenticated"],
+    [normalizedAllowedRoles]
+  );
+  const requiredTiers = normalizedAllowedTiers;
+  const authDebug = useMemo(
+    () => ({
+      authenticatedUserId,
+      authenticatedEmail,
+      authenticatedRole: authorizationRole || null,
+      route,
+      requiredRoles,
+      requiredTiers,
+      authorizationResult,
+    }),
+    [
+      authenticatedUserId,
+      authenticatedEmail,
+      authorizationRole,
+      route,
+      requiredRoles,
+      requiredTiers,
+      authorizationResult,
+    ]
+  );
+
+  useEffect(() => {
+    setAuthCheck(authDebug);
+  }, [setAuthCheck, authDebug]);
+
   if (loading || (session && loadingProfile && !authorizationRole)) {
     return <RouteLoading />;
   }
@@ -67,26 +152,16 @@ export default function ProtectedRoute({
   }
 
   if (!authorizationRole) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ authDebug }} />;
   }
 
   // Real admins always pass protected-route authorization.
   // Presentation may still be rendered as guest/candidate/recruiter elsewhere
   // through Admin View Mode, but admin tooling stays reachable.
-  if (authorizationRole === "admin") return children;
-
-  const roleAllowed =
-    allowedUserRoles.length === 0 ||
-    allowedUserRoles.map((r) => r.toLowerCase()).includes(authorizationRole);
-
-  const tierAllowed =
-    allowedTiers.length === 0 ||
-    (authorizationTier
-      ? allowedTiers.map((t) => t.toLowerCase()).includes(authorizationTier)
-      : false);
+  if (isAdmin) return children;
 
   if (!roleAllowed || !tierAllowed) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace state={{ authDebug }} />;
   }
 
   return children;

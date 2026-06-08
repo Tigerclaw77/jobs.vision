@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useSelector } from "react-redux";
 import "../styles/Home.css";
 import PricingTable from "./PricingTable";
 import { useEffectiveAuth } from "./auth/useEffectiveAuth";
@@ -15,9 +14,8 @@ const ROLE_COVERAGE = [
 ];
 
 const Home = () => {
-  const reduxUser = useSelector((state) => state.auth.user);
   const { user: effectiveUser } = useEffectiveAuth();
-  const user = effectiveUser ?? reduxUser;
+  const user = effectiveUser;
   const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
   const isKnownSingleRole = role === "candidate" || role === "recruiter";
 

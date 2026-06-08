@@ -64,7 +64,6 @@ const Header = () => {
   const hasUnreadNotifications = useSelector(
     (state) => state.notifications.hasUnreadNotifications
   );
-  const authState = useSelector((state) => state.auth || {});
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -161,7 +160,7 @@ const Header = () => {
   };
 
   const getProfileLink = () => {
-    const r = (activeRole || authState.userRole || authState.user?.userRole || "").toLowerCase();
+    const r = String(activeRole || "").toLowerCase();
     switch (r) {
       case "candidate":
         return "/candidate/profile";
