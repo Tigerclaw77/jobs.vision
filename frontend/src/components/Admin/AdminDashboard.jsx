@@ -64,6 +64,14 @@ const AdminDashboard = () => {
           </Button>
           <Button
             component={RouterLink}
+            to="/admin/job-imports"
+            variant="outlined"
+            className="glass-button"
+          >
+            Job Imports
+          </Button>
+          <Button
+            component={RouterLink}
             to="/admin/addjob"
             variant="contained"
             className="glass-button"

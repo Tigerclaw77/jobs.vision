@@ -1,0 +1,77 @@
+.job-import-review {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.job-import-review__header {
+  margin-bottom: 18px;
+}
+
+.job-import-review__header h2,
+.job-import-review__header p,
+.job-import-review__count {
+  color: #f8fafc;
+}
+
+.job-import-review__select,
+.job-import-review__panel .MuiInputBase-root,
+.job-import-review__item .MuiInputBase-root {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 8px;
+}
+
+.job-import-review__panel,
+.job-import-review__item {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.86) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.22);
+}
+
+.job-import-review__panel {
+  margin-bottom: 18px;
+}
+
+.job-import-review__panel h6,
+.job-import-review__item h6,
+.job-import-review__item p {
+  color: #f8fafc;
+}
+
+.job-import-review__message {
+  margin: 14px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: #ecfeff;
+  font-weight: 700;
+}
+
+.job-import-review__count {
+  margin: 10px 0 16px;
+}
+
+.job-import-review__fields {
+  margin-top: 8px;
+}
+
+.job-import-review__tags,
+.job-import-review__actions {
+  margin-top: 14px;
+}
+
+.job-import-review__actions .MuiButton-root {
+  text-transform: none;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .job-import-review {
+    width: min(100% - 20px, 1180px);
+    padding-top: 16px;
+  }
+}

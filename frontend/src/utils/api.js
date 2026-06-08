@@ -109,6 +109,33 @@ export const decideManualOverride = async (id, decision) => {
   return data;
 };
 
+export const fetchJobImports = async (params = {}) => {
+  const { data } = await axiosInstance.get("/admin/job-imports", { params });
+  return data?.items || [];
+};
+
+export const runJobDiscovery = async (sources) => {
+  const { data } = await axiosInstance.post("/admin/job-imports/discover", {
+    sources: Array.isArray(sources) ? sources : [sources],
+  });
+  return data;
+};
+
+export const updateJobImport = async (id, normalizedJob) => {
+  const { data } = await axiosInstance.patch(`/admin/job-imports/${id}`, { normalizedJob });
+  return data;
+};
+
+export const approveJobImport = async (id, job = {}) => {
+  const { data } = await axiosInstance.post(`/admin/job-imports/${id}/approve`, { job });
+  return data;
+};
+
+export const rejectJobImport = async (id, reason = "") => {
+  const { data } = await axiosInstance.post(`/admin/job-imports/${id}/reject`, { reason });
+  return data;
+};
+
 // =============================
 // ✅ RECRUITER: Jobs CRUD (Axios)
 // =============================

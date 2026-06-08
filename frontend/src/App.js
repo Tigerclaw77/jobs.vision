@@ -18,6 +18,7 @@ import Header from "./components/Header";
 import Home from "./components/Home";
 import Notifications from "./components/Notifications";
 import AdminDashboard from "./components/Admin/AdminDashboard";
+import JobImportReview from "./components/Admin/JobImportReview";
 import ManualOverrideReview from "./components/Admin/ManualOverrideReview";
 import RecruiterDashboard from "./components/Recruiter/RecruiterDashboard";
 import RecruiterRegistration from "./components/Recruiter/RecruiterRegistration";
@@ -290,6 +291,14 @@ function AppShell() {
               element={
                 <ProtectedRoute allowedUserRoles={["admin"]}>
                   <ManualOverrideReview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/job-imports"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <JobImportReview />
                 </ProtectedRoute>
               }
             />

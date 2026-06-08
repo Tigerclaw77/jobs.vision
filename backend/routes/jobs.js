@@ -112,6 +112,8 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "tag_ids",
   "featured",
   "posted_at",
+  "external_apply_url",
+  "source_url",
   "employer_name",
   "employer_brand",
   "employer_brand_verified",
@@ -136,6 +138,8 @@ const PUBLIC_JOB_COLUMN_FALLBACKS = {
   hourly_max: "null::numeric as hourly_max",
   daily_rate: "null::numeric as daily_rate",
   compensation_notes: "null::text as compensation_notes",
+  external_apply_url: "null::text as external_apply_url",
+  source_url: "null::text as source_url",
 };
 
 function isAdmin(user) {
