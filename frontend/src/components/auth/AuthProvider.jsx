@@ -1,5 +1,12 @@
 // src/components/auth/AuthProvider.jsx
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { getNeonSession, neonAuth, normalizeSessionResult } from "../../utils/neonAuthClient";
 
 function apiBaseUrl() {
@@ -29,6 +36,53 @@ export default function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [refreshingAuth, setRefreshingAuth] = useState(false);
+
+  const refreshAuth = useCallback(async (sessionResult) => {
+    setRefreshingAuth(true);
+
+    try {
+      const nextSession =
+        sessionResult !== undefined
+          ? normalizeSessionResult(sessionResult) ||
+            normalizeSessionResult({ data: { session: sessionResult } }) ||
+            sessionResult ||
+            null
+          : (await getNeonSession()).session || null;
+
+      setSession(nextSession);
+
+      if (!nextSession?.access_token) {
+        setAccount(null);
+        setProfile(null);
+        setLoadingProfile(false);
+        return { session: null, account: null, profile: null };
+      }
+
+      setLoadingProfile(true);
+      const me = await fetchMe(nextSession.access_token);
+      const nextProfile =
+        me.profile || { id: me.id, email: me.email, role: me.role };
+
+      setAccount(me || null);
+      setProfile(nextProfile);
+
+      return {
+        session: nextSession,
+        account: me || null,
+        profile: nextProfile,
+      };
+    } catch (error) {
+      await neonAuth.signOut();
+      setSession(null);
+      setAccount(null);
+      setProfile(null);
+      throw error;
+    } finally {
+      setLoadingProfile(false);
+      setRefreshingAuth(false);
+    }
+  }, []);
 
   useEffect(() => {
     let unsub = null;
@@ -36,17 +90,17 @@ export default function AuthProvider({ children }) {
 
     (async () => {
       setLoading(true);
-      const { session: currentSession } = await getNeonSession();
-      if (!alive) return;
-
-      setLoadingProfile(!!currentSession);
-      setSession(currentSession || null);
-      setLoading(false);
+      try {
+        await refreshAuth();
+      } catch {
+        // refreshAuth signs out and clears state when the stored session is invalid.
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
 
       unsub = neonAuth.onAuthStateChange((_event, nextSession) => {
-        const normalized = normalizeSessionResult({ data: { session: nextSession } }) || null;
-        setLoadingProfile(!!normalized);
-        setSession(normalized);
+        refreshAuth(nextSession).catch(() => {});
       }).data?.subscription;
     })();
 
@@ -54,31 +108,7 @@ export default function AuthProvider({ children }) {
       alive = false;
       unsub?.unsubscribe?.();
     };
-  }, []);
-
-  useEffect(() => {
-    (async () => {
-      if (!session) {
-        setAccount(null);
-        setProfile(null);
-        setLoadingProfile(false);
-        return;
-      }
-
-      setLoadingProfile(true);
-      try {
-        const me = await fetchMe(session.access_token);
-        setAccount(me || null);
-        setProfile(me.profile || { id: me.id, email: me.email, role: me.role });
-      } catch {
-        await neonAuth.signOut();
-        setAccount(null);
-        setProfile(null);
-      } finally {
-        setLoadingProfile(false);
-      }
-    })();
-  }, [session]);
+  }, [refreshAuth]);
 
   const value = useMemo(
     () => {
@@ -109,16 +139,18 @@ export default function AuthProvider({ children }) {
         role,
         tier,
         entitlements: account?.entitlements || null,
-        loading,
+        loading: loading || refreshingAuth,
         loadingProfile,
+        refreshAuth,
         async signOut() {
           await neonAuth.signOut();
+          setSession(null);
           setAccount(null);
           setProfile(null);
         },
       };
     },
-    [session, account, profile, loading, loadingProfile]
+    [session, account, profile, loading, refreshingAuth, loadingProfile, refreshAuth]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

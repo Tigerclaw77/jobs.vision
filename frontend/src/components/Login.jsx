@@ -75,6 +75,7 @@ export default function Login() {
     role: activeRole,
     loading: authLoading,
     loadingProfile,
+    refreshAuth,
   } = useAuth();
   const nextPath = searchParams.get("next") || null;
 
@@ -173,12 +174,17 @@ export default function Login() {
   ]);
 
   const bootstrapReduxAfterSignIn = async (session) => {
+    const refreshed = await refreshAuth(session);
     const { user: neonUser } = await getNeonUser();
-    const { session: currentSession } = await getNeonSession();
-    const user = session?.user ?? neonUser;
-    const token = session?.access_token || currentSession?.access_token;
+    const currentSession = refreshed.session || (await getNeonSession()).session;
+    const user = currentSession?.user ?? session?.user ?? neonUser;
+    const token = currentSession?.access_token || session?.access_token;
 
-    const { role, tier, entitlements } = await getRoleTier();
+    const { role, tier, entitlements } = await getRoleTier({
+      account: refreshed.account,
+      user,
+      session: currentSession,
+    });
 
     dispatch(
       loginRedux({

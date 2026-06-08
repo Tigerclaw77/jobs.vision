@@ -10,6 +10,7 @@ import {
   verifyNeonEmailToken,
 } from "../utils/neonAuthClient";
 import { login as loginRedux } from "../store/authSlice";
+import { useAuth } from "./auth/AuthProvider";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -39,6 +40,7 @@ function getParam(name) {
 export default function VerifyEmail() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { refreshAuth } = useAuth();
   const [phase, setPhase] = useState("loading"); // loading | success | nocode | error
   const [message, setMessage] = useState("");
 
@@ -53,14 +55,16 @@ export default function VerifyEmail() {
         return;
       }
 
-      const me = await fetchMe(session.access_token);
+      const refreshed = await refreshAuth(session);
+      const activeSession = refreshed.session || session;
+      const me = refreshed.account || (await fetchMe(activeSession.access_token));
       if (!mounted) return;
       const role =
         me.role ||
         me.profile?.role ||
-        session.user?.user_metadata?.accountRole ||
-        session.user?.user_metadata?.userRole ||
-        session.user?.user_metadata?.role ||
+        activeSession.user?.user_metadata?.accountRole ||
+        activeSession.user?.user_metadata?.userRole ||
+        activeSession.user?.user_metadata?.role ||
         "candidate";
 
       dispatch(
@@ -68,11 +72,11 @@ export default function VerifyEmail() {
           userRole: role,
           user: {
             ...me,
-            ...(session.user?.user_metadata || {}),
+            ...(activeSession.user?.user_metadata || {}),
             userRole: role,
             isVerified: true,
           },
-          token: session.access_token,
+          token: activeSession.access_token,
         })
       );
       setPhase("success");
@@ -137,7 +141,7 @@ export default function VerifyEmail() {
     return () => {
       mounted = false;
     };
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, refreshAuth]);
 
   return (
     <Container maxWidth="sm">
