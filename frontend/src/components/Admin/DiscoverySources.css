@@ -1,0 +1,83 @@
+.discovery-sources {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.discovery-sources__header {
+  margin-bottom: 18px;
+}
+
+.discovery-sources__header h2,
+.discovery-sources__header p,
+.discovery-sources__count,
+.discovery-sources__item h6,
+.discovery-sources__item p,
+.discovery-sources__item a,
+.discovery-sources__panel h6 {
+  color: #f8fafc;
+}
+
+.discovery-sources__item a {
+  text-decoration-color: rgba(94, 234, 212, 0.65);
+}
+
+.discovery-sources__panel,
+.discovery-sources__item {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.86) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 18px 42px rgba(2, 6, 23, 0.22);
+}
+
+.discovery-sources__panel {
+  margin-bottom: 18px;
+}
+
+.discovery-sources__panel .MuiInputBase-root {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 8px;
+}
+
+.discovery-sources__enabled {
+  height: 100%;
+  align-items: center !important;
+}
+
+.discovery-sources__enabled .MuiFormControlLabel-label {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.discovery-sources__message {
+  margin: 14px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(94, 234, 212, 0.28);
+  color: #ecfeff;
+  font-weight: 700;
+}
+
+.discovery-sources__count {
+  margin: 10px 0 16px;
+}
+
+.discovery-sources__notes {
+  margin-top: 8px !important;
+  color: #cbd5e1 !important;
+}
+
+.discovery-sources .MuiButton-root {
+  text-transform: none;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .discovery-sources {
+    width: min(100% - 20px, 1180px);
+    padding-top: 16px;
+  }
+}

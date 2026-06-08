@@ -136,6 +136,36 @@ export const rejectJobImport = async (id, reason = "") => {
   return data;
 };
 
+export const fetchDiscoverySources = async (params = {}) => {
+  const { data } = await axiosInstance.get("/admin/discovery-sources", { params });
+  return data?.items || [];
+};
+
+export const createDiscoverySource = async (source) => {
+  const { data } = await axiosInstance.post("/admin/discovery-sources", source);
+  return data;
+};
+
+export const updateDiscoverySource = async (id, source) => {
+  const { data } = await axiosInstance.patch(`/admin/discovery-sources/${id}`, source);
+  return data;
+};
+
+export const deleteDiscoverySource = async (id) => {
+  const { data } = await axiosInstance.delete(`/admin/discovery-sources/${id}`);
+  return data;
+};
+
+export const runDiscoverySource = async (id) => {
+  const { data } = await axiosInstance.post(`/admin/discovery-sources/${id}/run`);
+  return data;
+};
+
+export const runDiscoverySources = async (ids = null) => {
+  const { data } = await axiosInstance.post("/admin/discovery-sources/run", ids ? { ids } : {});
+  return data;
+};
+
 // =============================
 // ✅ RECRUITER: Jobs CRUD (Axios)
 // =============================

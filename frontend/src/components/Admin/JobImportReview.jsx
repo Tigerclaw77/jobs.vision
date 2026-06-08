@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
   Button,
@@ -195,19 +196,29 @@ function JobImportReview() {
             Discover employer career-page postings and publish only after admin review.
           </Typography>
         </Box>
-        <Stack direction="row" gap={1} alignItems="center">
-          <Typography variant="body2">Status</Typography>
-          <Select
-            size="small"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            className="job-import-review__select"
+        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+          <Button
+            component={RouterLink}
+            to="/admin/discovery-sources"
+            variant="outlined"
+            className="glass-button"
           >
-            <MenuItem value="needs_review">Needs Review</MenuItem>
-            <MenuItem value="rejected">Rejected</MenuItem>
-            <MenuItem value="published">Published</MenuItem>
-            <MenuItem value="all">All</MenuItem>
-          </Select>
+            Discovery Sources
+          </Button>
+          <Stack direction="row" gap={1} alignItems="center">
+            <Typography variant="body2">Status</Typography>
+            <Select
+              size="small"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="job-import-review__select"
+            >
+              <MenuItem value="needs_review">Needs Review</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="published">Published</MenuItem>
+              <MenuItem value="all">All</MenuItem>
+            </Select>
+          </Stack>
         </Stack>
       </Stack>
 

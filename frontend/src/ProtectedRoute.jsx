@@ -1,12 +1,14 @@
 // src/ProtectedRoute.jsx
 import React from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAdminViewMode } from "./components/auth/AdminViewModeProvider";
 import { useAuth } from "./components/auth/AuthProvider";
 
 /**
  * Route guard:
  * - Uses AuthProvider as the source of truth for session/profile.
+ * - Authorizes with the authenticated role only.
+ * - Admin View Mode supplies a preview role for presentation through useEffectiveAuth().
+ * - Preview role must never decide whether a real user may enter a route.
  * - Avoids duplicate /api/auth/me calls inside protected routes.
  * - Fails closed without flashing protected content.
  */
@@ -16,7 +18,6 @@ export default function ProtectedRoute({
   allowedTiers = [],
 }) {
   const loc = useLocation();
-  const { isRealAdmin, mode, effectiveRole, effectivePlan } = useAdminViewMode();
   const {
     session,
     user,
@@ -32,7 +33,10 @@ export default function ProtectedRoute({
     ...(user?.app_metadata || {}),
     ...(user?.user_metadata || {}),
   };
-  const role = String(
+
+  // Authenticated role: the actual account/profile role returned by auth + /api/auth/me.
+  // This is the only role used for route authorization.
+  const authorizationRole = String(
     authRole ||
       profile?.role ||
       account?.profile?.role ||
@@ -42,7 +46,10 @@ export default function ProtectedRoute({
       metadata.userRole ||
       ""
   ).toLowerCase();
-  const tier = String(
+
+  // Authorization tier follows the real authenticated account too.
+  // Preview plan/tier is intentionally ignored here.
+  const authorizationTier = String(
     authTier ||
       account?.tier ||
       account?.entitlements?.tier ||
@@ -50,39 +57,33 @@ export default function ProtectedRoute({
       ""
   ).toLowerCase();
 
-  const hasEffectiveMode = isRealAdmin && mode !== "admin";
-  const guardAuthed = hasEffectiveMode ? effectiveRole !== "guest" : Boolean(session);
-  const guardRole =
-    hasEffectiveMode && effectiveRole !== "guest"
-      ? String(effectiveRole || "").toLowerCase()
-      : role;
-  const guardTier =
-    hasEffectiveMode && effectiveRole !== "guest"
-      ? String(effectivePlan || "").toLowerCase()
-      : tier;
-
-  if (loading || (session && loadingProfile && !guardRole)) {
+  if (loading || (session && loadingProfile && !authorizationRole)) {
     return <RouteLoading />;
   }
 
-  if (!guardAuthed) {
+  if (!session) {
     const next = encodeURIComponent(loc.pathname + loc.search);
     return <Navigate to={`/login?next=${next}`} replace />;
   }
 
-  if (!guardRole) {
+  if (!authorizationRole) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  if (guardRole === "admin") return children;
+  // Real admins always pass protected-route authorization.
+  // Presentation may still be rendered as guest/candidate/recruiter elsewhere
+  // through Admin View Mode, but admin tooling stays reachable.
+  if (authorizationRole === "admin") return children;
 
   const roleAllowed =
     allowedUserRoles.length === 0 ||
-    allowedUserRoles.map((r) => r.toLowerCase()).includes(guardRole);
+    allowedUserRoles.map((r) => r.toLowerCase()).includes(authorizationRole);
 
   const tierAllowed =
     allowedTiers.length === 0 ||
-    (guardTier ? allowedTiers.map((t) => t.toLowerCase()).includes(guardTier) : false);
+    (authorizationTier
+      ? allowedTiers.map((t) => t.toLowerCase()).includes(authorizationTier)
+      : false);
 
   if (!roleAllowed || !tierAllowed) {
     return <Navigate to="/unauthorized" replace />;

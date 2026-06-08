@@ -156,6 +156,31 @@ create table if not exists public.job_imports (
   )
 );
 
+create table if not exists public.job_discovery_sources (
+  id uuid primary key default gen_random_uuid(),
+  employer_name text not null,
+  employer_website_url text not null,
+  careers_url text,
+  industry_key text,
+  source_type text not null default 'unknown',
+  enabled boolean not null default true,
+  notes text,
+  last_run_at timestamptz,
+  last_run_status text,
+  last_run_message text,
+  last_discovered_count integer not null default 0,
+  created_by text,
+  updated_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint job_discovery_sources_source_type_check check (
+    source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+  ),
+  constraint job_discovery_sources_last_run_status_check check (
+    last_run_status is null or last_run_status in ('success', 'failed')
+  )
+);
+
 create table if not exists public.job_applications (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references public.profiles(id) on delete cascade,
@@ -441,6 +466,12 @@ create index if not exists job_imports_role_tags_gin_idx
 
 create index if not exists job_imports_industry_tags_gin_idx
   on public.job_imports using gin (industry_tags);
+
+create index if not exists job_discovery_sources_enabled_idx
+  on public.job_discovery_sources (enabled, employer_name);
+
+create index if not exists job_discovery_sources_industry_idx
+  on public.job_discovery_sources (industry_key, enabled);
 
 create unique index if not exists job_applications_user_job_unique
   on public.job_applications (user_id, job_id);

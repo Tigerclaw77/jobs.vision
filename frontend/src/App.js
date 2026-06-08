@@ -18,6 +18,7 @@ import Header from "./components/Header";
 import Home from "./components/Home";
 import Notifications from "./components/Notifications";
 import AdminDashboard from "./components/Admin/AdminDashboard";
+import DiscoverySources from "./components/Admin/DiscoverySources";
 import JobImportReview from "./components/Admin/JobImportReview";
 import ManualOverrideReview from "./components/Admin/ManualOverrideReview";
 import RecruiterDashboard from "./components/Recruiter/RecruiterDashboard";
@@ -113,11 +114,18 @@ function AutoFillPatch() {
 function PublicOnlyRoute({ children }) {
   const { session, loading, role } = useAuth();
   const { isRealAdmin, effectiveRole } = useAdminViewMode();
+  const { search } = useLocation();
   const viewingAsGuest = isRealAdmin && effectiveRole === "guest";
+  const nextPath = new URLSearchParams(search).get("next");
 
   if (loading) return <RouteLoading message="Loading..." />;
+  if (session && String(role || "").toLowerCase() === "admin" && nextPath?.startsWith("/admin")) {
+    return <Navigate to={nextPath} replace />;
+  }
   if (session && !viewingAsGuest) {
-    // If we don't know role yet, just park at Home; private pages will route correctly once role is loaded.
+    // Authenticated role is the real account/profile role.
+    // Preview role is only used here for non-admin preview navigation.
+    // ProtectedRoute still authorizes with the authenticated role.
     const routeRole = isRealAdmin && effectiveRole && effectiveRole !== "admin" ? effectiveRole : role;
     const dest =
       routeRole === "recruiter"
@@ -299,6 +307,14 @@ function AppShell() {
               element={
                 <ProtectedRoute allowedUserRoles={["admin"]}>
                   <JobImportReview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/discovery-sources"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <DiscoverySources />
                 </ProtectedRoute>
               }
             />

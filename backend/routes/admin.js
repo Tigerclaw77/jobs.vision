@@ -14,6 +14,15 @@ const {
   saveDiscoveryRun,
   updateJobImport,
 } = require("../services/jobImportRepository");
+const {
+  createDiscoverySource,
+  deleteDiscoverySource,
+  getDiscoverySource,
+  listDiscoverySources,
+  recordDiscoverySourceRun,
+  toSourceInput,
+  updateDiscoverySource,
+} = require("../services/jobDiscoverySourceRepository");
 
 const router = express.Router();
 const SOURCE_TYPES = new Set(["career_page", "greenhouse", "lever", "workday", "unknown"]);
@@ -61,6 +70,8 @@ function normalizeSourceInput(input = {}) {
     careersUrl: toTrimmedString(input.careersUrl) || null,
     industryKey: toTrimmedString(input.industryKey) || null,
     sourceType: toTrimmedString(input.sourceType) || "unknown",
+    enabled: input.enabled !== false,
+    notes: toTrimmedString(input.notes) || null,
   };
 
   if (!source.employerName) {
@@ -89,6 +100,27 @@ function normalizeSourceInput(input = {}) {
 
 function discoveryConfigFor(source) {
   return source.industryKey === "eyecare" ? eyecareDiscoveryConfig : null;
+}
+
+async function runDiscoveryForSource(source, { discoveredBy = null } = {}) {
+  const run = await discoverJobsForSource(source, {
+    industryConfig: discoveryConfigFor(source),
+    maxDepth: 1,
+    maxFollowLinks: 1,
+    delayMs: 500,
+    logger: console,
+  });
+  const saved = await saveDiscoveryRun(run, { discoveredBy });
+
+  return {
+    source: run.source,
+    discoveredAt: run.discoveredAt,
+    notes: run.notes,
+    error: run.error || null,
+    discoveredCount: run.jobs.length,
+    savedCount: saved.length,
+    items: saved,
+  };
 }
 
 function adminUserId(req) {
@@ -310,23 +342,16 @@ router.post("/job-imports/discover", requireAdmin(), async (req, res) => {
     const savedItems = [];
 
     for (const source of sources.slice(0, 10)) {
-      const run = await discoverJobsForSource(source, {
-        industryConfig: discoveryConfigFor(source),
-        maxDepth: 1,
-        maxFollowLinks: 1,
-        delayMs: 500,
-        logger: console,
-      });
-      const saved = await saveDiscoveryRun(run, { discoveredBy: adminUserId(req) });
+      const run = await runDiscoveryForSource(source, { discoveredBy: adminUserId(req) });
       runs.push({
         source: run.source,
         discoveredAt: run.discoveredAt,
         notes: run.notes,
-        error: run.error || null,
-        discoveredCount: run.jobs.length,
-        savedCount: saved.length,
+        error: run.error,
+        discoveredCount: run.discoveredCount,
+        savedCount: run.savedCount,
       });
-      savedItems.push(...saved);
+      savedItems.push(...run.items);
     }
 
     res.status(201).json({
@@ -337,6 +362,129 @@ router.post("/job-imports/discover", requireAdmin(), async (req, res) => {
   } catch (e) {
     console.error("admin/job-imports discover error", e);
     res.status(e.statusCode || 500).json({ error: e.message || "Failed to run discovery" });
+  }
+});
+
+router.get("/discovery-sources", requireAdmin(), async (req, res) => {
+  try {
+    const includeDisabled = req.query.includeDisabled !== "false";
+    const items = await listDiscoverySources({ includeDisabled });
+    res.json({ items });
+  } catch (e) {
+    console.error("admin/discovery-sources list error", e);
+    res.status(500).json({ error: "Failed to list discovery sources" });
+  }
+});
+
+router.post("/discovery-sources", requireAdmin(), async (req, res) => {
+  try {
+    const source = normalizeSourceInput(req.body || {});
+    const item = await createDiscoverySource(source, adminUserId(req));
+    res.status(201).json(item);
+  } catch (e) {
+    console.error("admin/discovery-source create error", e);
+    res.status(e.statusCode || 500).json({ error: e.message || "Failed to create discovery source" });
+  }
+});
+
+router.post("/discovery-sources/run", requireAdmin(), async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null;
+    const sources = await listDiscoverySources({ includeDisabled: true });
+    const selected = sources
+      .filter((source) => (ids ? ids.includes(String(source.id)) : source.enabled))
+      .slice(0, 10);
+
+    const runs = [];
+    const savedItems = [];
+
+    for (const row of selected) {
+      try {
+        const run = await runDiscoveryForSource(toSourceInput(row), {
+          discoveredBy: adminUserId(req),
+        });
+        await recordDiscoverySourceRun(row.id, {
+          status: "success",
+          message: `${run.savedCount} review item(s) saved.`,
+          discoveredCount: run.savedCount,
+        });
+        runs.push({ sourceId: row.id, ...run, items: undefined });
+        savedItems.push(...run.items);
+      } catch (error) {
+        await recordDiscoverySourceRun(row.id, {
+          status: "failed",
+          message: error.message,
+          discoveredCount: 0,
+        });
+        runs.push({
+          sourceId: row.id,
+          source: toSourceInput(row),
+          error: error.message,
+          discoveredCount: 0,
+          savedCount: 0,
+          notes: [],
+        });
+      }
+    }
+
+    res.status(201).json({ runs, items: savedItems, count: savedItems.length });
+  } catch (e) {
+    console.error("admin/discovery-sources run error", e);
+    res.status(500).json({ error: "Failed to run discovery sources" });
+  }
+});
+
+router.patch("/discovery-sources/:id", requireAdmin(), async (req, res) => {
+  try {
+    const existing = await getDiscoverySource(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Discovery source not found" });
+
+    const source = normalizeSourceInput(req.body || {});
+    const item = await updateDiscoverySource(existing.id, source, adminUserId(req));
+    res.json(item);
+  } catch (e) {
+    console.error("admin/discovery-source update error", e);
+    res.status(e.statusCode || 500).json({ error: e.message || "Failed to update discovery source" });
+  }
+});
+
+router.delete("/discovery-sources/:id", requireAdmin(), async (req, res) => {
+  try {
+    const deleted = await deleteDiscoverySource(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Discovery source not found" });
+    res.json({ ok: true, item: deleted });
+  } catch (e) {
+    console.error("admin/discovery-source delete error", e);
+    res.status(500).json({ error: "Failed to delete discovery source" });
+  }
+});
+
+router.post("/discovery-sources/:id/run", requireAdmin(), async (req, res) => {
+  try {
+    const row = await getDiscoverySource(req.params.id);
+    if (!row) return res.status(404).json({ error: "Discovery source not found" });
+
+    try {
+      const run = await runDiscoveryForSource(toSourceInput(row), {
+        discoveredBy: adminUserId(req),
+      });
+      await recordDiscoverySourceRun(row.id, {
+        status: "success",
+        message: `${run.savedCount} review item(s) saved.`,
+        discoveredCount: run.savedCount,
+      });
+      res.status(201).json({ ...run, items: run.items, count: run.savedCount });
+    } catch (error) {
+      await recordDiscoverySourceRun(row.id, {
+        status: "failed",
+        message: error.message,
+        discoveredCount: 0,
+      });
+      res.status(500).json({ error: error.message || "Discovery failed" });
+    }
+  } catch (e) {
+    console.error("admin/discovery-source run error", e);
+    res.status(500).json({ error: "Failed to run discovery source" });
   }
 });
 
