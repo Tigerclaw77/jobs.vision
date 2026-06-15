@@ -24,13 +24,31 @@ import {
 } from "../../utils/api";
 import "./DiscoverySources.css";
 
-const SOURCE_TYPES = ["career_page", "greenhouse", "lever", "workday", "unknown"];
+const SOURCE_TYPES = [
+  "career_page",
+  "smartrecruiters",
+  "greenhouse",
+  "lever",
+  "workday",
+  "icims",
+  "taleo",
+  "unknown",
+];
+const CONTACT_STATUSES = [
+  ["not_contacted", "Not Contacted"],
+  ["contacted", "Contacted"],
+  ["responded", "Responded"],
+  ["claimed", "Claimed"],
+  ["declined", "Declined"],
+];
 const EMPTY_FORM = {
   employerName: "",
   employerWebsiteUrl: "",
   careersUrl: "",
   industryKey: "eyecare",
   sourceType: "career_page",
+  contactEmail: "",
+  contactStatus: "not_contacted",
   enabled: true,
   notes: "",
 };
@@ -42,9 +60,15 @@ function toForm(row = {}) {
     careersUrl: row.careers_url || "",
     industryKey: row.industry_key || "eyecare",
     sourceType: row.source_type || "career_page",
+    contactEmail: row.contact_email || "",
+    contactStatus: row.contact_status || "not_contacted",
     enabled: row.enabled !== false,
     notes: row.notes || "",
   };
+}
+
+function contactStatusLabel(status) {
+  return CONTACT_STATUSES.find(([value]) => value === status)?.[1] || "Not Contacted";
 }
 
 function formatLastRun(row) {
@@ -264,7 +288,28 @@ function DiscoverySources() {
               fullWidth
             />
           </Grid>
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              label="Contact Email"
+              value={form.contactEmail}
+              onChange={(event) => updateForm("contactEmail", event.target.value)}
+              fullWidth
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Select
+              value={form.contactStatus}
+              onChange={(event) => updateForm("contactStatus", event.target.value)}
+              fullWidth
+            >
+              {CONTACT_STATUSES.map(([value, label]) => (
+                <MenuItem key={value} value={value}>
+                  Outreach: {label}
+                </MenuItem>
+              ))}
+            </Select>
+          </Grid>
+          <Grid item xs={12}>
             <TextField
               label="Notes"
               value={form.notes}
@@ -304,6 +349,7 @@ function DiscoverySources() {
                   />
                   <Chip size="small" label={source.source_type} />
                   {source.industry_key ? <Chip size="small" label={source.industry_key} /> : null}
+                  <Chip size="small" label={`Outreach: ${contactStatusLabel(source.contact_status)}`} />
                 </Stack>
                 <Typography variant="body2">
                   Website:{" "}
@@ -316,6 +362,14 @@ function DiscoverySources() {
                     Careers:{" "}
                     <a href={source.careers_url} target="_blank" rel="noreferrer">
                       {source.careers_url}
+                    </a>
+                  </Typography>
+                ) : null}
+                {source.contact_email ? (
+                  <Typography variant="body2">
+                    Contact:{" "}
+                    <a href={`mailto:${source.contact_email}`}>
+                      {source.contact_email}
                     </a>
                   </Typography>
                 ) : null}

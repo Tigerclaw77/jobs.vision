@@ -1,16 +1,37 @@
 // src/components/JobSearch/JobModal.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
+import { reportListingIssue } from "../../utils/api";
 import {
   EMPLOYMENT_TYPE_LABELS,
+  LISTING_OPPORTUNITY_TYPE_LABELS,
+  LISTING_TIER_LABELS,
   OPPORTUNITY_TYPE_LABELS,
   PRACTICE_TYPE_LABELS,
   ROLE_LABELS,
+  SATURDAY_SCHEDULE_LABELS,
   WORK_ARRANGEMENT_LABELS,
   compensationSummary,
   labelsForValues,
   normalizeRole,
 } from "../../utils/jobTaxonomy";
+
+function externalApplyUrlFor(job = {}) {
+  return job.external_apply_url || job.apply_url || job.applyUrl || "";
+}
+
+function applyEmailFor(job = {}) {
+  return job.application_email || job.applicationEmail || "";
+}
+
+const REPORT_REASONS = [
+  ["expired", "Expired"],
+  ["broken_apply_link", "Broken Apply Link"],
+  ["incorrect_location", "Incorrect Location"],
+  ["incorrect_employer", "Incorrect Employer"],
+  ["duplicate_listing", "Duplicate Listing"],
+  ["other", "Other"],
+];
 
 export default function JobModal({
   isOpen,
@@ -25,15 +46,33 @@ export default function JobModal({
   onApply,
   onHide,
   onRestore,
+  onClaim,
+  claimTooltip,
+  isClaiming = false,
   isHidden = false,
   onClose,
   isAuthed,
 }) {
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState("expired");
+  const [reportComment, setReportComment] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
+
   useEffect(() => {
     if (isOpen) document.body.classList.add("modal-open");
     else document.body.classList.remove("modal-open");
     return () => document.body.classList.remove("modal-open");
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setShowReportForm(false);
+    setReportReason("expired");
+    setReportComment("");
+    setReportMessage("");
+    setIsReporting(false);
+  }, [isOpen, job?._id, job?.id]);
 
   if (!isOpen || !job) return null;
 
@@ -42,13 +81,84 @@ export default function JobModal({
     role === "optometrist"
       ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
       : [];
+  const compensationLine = compensationSummary(job);
+  const employmentLine = labelsForValues(
+    EMPLOYMENT_TYPE_LABELS,
+    job.employment_types || job.employment_type || job.type
+  ).join(", ");
   const jobDetails = [
+    ["Role", ROLE_LABELS[role] || job.role || ""],
     ["Opportunity Type", opportunityLabels.join(", ")],
     ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
-    ["Employment Type", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
     ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
-    ["Compensation", compensationSummary(job)],
+    ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
+    ["Sign-on Bonus", job.sign_on_bonus || ""],
+    ["Relocation Assistance", job.relocation_assistance ? "Available" : ""],
+    ["CE Allowance", job.ce_allowance || ""],
+    ["Student Loan Assistance", job.student_loan_assistance ? "Available" : ""],
+    ["Benefits", job.benefits || ""],
   ].filter(([, value]) => value);
+  const listingTier =
+    job.listing_tier ||
+    (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
+  const externalApplyUrl = externalApplyUrlFor(job);
+  const applyEmail = applyEmailFor(job);
+  const emailApplyUrl = applyEmail
+    ? `mailto:${applyEmail}?subject=${encodeURIComponent(`Application for ${job.title || "job"}`)}`
+    : "";
+  const listingOpportunityType = job.listing_opportunity_type || "job";
+  const claimStatus = job.claim_status || "unclaimed";
+  const isImportedListing = job.listing_source === "imported" || listingTier === "imported";
+  const isClaimedListing = claimStatus === "claimed" || Boolean(job.claimed_by_user_id);
+  const showClaimAction = Boolean(onClaim && isImportedListing && !isClaimedListing);
+  const badges = [
+    listingTier === "featured" && {
+      key: "featured",
+      className: "job-listing-badge featured",
+      label: LISTING_TIER_LABELS.featured,
+    },
+    listingTier === "sponsor" && {
+      key: "sponsor",
+      className: "job-listing-badge sponsor",
+      label: LISTING_TIER_LABELS.sponsor,
+    },
+    listingOpportunityType !== "job" && {
+      key: listingOpportunityType,
+      className: `job-listing-badge opportunity ${listingOpportunityType}`,
+      label: LISTING_OPPORTUNITY_TYPE_LABELS[listingOpportunityType] || listingOpportunityType,
+    },
+    isClaimedListing && {
+      key: "claimed",
+      className: "job-listing-badge claimed",
+      label: "Claimed",
+    },
+    (isClaimedListing || job.listing_source === "employer_submitted") && {
+      key: "employer-managed",
+      className: "job-listing-badge employer-managed",
+      label: "Employer Managed",
+    },
+  ].filter(Boolean);
+
+  async function handleReportSubmit(event) {
+    event.preventDefault();
+    const reportJobId = job?._id || job?.id;
+    if (!reportJobId) return;
+    setIsReporting(true);
+    setReportMessage("");
+    try {
+      await reportListingIssue(reportJobId, {
+        reason: reportReason,
+        comment: reportComment,
+      });
+      setReportMessage("Report submitted. Thank you.");
+      setReportComment("");
+      setShowReportForm(false);
+    } catch (error) {
+      setReportMessage(error?.response?.data?.error || "Failed to submit report.");
+    } finally {
+      setIsReporting(false);
+    }
+  }
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -73,12 +183,10 @@ export default function JobModal({
           <button
             type="button"
             className={`status-chip applied ${isApplied ? "active" : ""}`}
-            title={appliedTooltip || (isApplied ? "Already applied" : "Apply to this job")}
-            aria-label={isApplied ? "Already applied" : "Apply to this job"}
+            title={appliedTooltip || (isApplied ? "Mark as not applied" : "Mark as applied")}
+            aria-label={isApplied ? "Mark as not applied" : "Mark as applied"}
             aria-pressed={Boolean(isApplied)}
-            onClick={() => {
-              if (!isApplied) onApply(job._id);
-            }}
+            onClick={() => onApply(job._id)}
           >
             <CheckCircle size={20} />
           </button>
@@ -106,11 +214,28 @@ export default function JobModal({
         </div>
 
         <h3 className="modal-title">{job.title}</h3>
+        {badges.length > 0 && (
+          <div className="job-listing-badges modal-listing-badges">
+            {badges.map((badge) => (
+              <span key={badge.key} className={badge.className} title={badge.title || badge.label}>
+                {badge.label}
+              </span>
+            ))}
+          </div>
+        )}
         {job.company && <p className="modal-company">{job.company}</p>}
         {job.location && <p className="modal-location">{job.location}</p>}
-        <p className="modal-rolehours">
-          {ROLE_LABELS[role] || job.role || "Optometrist"}
-        </p>
+        {employmentLine && <p className="modal-employment">{employmentLine}</p>}
+        {compensationLine && <p className="modal-compensation">{compensationLine}</p>}
+
+        {job.description && (
+          <section className="modal-description-block" aria-label="Job description">
+            <h4>Description</h4>
+            <div className="modal-description-scroll" tabIndex={0}>
+              <p className="modal-desc">{job.description}</p>
+            </div>
+          </section>
+        )}
 
         {jobDetails.length > 0 && (
           <div className="modal-job-details">
@@ -122,10 +247,81 @@ export default function JobModal({
           </div>
         )}
 
-        {job.description && <p className="modal-desc">{job.description}</p>}
+        <div className="modal-report">
+          <button
+            type="button"
+            className="modal-report-toggle"
+            onClick={() => setShowReportForm((current) => !current)}
+          >
+            Report Listing Issue
+          </button>
+          {showReportForm ? (
+            <form className="modal-report-form" onSubmit={handleReportSubmit}>
+              <label>
+                Issue
+                <select
+                  value={reportReason}
+                  onChange={(event) => setReportReason(event.target.value)}
+                >
+                  {REPORT_REASONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Comment
+                <textarea
+                  value={reportComment}
+                  onChange={(event) => setReportComment(event.target.value)}
+                  maxLength={1000}
+                  placeholder="Optional"
+                />
+              </label>
+              <div className="modal-report-actions">
+                <button className="btn-secondary" type="submit" disabled={isReporting}>
+                  {isReporting ? "Submitting..." : "Submit Report"}
+                </button>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={() => setShowReportForm(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
+          {reportMessage ? <p className="modal-report-message">{reportMessage}</p> : null}
+        </div>
 
         <div className="modal-actions">
-          {!isApplied && (
+          {showClaimAction && (
+            <button
+              className="btn-secondary"
+              onClick={() => onClaim(job._id)}
+              title={claimTooltip || "Claim this Listing"}
+              disabled={isClaiming || claimStatus === "pending"}
+            >
+              {claimStatus === "pending"
+                ? "Claim Pending"
+                : isClaiming
+                ? "Submitting..."
+                : "Claim this Listing"}
+            </button>
+          )}
+          {externalApplyUrl || emailApplyUrl ? (
+            <a
+              className="btn-primary"
+              href={externalApplyUrl || emailApplyUrl}
+              target={externalApplyUrl ? "_blank" : undefined}
+              rel={externalApplyUrl ? "noreferrer" : undefined}
+              title={externalApplyUrl ? "Apply on employer site" : "Apply by email"}
+            >
+              {externalApplyUrl ? "Apply on Employer Site" : "Apply by Email"}
+            </a>
+          ) : !isApplied && (
             <button
               className="btn-primary"
               onClick={() => onApply(job._id)}

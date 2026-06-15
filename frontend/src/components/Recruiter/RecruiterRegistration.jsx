@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as Yup from "yup";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Container,
   Paper,
@@ -90,6 +90,8 @@ const recruiterSchema = Yup.object({
 
 export default function RecruiterRegistration() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get("next") || "";
   const base = window.location.origin;
 
   const {
@@ -181,7 +183,8 @@ export default function RecruiterRegistration() {
 
       const flash = "If that email exists, we’ve sent a verification link.";
       reset();
-      navigate("/login", { state: { flash, severity: "success" } });
+      const loginPath = nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login";
+      navigate(loginPath, { state: { flash, severity: "success" } });
     } catch (err) {
       showToast(
         err?.message || "Registration failed. Please try again.",
@@ -312,12 +315,12 @@ export default function RecruiterRegistration() {
               sx={{ display: "block", mb: 1 }}
             >
               Use your work email (e.g. @walmart.com) or{" "}
-              <a
-                href="/manual-override"
+              <RouterLink
+                to="/manual-override"
                 style={{ color: "inherit", textDecoration: "underline" }}
               >
                 request manual review
-              </a>
+              </RouterLink>
               .
             </Typography>
           ) : (

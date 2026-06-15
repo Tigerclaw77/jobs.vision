@@ -7,7 +7,7 @@ function apiBaseUrl() {
 }
 
 export default async function apiFetch(path, { method = "GET", body, headers } = {}) {
-  const token = (await getNeonAccessToken()) || localStorage.getItem("token");
+  const token = await getNeonAccessToken();
 
   const res = await fetch(`${apiBaseUrl()}${path}`, {
     method,

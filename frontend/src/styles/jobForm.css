@@ -91,6 +91,12 @@
 
 .recruiter-job-form-card .MuiFormHelperText-root {
   margin-left: 0;
+  color: #cbd5e1 !important;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.recruiter-job-form-card .MuiFormHelperText-root.Mui-error {
   color: #fecaca !important;
   font-weight: 700;
 }
@@ -132,6 +138,256 @@
 
 .recruiter-job-form-card .recruiter-job-tag-chip .MuiChip-deleteIcon:hover {
   color: #0f172a !important;
+}
+
+.recruiter-position-step,
+.recruiter-job-preview,
+.recruiter-apply-destination {
+  margin: 0 0 22px;
+  padding: 16px;
+  border: 1px solid rgba(147, 197, 253, 0.34);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.74);
+}
+
+.recruiter-position-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.recruiter-position-options button {
+  min-height: 48px;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.recruiter-position-options button.selected {
+  color: #082f49;
+  background: #bae6fd;
+  border-color: #7dd3fc;
+}
+
+.recruiter-position-options button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.recruiter-position-step p,
+.recruiter-position-empty {
+  color: #dbeafe !important;
+  font-weight: 700;
+}
+
+.recruiter-preview-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(280px, 1.2fr);
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.recruiter-preview-card,
+.recruiter-preview-modal {
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.recruiter-preview-card h3,
+.recruiter-preview-modal h3 {
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.recruiter-preview-card p,
+.recruiter-preview-modal p,
+.recruiter-preview-modal h4 {
+  color: #334155;
+}
+
+.recruiter-preview-modal .modal-description-scroll {
+  max-height: 220px;
+}
+
+.recruiter-preview-actions {
+  margin-top: 12px;
+}
+
+.recruiter-job-preview h3 {
+  margin: 8px 0 4px;
+  color: #ffffff;
+  font-size: 1.15rem;
+}
+
+.recruiter-job-preview .recruiter-preview-card h3,
+.recruiter-job-preview .recruiter-preview-modal h3 {
+  color: #0f172a;
+}
+
+.recruiter-job-preview p,
+.recruiter-apply-destination p,
+.recruiter-job-plan-required span {
+  color: #dbeafe;
+  margin: 6px 0;
+}
+
+.recruiter-job-plan-required {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(147, 197, 253, 0.22);
+}
+
+.recruiter-job-plan-required strong {
+  color: #fed7aa;
+}
+
+.recruiter-job-plan-required a {
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.recruiter-apply-default {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: #f8fafc;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.recruiter-apply-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.recruiter-apply-option {
+  display: flex;
+  gap: 10px;
+  min-height: 84px;
+  padding: 12px;
+  border: 1px solid rgba(147, 197, 253, 0.48);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.recruiter-apply-option:has(input:checked) {
+  border-color: #7dd3fc;
+  background: rgba(12, 74, 110, 0.72);
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.45);
+}
+
+.recruiter-apply-option input {
+  margin-top: 3px;
+  accent-color: #38bdf8;
+}
+
+.recruiter-apply-option span {
+  display: grid;
+  gap: 4px;
+}
+
+.recruiter-apply-option strong {
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.recruiter-apply-option small,
+.recruiter-apply-current,
+.recruiter-apply-summary {
+  color: #dbeafe !important;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.recruiter-apply-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(186, 230, 253, 0.34);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.36);
+}
+
+.recruiter-apply-summary span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.recruiter-apply-summary a {
+  color: #bae6fd;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.recruiter-apply-summary strong {
+  color: #fed7aa;
+  font-weight: 800;
+}
+
+.recruiter-additional-details {
+  border: 1px solid rgba(147, 197, 253, 0.34);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.recruiter-additional-details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.recruiter-additional-details summary::marker {
+  color: #bae6fd;
+}
+
+.recruiter-additional-details summary small {
+  color: #dbeafe;
+  font-weight: 650;
+}
+
+.recruiter-additional-details[open] summary {
+  border-bottom: 1px solid rgba(147, 197, 253, 0.24);
+}
+
+.recruiter-additional-details .MuiGrid-container {
+  padding: 16px;
+}
+
+.recruiter-job-checkbox {
+  min-height: 56px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.recruiter-job-form-error {
+  color: #fecaca !important;
+  font-weight: 800 !important;
 }
 
 .recruiter-job-form-actions {
@@ -181,5 +437,18 @@
 
   .recruiter-job-form-actions .MuiButton-root {
     width: 100%;
+  }
+
+  .recruiter-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recruiter-apply-options {
+    grid-template-columns: 1fr;
+  }
+
+  .recruiter-additional-details summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

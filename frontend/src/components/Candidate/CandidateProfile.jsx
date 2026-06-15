@@ -26,7 +26,7 @@ const SPECIALTY_INTEREST_OPTIONS = [
 const normalizeInterest = (value) => String(value || "").trim().toLowerCase();
 
 const CandidateProfile = () => {
-  const { user: reduxUser, token, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, userRole } = useSelector((state) => state.auth);
   const {
     session,
     user: authUser,
@@ -137,7 +137,6 @@ const CandidateProfile = () => {
       setInterestsText(joinInterests(next.specialtyInterests));
       dispatch(
         login({
-          token,
           userRole: userRole || res.userRole || res.role || profileUser?.userRole,
           user: {
             ...profileUser,

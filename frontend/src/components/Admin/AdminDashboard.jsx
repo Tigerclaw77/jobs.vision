@@ -72,6 +72,22 @@ const AdminDashboard = () => {
           </Button>
           <Button
             component={RouterLink}
+            to="/admin/marketplace"
+            variant="outlined"
+            className="glass-button"
+          >
+            Marketplace
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/admin/listing-claims"
+            variant="outlined"
+            className="glass-button"
+          >
+            Listing Claims
+          </Button>
+          <Button
+            component={RouterLink}
             to="/admin/discovery-sources"
             variant="outlined"
             className="glass-button"

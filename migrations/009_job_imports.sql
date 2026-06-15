@@ -43,10 +43,10 @@ create table if not exists public.job_imports (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint job_imports_source_type_check check (
-    source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
   ),
   constraint job_imports_normalized_source_type_check check (
-    normalized_source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    normalized_source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
   ),
   constraint job_imports_status_check check (
     status in ('discovered', 'needs_review', 'rejected', 'published')

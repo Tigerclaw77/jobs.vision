@@ -61,7 +61,9 @@ create table if not exists public.jobs (
   description text,
   company text,
   employer_name text,
+  parent_company text,
   employer_brand text,
+  practice_name text,
   employer_domain text,
   employer_brand_verified boolean not null default false,
   venue_brand text,
@@ -81,6 +83,12 @@ create table if not exists public.jobs (
   employment_types text[] not null default '{}',
   work_arrangement text,
   work_arrangements text[] not null default '{}',
+  saturday_schedule text,
+  sign_on_bonus text,
+  relocation_assistance boolean not null default false,
+  benefits text,
+  ce_allowance text,
+  student_loan_assistance boolean not null default false,
   compensation_type text,
   salary_min numeric(12,2),
   salary_max numeric(12,2),
@@ -95,7 +103,15 @@ create table if not exists public.jobs (
   source text,
   seed_batch text,
   external_apply_url text,
+  application_email text,
   source_url text,
+  listing_source text not null default 'employer_submitted',
+  listing_tier text not null default 'standard_paid',
+  listing_opportunity_type text not null default 'job',
+  location_precision text not null default 'unknown',
+  claimed_by_user_id text,
+  claimed_at timestamptz,
+  claim_status text not null default 'unclaimed',
   is_archived boolean not null default false,
   posted_at timestamptz not null default now(),
   first_activated_at timestamptz,
@@ -108,7 +124,25 @@ create table if not exists public.jobs (
   latitude numeric(10,7),
   longitude numeric(10,7),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint jobs_listing_source_check check (
+    listing_source in ('imported', 'employer_submitted')
+  ),
+  constraint jobs_listing_tier_check check (
+    listing_tier in ('imported', 'standard_paid', 'featured', 'sponsor')
+  ),
+  constraint jobs_listing_opportunity_type_check check (
+    listing_opportunity_type in ('job', 'practice_sale', 'partnership', 'lease')
+  ),
+  constraint jobs_location_precision_check check (
+    location_precision in ('exact', 'facility', 'city', 'metro', 'state', 'remote', 'multiple', 'unknown')
+  ),
+  constraint jobs_saturday_schedule_check check (
+    saturday_schedule is null or saturday_schedule in ('none', 'occasional', 'alternating', 'most', 'every', 'unknown')
+  ),
+  constraint jobs_claim_status_check check (
+    claim_status in ('unclaimed', 'pending', 'claimed', 'rejected')
+  )
 );
 
 create table if not exists public.job_imports (
@@ -138,6 +172,30 @@ create table if not exists public.job_imports (
   industry_tags text[] not null default '{}',
   role_tags text[] not null default '{}',
   status text not null default 'needs_review',
+  parent_company text,
+  employer_brand text,
+  practice_name text,
+  listing_source text not null default 'imported',
+  listing_tier text not null default 'imported',
+  listing_opportunity_type text not null default 'job',
+  location_precision text not null default 'unknown',
+  primary_role text,
+  secondary_role text,
+  specialty text,
+  classification_employment_type text,
+  classification_practice_type text,
+  compensation_summary text,
+  jobs_vision_relevant boolean,
+  recommendation text,
+  recommendation_reason text,
+  classification_confidence_score numeric(5,2),
+  role_badge text,
+  evergreen boolean not null default false,
+  evergreen_reason text,
+  source_posted_at timestamptz,
+  source_updated_at timestamptz,
+  source_posting_age_days integer,
+  freshness_checked_at timestamptz,
   duplicate_key text not null,
   discovery_result jsonb not null,
   normalized_job jsonb not null,
@@ -146,19 +204,54 @@ create table if not exists public.job_imports (
   discovered_by text,
   reviewed_by text,
   reviewed_at timestamptz,
+  auto_decision_applied boolean not null default false,
+  auto_decision text,
+  auto_decision_at timestamptz,
+  review_action text,
+  review_source text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint job_imports_source_type_check check (
-    source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
   ),
   constraint job_imports_normalized_source_type_check check (
-    normalized_source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    normalized_source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
   ),
   constraint job_imports_status_check check (
-    status in ('discovered', 'needs_review', 'rejected', 'published')
+    status in ('discovered', 'needs_review', 'evergreen', 'rejected', 'published')
+  ),
+  constraint job_imports_listing_source_check check (
+    listing_source in ('imported', 'employer_submitted')
+  ),
+  constraint job_imports_listing_tier_check check (
+    listing_tier in ('imported', 'standard_paid', 'featured', 'sponsor')
+  ),
+  constraint job_imports_listing_opportunity_type_check check (
+    listing_opportunity_type in ('job', 'practice_sale', 'partnership', 'lease')
+  ),
+  constraint job_imports_location_precision_check check (
+    location_precision in ('exact', 'facility', 'city', 'metro', 'state', 'remote', 'multiple', 'unknown')
   ),
   constraint job_imports_confidence_score_check check (
     confidence_score >= 0 and confidence_score <= 100
+  ),
+  constraint job_imports_recommendation_check check (
+    recommendation is null or recommendation in ('approve', 'reject', 'review')
+  ),
+  constraint job_imports_role_badge_check check (
+    role_badge is null or role_badge in ('OD', 'OPTICIAN', 'TECH', 'MANAGER', 'OPTICAL', 'FRONT_DESK', 'OMD', 'OTHER', 'UNKNOWN')
+  ),
+  constraint job_imports_classification_confidence_score_check check (
+    classification_confidence_score is null or (classification_confidence_score >= 0 and classification_confidence_score <= 100)
+  ),
+  constraint job_imports_auto_decision_check check (
+    auto_decision is null or auto_decision in ('approve', 'reject')
+  ),
+  constraint job_imports_review_action_check check (
+    review_action is null or review_action in ('publish', 'reject')
+  ),
+  constraint job_imports_review_source_check check (
+    review_source is null or review_source in ('manual', 'batch', 'auto')
   )
 );
 
@@ -169,6 +262,8 @@ create table if not exists public.job_discovery_sources (
   careers_url text,
   industry_key text,
   source_type text not null default 'unknown',
+  contact_email text,
+  contact_status text not null default 'not_contacted',
   enabled boolean not null default true,
   notes text,
   last_run_at timestamptz,
@@ -180,10 +275,33 @@ create table if not exists public.job_discovery_sources (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint job_discovery_sources_source_type_check check (
-    source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
+  ),
+  constraint job_discovery_sources_contact_status_check check (
+    contact_status in ('not_contacted', 'contacted', 'responded', 'claimed', 'declined')
   ),
   constraint job_discovery_sources_last_run_status_check check (
     last_run_status is null or last_run_status in ('success', 'failed')
+  )
+);
+
+create table if not exists public.job_listing_claims (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  requested_by_user_id text not null,
+  requester_email text,
+  requester_name text,
+  company_name text,
+  company_website text,
+  message text,
+  status text not null default 'pending',
+  reviewed_by text,
+  reviewed_at timestamptz,
+  review_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint job_listing_claims_status_check check (
+    status in ('pending', 'approved', 'rejected')
   )
 );
 
@@ -376,6 +494,7 @@ create index if not exists profiles_created_at_idx on public.profiles (created_a
 create index if not exists profiles_search_trgm_idx on public.profiles using gin ((coalesce(email, '') || ' ' || coalesce(first_name, '') || ' ' || coalesce(last_name, '') || ' ' || coalesce(company, '')) gin_trgm_ops);
 
 create index if not exists jobs_public_visibility_idx on public.jobs (status, is_archived, posted_at desc) where status = 'active' and is_archived = false;
+create index if not exists jobs_public_listing_rank_idx on public.jobs (status, is_archived, listing_tier, posted_at desc) where status = 'active' and is_archived = false;
 create index if not exists jobs_recruiter_status_idx on public.jobs (recruiter_id, status, is_archived, posted_at desc);
 create index if not exists jobs_posted_by_idx on public.jobs (posted_by);
 create index if not exists jobs_city_state_idx on public.jobs (city, state);
@@ -390,20 +509,45 @@ create index if not exists jobs_employment_types_gin_idx on public.jobs using gi
 create index if not exists jobs_work_arrangements_gin_idx on public.jobs using gin (work_arrangements);
 create index if not exists jobs_compensation_type_idx on public.jobs (compensation_type);
 create index if not exists jobs_employer_brand_idx on public.jobs (employer_brand);
+create index if not exists jobs_parent_company_idx on public.jobs (parent_company);
+create index if not exists jobs_practice_name_idx on public.jobs (practice_name);
 create index if not exists jobs_employer_domain_idx on public.jobs (employer_domain);
 create index if not exists jobs_tag_ids_gin_idx on public.jobs using gin (tag_ids);
 create index if not exists jobs_title_trgm_idx on public.jobs using gin (title gin_trgm_ops);
 create index if not exists jobs_employer_name_trgm_idx on public.jobs using gin (employer_name gin_trgm_ops);
 create index if not exists jobs_external_apply_url_idx on public.jobs (external_apply_url) where external_apply_url is not null;
+create index if not exists jobs_listing_source_idx on public.jobs (listing_source);
+create index if not exists jobs_listing_tier_idx on public.jobs (listing_tier);
+create index if not exists jobs_listing_opportunity_type_idx on public.jobs (listing_opportunity_type);
+create index if not exists jobs_location_precision_idx on public.jobs (location_precision);
+create index if not exists jobs_claim_status_idx on public.jobs (claim_status);
+create index if not exists jobs_claimed_by_user_idx on public.jobs (claimed_by_user_id) where claimed_by_user_id is not null;
 
 create unique index if not exists job_imports_duplicate_key_idx on public.job_imports (duplicate_key);
 create index if not exists job_imports_status_discovered_idx on public.job_imports (status, discovered_at desc);
+create index if not exists job_imports_listing_filters_idx on public.job_imports (status, listing_tier, listing_opportunity_type, discovered_at desc);
 create index if not exists job_imports_industry_status_idx on public.job_imports (industry_key, status);
 create index if not exists job_imports_role_tags_gin_idx on public.job_imports using gin (role_tags);
 create index if not exists job_imports_industry_tags_gin_idx on public.job_imports using gin (industry_tags);
+create index if not exists job_imports_recommendation_idx on public.job_imports (status, recommendation, classification_confidence_score desc);
+create index if not exists job_imports_role_badge_idx on public.job_imports (status, role_badge, discovered_at desc);
+create index if not exists job_imports_auto_decision_idx on public.job_imports (status, auto_decision_applied, auto_decision, classification_confidence_score desc);
+create index if not exists job_imports_review_source_idx on public.job_imports (review_source, reviewed_at desc);
+create index if not exists job_imports_evergreen_idx on public.job_imports (evergreen, status, source_posting_age_days desc);
+create index if not exists job_imports_parent_company_idx on public.job_imports (parent_company);
+create index if not exists job_imports_employer_brand_idx on public.job_imports (employer_brand);
+create index if not exists job_imports_practice_name_idx on public.job_imports (practice_name);
 
 create index if not exists job_discovery_sources_enabled_idx on public.job_discovery_sources (enabled, employer_name);
 create index if not exists job_discovery_sources_industry_idx on public.job_discovery_sources (industry_key, enabled);
+create index if not exists job_discovery_sources_contact_status_idx on public.job_discovery_sources (contact_status, employer_name);
+
+create index if not exists job_listing_claims_status_created_idx on public.job_listing_claims (status, created_at desc);
+create index if not exists job_listing_claims_job_status_idx on public.job_listing_claims (job_id, status);
+create index if not exists job_listing_claims_requester_idx on public.job_listing_claims (requested_by_user_id, created_at desc);
+create unique index if not exists job_listing_claims_one_pending_per_user_job_idx
+  on public.job_listing_claims (job_id, requested_by_user_id)
+  where status = 'pending';
 
 create unique index if not exists job_applications_user_job_unique on public.job_applications (user_id, job_id);
 create index if not exists job_applications_user_created_idx on public.job_applications (user_id, created_at desc);

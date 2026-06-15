@@ -12,7 +12,7 @@ function formatList(value, fallback = "Not provided") {
 const Unauthorized = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, user, account, profile, role } = useAuth();
+  const { session, user, account, profile, role, profileError } = useAuth();
   const authDebug = location.state?.authDebug || {};
   const detectedRole =
     authDebug.authenticatedRole ||
@@ -75,6 +75,12 @@ const Unauthorized = () => {
             <strong>Authorization result:</strong>{" "}
             {authDebug.authorizationResult || "denied"}
           </Typography>
+          {profileError && (
+            <Typography variant="body2">
+              <strong>Profile lookup:</strong> {profileError.message}
+              {profileError.url ? ` (${profileError.url})` : ""}
+            </Typography>
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "center", gap: "20px" }}>

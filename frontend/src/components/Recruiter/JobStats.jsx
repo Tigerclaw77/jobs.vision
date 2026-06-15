@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "../utils/api";
+import api from "../../utils/api";
 
 const JobStats = () => {
   const [jobStats, setJobStats] = useState([]);
@@ -14,9 +14,7 @@ const JobStats = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await api.get("http://localhost:5000/jobs/saved-count", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const response = await api.get("http://localhost:5000/jobs/saved-count");
       setJobStats(response.data);
     } catch (error) {
       setError("Error fetching job stats.");

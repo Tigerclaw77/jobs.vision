@@ -15,11 +15,21 @@ function apiBaseUrl() {
 }
 
 async function fetchMe(accessToken) {
-  const res = await fetch(`${apiBaseUrl()}/auth/me`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error("unauthorized");
-  return res.json(); // { id, email, role, profile: { id,email,role } }
+  const url = `${apiBaseUrl()}/auth/me`;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch (error) {
+    error.requestUrl = url;
+    throw error;
+  }
+
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`unauthorized (${res.status})`);
+  return body; // { id, email, role, profile: { id,email,role } }
 }
 
 const AuthCtx = createContext(null);
@@ -37,6 +47,16 @@ export default function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [refreshingAuth, setRefreshingAuth] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+
+  useEffect(() => {
+    try {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+    } catch {
+      /* Legacy bearer tokens are no longer an auth source. */
+    }
+  }, []);
 
   const refreshAuth = useCallback(async (sessionResult) => {
     setRefreshingAuth(true);
@@ -55,28 +75,52 @@ export default function AuthProvider({ children }) {
       if (!nextSession?.access_token) {
         setAccount(null);
         setProfile(null);
+        setProfileError(null);
         setLoadingProfile(false);
         return { session: null, account: null, profile: null };
       }
 
       setLoadingProfile(true);
-      const me = await fetchMe(nextSession.access_token);
-      const nextProfile =
-        me.profile || { id: me.id, email: me.email, role: me.role };
+      let me = null;
+      try {
+        me = await fetchMe(nextSession.access_token);
+      } catch (profileLookupError) {
+        const nextProfileError = {
+          message: profileLookupError?.message || String(profileLookupError),
+          url: profileLookupError?.requestUrl || `${apiBaseUrl()}/auth/me`,
+        };
+        setAccount(null);
+        setProfile(null);
+        setProfileError(nextProfileError);
+        return {
+          session: nextSession,
+          account: null,
+          profile: null,
+          profileError: nextProfileError,
+        };
+      }
+
+      const nextProfile = me.profile || { id: me.id, email: me.email, role: me.role };
 
       setAccount(me || null);
       setProfile(nextProfile);
+      setProfileError(null);
 
       return {
         session: nextSession,
         account: me || null,
         profile: nextProfile,
+        profileError: null,
       };
     } catch (error) {
       await neonAuth.signOut();
       setSession(null);
       setAccount(null);
       setProfile(null);
+      setProfileError({
+        message: error?.message || String(error),
+        url: error?.requestUrl || null,
+      });
       throw error;
     } finally {
       setLoadingProfile(false);
@@ -136,6 +180,7 @@ export default function AuthProvider({ children }) {
         accessToken: session?.access_token || null,
         account,
         profile,
+        profileError,
         role,
         tier,
         entitlements: account?.entitlements || null,
@@ -147,10 +192,11 @@ export default function AuthProvider({ children }) {
           setSession(null);
           setAccount(null);
           setProfile(null);
+          setProfileError(null);
         },
       };
     },
-    [session, account, profile, loading, refreshingAuth, loadingProfile, refreshAuth]
+    [session, account, profile, profileError, loading, refreshingAuth, loadingProfile, refreshAuth]
   );
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;

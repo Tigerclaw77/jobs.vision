@@ -27,7 +27,7 @@ const RECRUITER_PROFILE_COMPLETION_LABELS = {
 };
 
 const RecruiterProfile = () => {
-  const { user: reduxUser, token, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, userRole } = useSelector((state) => state.auth);
   const {
     session,
     user: authUser,
@@ -117,7 +117,6 @@ const RecruiterProfile = () => {
       setForm(next);
       dispatch(
         login({
-          token,
           userRole: userRole || res.userRole || res.role || profileUser?.userRole,
           user: {
             ...profileUser,
@@ -230,7 +229,7 @@ const RecruiterProfile = () => {
               </section>
 
               <section className="profile-card emphasis" id="application-preferences">
-                <h2>Application Preferences</h2>
+                <h2>Default Apply Destination</h2>
                 <div className="profile-check-list">
                   <label className="profile-check">
                     <input
@@ -238,12 +237,12 @@ const RecruiterProfile = () => {
                       checked={form.applicationUseAccountEmail}
                       onChange={handleChange("applicationUseAccountEmail")}
                     />
-                    <span>Use account email for applications ({form.email || "no email on file"})</span>
+                    <span>Use account email as the default apply email ({form.email || "no email on file"})</span>
                   </label>
                 </div>
                 <div className="profile-grid" style={{ marginTop: 14 }}>
                   <div className="profile-field">
-                    <label htmlFor="applicationEmail">Application Email</label>
+                    <label htmlFor="applicationEmail">Default Apply Email</label>
                     <input
                       id="applicationEmail"
                       value={form.applicationEmail}
@@ -260,21 +259,21 @@ const RecruiterProfile = () => {
                     />
                   </div>
                   <div className="profile-field full">
-                    <label htmlFor="applicationWebsite">Application Website / URL</label>
+                    <label htmlFor="applicationWebsite">Default Apply URL</label>
                     <input
                       id="applicationWebsite"
                       value={form.applicationWebsite}
                       onChange={handleChange("applicationWebsite")}
-                      placeholder="Optional website, contact form, or scheduling URL"
+                      placeholder="https://example.com/careers"
                     />
                   </div>
                   <div className="profile-field full">
-                    <label htmlFor="applicationInstructions">Application Instructions</label>
+                    <label htmlFor="applicationInstructions">Candidate Instructions</label>
                     <textarea
                       id="applicationInstructions"
                       value={form.applicationInstructions}
                       onChange={handleChange("applicationInstructions")}
-                      placeholder="Tell candidates whether to email, call, text, or use a website form."
+                      placeholder="Optional context shown internally for now."
                     />
                   </div>
                 </div>
@@ -297,7 +296,7 @@ const RecruiterProfile = () => {
                       checked={form.smsNotifications}
                       onChange={handleChange("smsNotifications")}
                     />
-                    <span>SMS notifications</span>
+                    <span>SMS notification preference</span>
                   </label>
                   <label className="profile-check">
                     <input
@@ -305,7 +304,7 @@ const RecruiterProfile = () => {
                       checked={form.leadNotifications}
                       onChange={handleChange("leadNotifications")}
                     />
-                    <span>Lead notifications</span>
+                    <span>Applicant notification preference</span>
                   </label>
                   <label className="profile-check">
                     <input
@@ -313,10 +312,10 @@ const RecruiterProfile = () => {
                       checked={form.weeklySummaryEmails}
                       onChange={handleChange("weeklySummaryEmails")}
                     />
-                    <span>Weekly summary emails</span>
+                    <span>Weekly summary preference</span>
                   </label>
                 </div>
-                <p className="profile-help">SMS delivery is not connected yet.</p>
+                <p className="profile-help">Preferences are saved; SMS and automated applicant emails are not connected yet.</p>
               </section>
 
               <section className="profile-card profile-contact-methods-card">

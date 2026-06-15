@@ -6,9 +6,6 @@ const { getPlanByKey } = require("../services/stripeCatalog.js");
 const router = express.Router();
 
 const stripeKey = process.env.STRIPE_SECRET_KEY;
-if (stripeKey && !stripeKey.startsWith("sk_test_")) {
-  throw new Error("Only Stripe test-mode secret keys are supported in this integration pass.");
-}
 const stripe = stripeKey ? require("stripe")(stripeKey) : null;
 
 function frontendUrl() {
@@ -109,6 +106,8 @@ router.post("/checkout", requireAuth, async (req, res) => {
 
     const customerId = await getOrCreateCustomer(profile);
     const baseUrl = frontendUrl();
+    const successPath = plan.audience === "recruiter" ? "/recruiter/dashboard" : "/profile";
+    const cancelPath = plan.audience === "recruiter" ? "/pricing?audience=recruiter" : "/";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -116,10 +115,12 @@ router.post("/checkout", requireAuth, async (req, res) => {
       client_reference_id: profile.id,
       line_items: lineItems,
       allow_promotion_codes: true,
-      success_url: `${baseUrl}/profile?checkout=success&plan=${encodeURIComponent(
+      success_url: `${baseUrl}${successPath}?checkout=success&plan=${encodeURIComponent(
         plan.planKey
       )}`,
-      cancel_url: `${baseUrl}/?checkout=cancelled&plan=${encodeURIComponent(plan.planKey)}`,
+      cancel_url: `${baseUrl}${cancelPath}${
+        cancelPath.includes("?") ? "&" : "?"
+      }checkout=cancelled&plan=${encodeURIComponent(plan.planKey)}`,
       metadata: {
         app: "jobs.vision",
         userId: profile.id,

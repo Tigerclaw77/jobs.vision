@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "../utils/api";
+import api from "../../utils/api";
 
 const RecommendedJobs = () => {
   const [recommendedJobs, setRecommendedJobs] = useState([]);
@@ -14,9 +14,7 @@ const RecommendedJobs = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await api.get("http://localhost:5000/recommend-jobs", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const response = await api.get("http://localhost:5000/recommend-jobs");
       setRecommendedJobs(response.data);
     } catch (error) {
       setError("Error fetching job recommendations.");

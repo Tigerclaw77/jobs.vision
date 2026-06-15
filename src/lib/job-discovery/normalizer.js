@@ -5,6 +5,7 @@ const {
   truncate,
   uniqueStrings,
 } = require("./utils");
+const { classifyJobForReview } = require("./classifier");
 
 function detectEmploymentType(text) {
   const haystack = stableLower(text);
@@ -59,11 +60,34 @@ function normalizeDiscoveryResult(result, source, options = {}) {
     applyUrl: result.applyUrl || null,
     sourceUrl: result.sourceUrl,
     sourceType: result.sourceType,
+    atsProvider: result.atsProvider || null,
+    customFields: Array.isArray(result.customFields) ? result.customFields : [],
+    smartRecruiters: result.smartRecruiters || null,
+    smartRecruitersDetail: result.smartRecruitersDetail || null,
+    classification: result.classification || "unknown",
+    requisitionId: result.requisitionId || null,
     industryTags,
     roleTags,
     status: "needs_review",
   };
+  const classificationSummary = classifyJobForReview({
+    ...normalized,
+    rawTitle: result.rawTitle,
+    rawDescription: result.rawDescription,
+    rawLocation: result.rawLocation,
+  });
 
+  normalized.classificationSummary = classificationSummary;
+  normalized.primaryRole = classificationSummary.primaryRole;
+  normalized.secondaryRole = classificationSummary.secondaryRole;
+  normalized.specialty = classificationSummary.specialty;
+  normalized.practiceType = classificationSummary.practiceType;
+  normalized.compensationSummary = classificationSummary.compensationSummary;
+  normalized.jobsVisionRelevant = classificationSummary.jobsVisionRelevant;
+  normalized.recommendation = classificationSummary.recommendation;
+  normalized.recommendationReason = classificationSummary.recommendationReason;
+  normalized.classificationConfidenceScore = classificationSummary.confidenceScore;
+  normalized.roleBadge = classificationSummary.roleBadge;
   normalized.duplicateKey = createDuplicateKey(normalized);
   return normalized;
 }

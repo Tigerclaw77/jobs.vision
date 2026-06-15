@@ -1,14 +1,105 @@
 import React from "react";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import {
-  EMPLOYMENT_TYPE_LABELS,
-  OPPORTUNITY_TYPE_LABELS,
+  LISTING_OPPORTUNITY_TYPE_LABELS,
+  LISTING_TIER_LABELS,
   ROLE_LABELS,
-  WORK_ARRANGEMENT_LABELS,
   compensationSummary,
-  labelsForValues,
   normalizeRole,
+  normalizeMultiValue,
 } from "../../utils/jobTaxonomy";
+
+function valuesFrom(job, arrayKey, singleKey, fallbackKey) {
+  return normalizeMultiValue(job?.[arrayKey] || job?.[singleKey] || job?.[fallbackKey]);
+}
+
+function displayRole(role, fallbackTitle = "") {
+  if (role === "other" && fallbackTitle) return String(fallbackTitle).trim();
+  const label = ROLE_LABELS[role] || fallbackTitle || "Job";
+  return String(label).trim();
+}
+
+function opportunityDescriptor(values = []) {
+  if (values.some((value) => value === "corporate_lease")) return "Lease";
+  if (values.some((value) => value === "partnership_opportunity")) return "Partnership";
+  if (values.some((value) => value === "practice_acquisition")) return "Acquisition";
+  if (
+    values.some((value) =>
+      ["associate_w2", "associate_1099", "corporate_employment"].includes(value)
+    )
+  ) {
+    return "Associate";
+  }
+  return "";
+}
+
+function conciseTitle(job = {}, role = "") {
+  const roleTitle = displayRole(role, job.title);
+  const employmentValues = valuesFrom(job, "employment_types", "employment_type", "type");
+  const opportunityValues = role === "optometrist"
+    ? valuesFrom(job, "opportunity_types", "opportunity_type")
+    : [];
+
+  if (employmentValues.includes("per_diem_fill_in")) {
+    return role === "optometrist" ? `${roleTitle} - Locum Tenens` : `${roleTitle} - Per Diem`;
+  }
+
+  const parts = [];
+  const isFullTime = employmentValues.includes("full_time");
+  const isPartTime = employmentValues.includes("part_time");
+  if (isFullTime && isPartTime) parts.push("F/T or P/T");
+  else if (isFullTime) parts.push("F/T");
+  else if (isPartTime) parts.push("P/T");
+
+  const opportunity = opportunityDescriptor(opportunityValues);
+  if (opportunity) parts.push(opportunity);
+
+  return parts.length ? `${roleTitle} - ${parts.join(" ")}` : roleTitle;
+}
+
+function compactCompensation(job = {}) {
+  const structured = compensationSummary(job);
+  const raw = String(structured || job.salary || "").trim();
+  if (!raw) return { primary: "", secondary: "" };
+
+  const normalized = raw.replace(/\s+/g, " ").replace(/[–—]/g, "-");
+  const moneyPattern = "\\$\\s?\\d{2,4}(?:,\\d{3})?(?:\\.\\d{2})?";
+  const range = normalized.match(new RegExp(`(${moneyPattern})\\s*(?:-|to)\\s*(\\$?\\s?\\d{2,4}(?:,\\d{3})?(?:\\.\\d{2})?)`, "i"));
+  const daily = normalized.match(/\$\s?\d{2,4}(?:,\d{3})?(?:\.\d{2})?\s*(?:\/\s?day|per day)/i);
+  const singleAnnual = normalized.match(/\$\s?\d{2,4},\d{3}(?:\.\d{2})?/i);
+  const singleHourly = normalized.match(/\$\s?\d{2,3}(?:\.\d{2})?\s*(?:\/\s?hr|per hour|hourly)/i);
+  const hasHourly = /\/\s?hr|per hour|hourly/i.test(normalized);
+  const cleanMoney = (value = "") => {
+    const compact = value.replace(/\s+/g, "");
+    return compact.startsWith("$") ? compact : `$${compact}`;
+  };
+
+  let primary = "";
+  if (daily) {
+    primary = daily[0].replace(/\s*per day/i, "/day").replace(/\s+/g, "");
+  } else if (range) {
+    primary = `${cleanMoney(range[1])} - ${cleanMoney(range[2])}`;
+    if (hasHourly) primary += "/hr";
+  } else if (singleHourly) {
+    primary = singleHourly[0].replace(/\s*per hour/i, "/hr").replace(/\s+/g, "");
+  } else if (singleAnnual) {
+    primary = singleAnnual[0].replace(/\s+/g, "");
+  } else {
+    const isShortNote = normalized.length <= 36;
+    const looksLikeBenefits = /paid ce|insurance|retirement|pto|relocation|benefits|assistance/i.test(normalized);
+    primary = isShortNote && !looksLikeBenefits ? normalized : "";
+  }
+
+  if (primary && /\bproduction\b/i.test(normalized) && !/production/i.test(primary)) {
+    primary += " + production";
+  } else if (primary && /commission/i.test(normalized) && !/commission/i.test(primary)) {
+    primary += " + commission";
+  } else if (primary && /\bbonus\b/i.test(normalized) && !/bonus/i.test(primary)) {
+    primary += " + bonus";
+  }
+
+  return { primary, secondary: "" };
+}
 
 export default function JobCard({
   job,
@@ -24,23 +115,48 @@ export default function JobCard({
   isHidden = false,
   onRestoreClick,
   restoreTooltip,
+  onClaimClick,
+  claimTooltip,
+  isClaiming = false,
+  onAdminRemoveClick,
 }) {
   const role = normalizeRole(job.role) || job.role;
-  const opportunityLabels =
-    role === "optometrist"
-      ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
-      : [];
-  const meta = [
-    ROLE_LABELS[role] || job.role,
-    ...labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type || job.type),
-    ...labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement),
-    ...opportunityLabels,
-    compensationSummary(job),
+  const cardTitle = conciseTitle(job, role);
+  const cardCompensation = compactCompensation(job);
+  const listingTier =
+    job.listing_tier ||
+    (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
+  const listingOpportunityType = job.listing_opportunity_type || "job";
+  const claimStatus = job.claim_status || "unclaimed";
+  const isImportedListing = job.listing_source === "imported" || listingTier === "imported";
+  const isClaimedListing = claimStatus === "claimed" || Boolean(job.claimed_by_user_id);
+  const showClaimAction = Boolean(onClaimClick && isImportedListing && !isClaimedListing);
+  const badges = [
+    listingTier === "sponsor" && {
+      key: "sponsor",
+      className: "job-listing-badge sponsor",
+      label: LISTING_TIER_LABELS.sponsor,
+    },
+    listingOpportunityType !== "job" && {
+      key: listingOpportunityType,
+      className: `job-listing-badge opportunity ${listingOpportunityType}`,
+      label: LISTING_OPPORTUNITY_TYPE_LABELS[listingOpportunityType] || listingOpportunityType,
+    },
+    isClaimedListing && {
+      key: "claimed",
+      className: "job-listing-badge claimed",
+      label: "Claimed",
+    },
   ].filter(Boolean);
+  const cardClasses = [
+    "job-card",
+    listingTier === "featured" ? "job-card-featured" : "",
+    isHidden ? "job-card-hidden" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <div
-      className={`job-card ${isHidden ? "job-card-hidden" : ""}`}
+      className={cardClasses}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -59,12 +175,10 @@ export default function JobCard({
         <button
           type="button"
           className={`jl-icon-btn jl-check ${isApplied ? "active" : ""}`}
-          title={appliedTooltip || (isApplied ? "Already applied" : "Apply to this job")}
-          aria-label={isApplied ? "Already applied" : "Apply to this job"}
+          title={appliedTooltip || (isApplied ? "Mark as not applied" : "Mark as applied")}
+          aria-label={isApplied ? "Mark as not applied" : "Mark as applied"}
           aria-pressed={Boolean(isApplied)}
-          onClick={() => {
-            if (!isApplied) onApplyClick?.(job._id);
-          }}
+          onClick={() => onApplyClick?.(job._id)}
         >
           <CheckCircle size={18} />
         </button>
@@ -92,10 +206,59 @@ export default function JobCard({
       </div>
 
       <div className="job-content">
-        <h3 className="job-title">{job.title}</h3>
+        {badges.length > 0 && (
+          <div className="job-listing-badges">
+            {badges.map((badge) => (
+              <span key={badge.key} className={badge.className} title={badge.title || badge.label}>
+                {badge.label}
+              </span>
+            ))}
+          </div>
+        )}
+        <h3 className="job-title">{cardTitle}</h3>
         {job.company && <p className="job-company">{job.company}</p>}
         {job.location && <p className="job-location">{job.location}</p>}
-        {meta.length > 0 && <p className="job-meta">{meta.join(" | ")}</p>}
+        {cardCompensation.primary && (
+          <p className="job-compensation">
+            <span>{cardCompensation.primary}</span>
+            {cardCompensation.secondary && <small>{cardCompensation.secondary}</small>}
+          </p>
+        )}
+        {(showClaimAction || onAdminRemoveClick) && (
+          <div className="job-secondary-actions">
+            {showClaimAction && (
+              <button
+                type="button"
+                className="job-claim-action"
+                title={claimTooltip || "Claim this listing"}
+                disabled={isClaiming || claimStatus === "pending"}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClaimClick?.(job._id);
+                }}
+              >
+                {claimStatus === "pending"
+                  ? "Claim pending"
+                  : isClaiming
+                  ? "Submitting..."
+                  : "Claim this listing"}
+              </button>
+            )}
+            {onAdminRemoveClick && (
+              <button
+                type="button"
+                className="job-admin-remove-action"
+                title="Remove from public results"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAdminRemoveClick(job._id || job.id);
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        )}
         {isHidden && (
           <button
             type="button"

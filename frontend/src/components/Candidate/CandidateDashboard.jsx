@@ -7,6 +7,7 @@ import JobModal from "../JobSearch/JobModal";
 import {
   applyToJob,
   fetchFavoriteJobs,
+  removeJobApplication,
   removeJobFromFavorites,
 } from "../../utils/api.supabase";
 import { fetchUserJobData } from "../../store/jobSlice";
@@ -151,12 +152,21 @@ const CandidateDashboard = () => {
 
   const handleApply = async (jobId) => {
     if (!jobId) return;
+    const normalizedId = String(jobId);
+    const wasApplied = appliedJobIds.has(normalizedId);
     try {
-      await applyToJob(jobId);
+      if (wasApplied) {
+        await removeJobApplication(jobId);
+      } else {
+        await applyToJob(jobId);
+      }
+      const nextAppliedJobs = wasApplied
+        ? appliedJobs.map(String).filter((id) => id !== normalizedId)
+        : Array.from(new Set([...appliedJobs.map(String), normalizedId]));
       dispatch(
         fetchUserJobData({
           savedJobs: favoriteIds,
-          appliedJobs: Array.from(new Set([...appliedJobs.map(String), String(jobId)])),
+          appliedJobs: nextAppliedJobs,
           recruiterJobs,
           hiddenJobs,
         })
@@ -290,8 +300,8 @@ const CandidateDashboard = () => {
           savedTooltip="Remove saved job"
           appliedTooltip={
             selectedJob && appliedJobIds.has(String(selectedJob._id))
-              ? "Already applied"
-              : "Apply to this job"
+              ? "Mark as not applied"
+              : "Mark as applied"
           }
           onFavoriteClick={removeFavorite}
           onApply={handleApply}

@@ -57,7 +57,9 @@ const chooseDest = (role, next) => {
   const r = String(role || "").toLowerCase();
   if (next) {
     if (r === "admin" && next.startsWith("/admin")) return next;
+    if (r === "admin" && next.startsWith("/claim-listing/")) return next;
     if (r === "recruiter" && next.startsWith("/recruiter")) return next;
+    if (r === "recruiter" && next.startsWith("/claim-listing/")) return next;
     if (r === "candidate" && next.startsWith("/candidate")) return next;
   }
   return pathForRole(r);
@@ -178,7 +180,6 @@ export default function Login() {
     const { user: neonUser } = await getNeonUser();
     const currentSession = refreshed.session || (await getNeonSession()).session;
     const user = currentSession?.user ?? session?.user ?? neonUser;
-    const token = currentSession?.access_token || session?.access_token;
 
     const { role, tier, entitlements } = await getRoleTier({
       account: refreshed.account,
@@ -188,7 +189,6 @@ export default function Login() {
 
     dispatch(
       loginRedux({
-        token: token || null,
         userRole: role,
         user: {
           id: user?.id || null,
@@ -211,8 +211,9 @@ export default function Login() {
       })
     );
 
-    // 🚪 Go to intended destination or per-role default (admin → /admin)
-    navigate(chooseDest(role, nextPath), { replace: true });
+    const destination = chooseDest(role, nextPath);
+    // Go to intended destination or per-role default.
+    navigate(destination, { replace: true });
   };
 
   // ---- Password login

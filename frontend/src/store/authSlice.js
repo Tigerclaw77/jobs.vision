@@ -91,12 +91,11 @@ try {
 } catch { rawUser = null; }
 
 const initialState = {
-  token: safeGet("token") || null,
   userRole: safeGet("userRole") || null,
   user: rawUser || null,
   status: "idle",
   error: null,
-  isAuthenticated: !!safeGet("token"),
+  isAuthenticated: false,
 };
 
 /**
@@ -152,7 +151,7 @@ export const fetchUserSession = createAsyncThunk(
         })
       );
 
-      return { token: session.access_token, user: shapedUser };
+      return { user: shapedUser };
     } catch (err) {
       return thunkAPI.rejectWithValue(err?.message || "Failed to load session");
     }
@@ -165,18 +164,16 @@ const authSlice = createSlice({
   reducers: {
     // Called by your login screen after Neon Auth signInWithPassword()
     login(state, action) {
-      const { token, userRole, user } = action.payload;
-      state.token = token;
+      const { userRole, user } = action.payload;
       state.userRole = userRole;
       state.user = user;
       state.isAuthenticated = true;
 
-      safeSet("token", token);
+      safeSet("token", null);
       safeSet("userRole", userRole || "");
       safeSet("user", JSON.stringify(user || {}));
     },
     logout(state) {
-      state.token = null;
       state.userRole = null;
       state.user = null;
       state.status = "idle";
@@ -195,19 +192,17 @@ const authSlice = createSlice({
       })
       .addCase(fetchUserSession.fulfilled, (state, action) => {
         state.status = "succeeded";
-        state.token = action.payload.token;
         state.user = action.payload.user;
         state.userRole = action.payload.user?.userRole || null;
         state.isAuthenticated = true;
 
-        safeSet("token", action.payload.token);
+        safeSet("token", null);
         safeSet("userRole", action.payload.user?.userRole || "");
         safeSet("user", JSON.stringify(action.payload.user));
       })
       .addCase(fetchUserSession.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload;
-        state.token = null;
         state.user = null;
         state.userRole = null;
         state.isAuthenticated = false;

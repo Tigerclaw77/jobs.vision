@@ -1,20 +1,27 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import RecruiterJobCard from "./RecruiterJobCard";
 
-const JobTabs = ({ jobsByStatus, onEdit, onArchive, onUnarchive }) => {
-  const [activeTab, setActiveTab] = useState("active");
+const TAB_ORDER = ["draft", "active", "paused", "expired", "archived", "pending", "featured"];
+
+const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchive }) => {
+  const [activeTab, setActiveTab] = useState("draft");
 
   const tabLabels = {
+    draft: "Drafts",
     active: "Active",
-    pending: "Pending Verification",
-    archived: "Archived",
-    featured: "Featured",
+    paused: "Paused",
     expired: "Expired",
+    archived: "Archived",
+    pending: "Pending Verification",
+    featured: "Featured",
   };
 
-  const tabs = Object.keys(jobsByStatus).filter(
-    (key) => jobsByStatus[key]?.length > 0
-  );
+  const tabs = TAB_ORDER.filter((key) => key in jobsByStatus);
+
+  useEffect(() => {
+    if (!tabs.length) return;
+    if (!tabs.includes(activeTab)) setActiveTab(tabs[0]);
+  }, [activeTab, tabs]);
 
   return (
     <div className="job-tabs">
@@ -39,6 +46,8 @@ const JobTabs = ({ jobsByStatus, onEdit, onArchive, onUnarchive }) => {
               key={job.id || job._id}
               job={job}
               onEdit={onEdit}
+              onPause={activeTab === "active" || activeTab === "pending" ? onPause : null}
+              onResume={activeTab === "paused" ? onResume : null}
               onArchive={activeTab !== "archived" ? onArchive : null}
               onUnarchive={activeTab === "archived" ? onUnarchive : null}
             />

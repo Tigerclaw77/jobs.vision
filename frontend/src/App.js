@@ -16,10 +16,13 @@ import Login from "./components/Login";
 import Logout from "./components/Logout";
 import Header from "./components/Header";
 import Home from "./components/Home";
+import PricingPage from "./components/PricingPage";
 import Notifications from "./components/Notifications";
 import AdminDashboard from "./components/Admin/AdminDashboard";
 import DiscoverySources from "./components/Admin/DiscoverySources";
 import JobImportReview from "./components/Admin/JobImportReview";
+import ListingClaims from "./components/Admin/ListingClaims";
+import MarketplaceDashboard from "./components/Admin/MarketplaceDashboard";
 import ManualOverrideReview from "./components/Admin/ManualOverrideReview";
 import RecruiterDashboard from "./components/Recruiter/RecruiterDashboard";
 import RecruiterRegistration from "./components/Recruiter/RecruiterRegistration";
@@ -33,6 +36,7 @@ import Profile from "./components/Profile";
 import CandidateDashboard from "./components/Candidate/CandidateDashboard";
 import SearchJobs from "./components/Candidate/SearchJobs";
 import JobList from "./components/JobSearch/JobList";
+import ClaimListing from "./components/ClaimListing";
 import CheckYourEmail from "./components/CheckYourEmail";
 import VerifyEmail from "./components/VerifyEmail";
 import ForgotPassword from "./components/ForgotPassword";
@@ -264,6 +268,7 @@ function AppShell() {
             <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
+            <Route path="/pricing" element={<PricingPage />} />
 
             {/* Auth pages are public-only to avoid the "logged in but see login again" loop */}
             <Route
@@ -303,6 +308,7 @@ function AppShell() {
 
             {/* Open job search page */}
             <Route path="/jobs" element={<JobList />} />
+            <Route path="/claim-listing/:jobId" element={<ClaimListing />} />
 
             <Route path="/unauthorized" element={<Unauthorized />} />
 
@@ -356,6 +362,22 @@ function AppShell() {
               element={
                 <ProtectedRoute allowedUserRoles={["admin"]}>
                   <JobImportReview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/listing-claims"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <ListingClaims />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/marketplace"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <MarketplaceDashboard />
                 </ProtectedRoute>
               }
             />

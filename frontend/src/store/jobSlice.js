@@ -1,17 +1,19 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
+import { getNeonAccessToken } from "../utils/neonAuthClient";
 
 // ✅ Toggle Favorite Job
 export const toggleFavoriteJob = createAsyncThunk(
   "jobs/toggleFavoriteJob",
-  async (jobId, { getState, rejectWithValue }) => {
+  async (jobId, { rejectWithValue }) => {
     try {
-      const { auth } = getState();
+      const token = await getNeonAccessToken();
+      if (!token) throw new Error("Not signed in.");
       const res = await axios.post(
         `/api/jobs/favorite/${jobId}`,
         {},
         {
-          headers: { Authorization: `Bearer ${auth.token}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       return res.data.favorites;
@@ -24,14 +26,15 @@ export const toggleFavoriteJob = createAsyncThunk(
 // ✅ Apply to Job
 export const applyToJob = createAsyncThunk(
   "jobs/applyToJob",
-  async (jobId, { getState, rejectWithValue }) => {
+  async (jobId, { rejectWithValue }) => {
     try {
-      const { auth } = getState();
+      const token = await getNeonAccessToken();
+      if (!token) throw new Error("Not signed in.");
       const res = await axios.post(
         `/api/jobs/apply/${jobId}`,
         {},
         {
-          headers: { Authorization: `Bearer ${auth.token}` },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       return res.data.appliedJobs;

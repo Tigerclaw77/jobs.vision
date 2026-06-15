@@ -31,6 +31,9 @@ async function main() {
       industryConfig,
       maxDepth: 1,
       maxFollowLinks: 1,
+      maxAtsJobs: Number(process.env.JOB_DISCOVERY_MAX_ATS_JOBS || 1200),
+      maxIcimsPages: Number(process.env.JOB_DISCOVERY_MAX_ICIMS_PAGES || 10),
+      atsPageDelayMs: Number(process.env.JOB_DISCOVERY_ATS_PAGE_DELAY_MS || 150),
       delayMs: 750,
     });
 

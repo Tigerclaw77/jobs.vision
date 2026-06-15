@@ -9,8 +9,9 @@ function scoreDiscovery(result, normalized, options = {}) {
   if (normalized.location) score += 10;
   if (normalized.description && normalized.description.length > 120) score += 15;
   if (normalized.applyUrl) score += 15;
+  if (normalized.requisitionId) score += 10;
   if (result.extractionNotes?.some((note) => /json-ld/i.test(note))) score += 15;
-  if (["greenhouse", "lever", "workday"].includes(result.sourceType)) score += 5;
+  if (result.atsProvider || ["greenhouse", "lever", "workday"].includes(result.sourceType)) score += 5;
   if (normalized.roleTags?.length) score += 5;
 
   if (options.industryConfig?.includeIfAnyKeywordMatches?.length && !normalized.roleTags?.length) {

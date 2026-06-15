@@ -1,13 +1,14 @@
 // src/components/JobSearch/JobList.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { createStripeCheckout } from "../../utils/api";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { archiveJob, createStripeCheckout } from "../../utils/api";
 import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 
 import {
   fetchJobs,
   addJobToFavorites,
   applyToJob,
+  removeJobApplication,
   hideJob as hideJobPreference,
   unhideJob as unhideJobPreference,
   getUserJobInteractions,
@@ -20,12 +21,16 @@ import JobMap from "./JobMap";
 import Pagination from "./Pagination";
 
 import { buildLookupFromJobs, smartParseQuery } from "../../utils/smartParseQuery";
+import { JOB_SORT_MODES, normalizeSortMode, rankJobs } from "../../utils/jobRanking";
 import {
+  BRAND_FILTER_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   OPPORTUNITY_TYPE_LABELS,
   PRACTICE_TYPE_LABELS,
   ROLE_LABELS,
+  SATURDAY_SCHEDULE_LABELS,
   WORK_ARRANGEMENT_LABELS,
+  expandBrandFilterValues,
   normalizeMultiValue,
   normalizeRole,
   normalizeToken,
@@ -35,6 +40,11 @@ import "../../styles/jobSearch.css";
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const PAGE_SIZE = 12;
 const FREE_SAVE_LIMIT = 5;
+const SORT_OPTIONS = [
+  { value: JOB_SORT_MODES.BEST_MATCH, label: "Best Match" },
+  { value: JOB_SORT_MODES.NEWEST, label: "Newest" },
+  { value: JOB_SORT_MODES.DISTANCE, label: "Distance" },
+];
 let googleMapsPromise;
 
 // ---------- helpers ----------
@@ -67,6 +77,116 @@ function cleanLocationInput(location = "") {
 function normalizeLocationText(location = "") {
   return cleanLocationInput(location).toLowerCase();
 }
+const US_STATES = [
+  ["AL", "Alabama"],
+  ["AK", "Alaska"],
+  ["AZ", "Arizona"],
+  ["AR", "Arkansas"],
+  ["CA", "California"],
+  ["CO", "Colorado"],
+  ["CT", "Connecticut"],
+  ["DE", "Delaware"],
+  ["DC", "District of Columbia"],
+  ["FL", "Florida"],
+  ["GA", "Georgia"],
+  ["HI", "Hawaii"],
+  ["ID", "Idaho"],
+  ["IL", "Illinois"],
+  ["IN", "Indiana"],
+  ["IA", "Iowa"],
+  ["KS", "Kansas"],
+  ["KY", "Kentucky"],
+  ["LA", "Louisiana"],
+  ["ME", "Maine"],
+  ["MD", "Maryland"],
+  ["MA", "Massachusetts"],
+  ["MI", "Michigan"],
+  ["MN", "Minnesota"],
+  ["MS", "Mississippi"],
+  ["MO", "Missouri"],
+  ["MT", "Montana"],
+  ["NE", "Nebraska"],
+  ["NV", "Nevada"],
+  ["NH", "New Hampshire"],
+  ["NJ", "New Jersey"],
+  ["NM", "New Mexico"],
+  ["NY", "New York"],
+  ["NC", "North Carolina"],
+  ["ND", "North Dakota"],
+  ["OH", "Ohio"],
+  ["OK", "Oklahoma"],
+  ["OR", "Oregon"],
+  ["PA", "Pennsylvania"],
+  ["RI", "Rhode Island"],
+  ["SC", "South Carolina"],
+  ["SD", "South Dakota"],
+  ["TN", "Tennessee"],
+  ["TX", "Texas"],
+  ["UT", "Utah"],
+  ["VT", "Vermont"],
+  ["VA", "Virginia"],
+  ["WA", "Washington"],
+  ["WV", "West Virginia"],
+  ["WI", "Wisconsin"],
+  ["WY", "Wyoming"],
+];
+const STATE_LOOKUP = US_STATES.reduce((lookup, [code, name]) => {
+  const entry = { code, name };
+  lookup.set(code.toLowerCase(), entry);
+  lookup.set(name.toLowerCase(), entry);
+  return lookup;
+}, new Map());
+function stateLookupKey(value = "") {
+  return cleanLocationInput(value).replace(/\./g, "").toLowerCase();
+}
+function detectStateLocation(location = "") {
+  const cleaned = cleanLocationInput(location);
+  if (!cleaned || cleaned.includes(",") || /^\d{5}(?:-\d{4})?$/.test(cleaned)) return null;
+  return STATE_LOOKUP.get(stateLookupKey(cleaned)) || null;
+}
+function stateCodeFromLocationText(location = "") {
+  const cleaned = cleanLocationInput(location).replace(/\./g, "");
+  if (!cleaned) return "";
+
+  const exact = STATE_LOOKUP.get(cleaned.toLowerCase());
+  if (exact) return exact.code;
+
+  const commaParts = cleaned
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reverse();
+  for (const part of commaParts) {
+    const match = STATE_LOOKUP.get(part.toLowerCase());
+    if (match) return match.code;
+  }
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  for (let length = Math.min(words.length, 3); length > 0; length -= 1) {
+    const suffix = words.slice(words.length - length).join(" ");
+    const match = STATE_LOOKUP.get(suffix.toLowerCase());
+    if (match) return match.code;
+  }
+
+  const pieces = cleaned
+    .split(/[\s,]+/)
+    .map((piece) => piece.trim())
+    .filter(Boolean)
+    .reverse();
+  for (const piece of pieces) {
+    if (piece.length !== 2) continue;
+    const match = STATE_LOOKUP.get(piece.toLowerCase());
+    if (match) return match.code;
+  }
+  return "";
+}
+function stateCodeForJob(job = {}) {
+  return (
+    stateCodeFromLocationText(job.state) ||
+    stateCodeFromLocationText(job.state_code) ||
+    stateCodeFromLocationText(job.location)
+  );
+}
 function getJobLocationText(job = {}) {
   return [
     job.location,
@@ -85,6 +205,14 @@ function getJobPosition(job, geocodedLocations = {}) {
 
   const key = locationKey(job?.location);
   return key ? geocodedLocations[key] || null : null;
+}
+function jobDistanceFromCenter(job, center, geocodedLocations = {}) {
+  const position = getJobPosition(job, geocodedLocations);
+  if (!position || !center) return null;
+  return {
+    ...position,
+    distanceMi: haversineMi(center, position),
+  };
 }
 function loadGoogleMaps(apiKey) {
   if (!apiKey) return Promise.reject(new Error("Google Maps API key is not configured."));
@@ -134,6 +262,7 @@ async function geocodeAddress(address, apiKey) {
 const TYPE_LABEL = EMPLOYMENT_TYPE_LABELS;
 const OPPORTUNITY_TYPE_LABEL = OPPORTUNITY_TYPE_LABELS;
 const PRACTICE_TYPE_LABEL = PRACTICE_TYPE_LABELS;
+const SATURDAY_SCHEDULE_LABEL = SATURDAY_SCHEDULE_LABELS;
 const WORK_ARRANGEMENT_LABEL = WORK_ARRANGEMENT_LABELS;
 const titleCase = (s = "") =>
   String(s)
@@ -187,6 +316,9 @@ const DEFAULT_FILTERS = {
   workArrangements: [],
   opportunityTypes: [],
   practiceTypes: [],
+  saturdaySchedules: [],
+  includeBrand: [],
+  excludeBrand: [],
   company: "",
   showHiddenJobs: false,
 };
@@ -197,6 +329,9 @@ const ARRAY_FILTER_KEYS = new Set([
   "workArrangements",
   "opportunityTypes",
   "practiceTypes",
+  "saturdaySchedules",
+  "includeBrand",
+  "excludeBrand",
 ]);
 
 function searchParamsForFilters(filters, sort, page) {
@@ -216,7 +351,7 @@ function searchParamsForFilters(filters, sort, page) {
     if (serializedValue === "") return;
     params[key] = String(serializedValue);
   });
-  params.sort = sort || "newest";
+  params.sort = normalizeSortMode(sort);
   params.page = String(page || 1);
   return params;
 }
@@ -244,18 +379,16 @@ function filtersFromSearchParams(searchParams) {
       next[key] = value;
     }
   });
-  if (!includesOptometristRole(next.roles)) {
-    next.opportunityTypes = [];
-  }
-
   return next;
 }
 
 export default function JobList() {
+  const navigate = useNavigate();
   const effectiveAuth = useEffectiveAuth();
   const authUser = effectiveAuth.user;
   const userRole = String(authUser?.userRole || effectiveAuth.role || "").toLowerCase();
   const isCandidateUser = userRole === "candidate";
+  const isAdminUser = userRole === "admin";
   const canUseMapSearch =
     userRole === "admin" || authUser?.entitlements?.candidate?.features?.mapSearch === true;
   const canUseAdvancedOdFilters = canUseMapSearch;
@@ -270,9 +403,21 @@ export default function JobList() {
 
   // filters & query state
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [sort, setSort] = useState("newest");
+  const [sort, setSort] = useState(JOB_SORT_MODES.BEST_MATCH);
   const [searchParams, setSearchParams] = useSearchParams();
   const debounceRef = useRef(null);
+  const includeBrandFilter = useMemo(
+    () => normalizeFilterArray(filters.includeBrand),
+    [filters.includeBrand]
+  );
+  const excludeBrandFilter = useMemo(
+    () => normalizeFilterArray(filters.excludeBrand),
+    [filters.excludeBrand]
+  );
+  const brandFilterKey = useMemo(
+    () => `${includeBrandFilter.join("|")}::${excludeBrandFilter.join("|")}`,
+    [includeBrandFilter, excludeBrandFilter]
+  );
 
   // interactions
   const [favorites, setFavorites] = useState(new Set());
@@ -293,7 +438,7 @@ export default function JobList() {
   // parse URL
   useEffect(() => {
     setFilters(filtersFromSearchParams(searchParams));
-    setSort(searchParams.get("sort") || "newest");
+    setSort(normalizeSortMode(searchParams.get("sort")));
   }, [searchParams]);
 
   // load jobs
@@ -301,7 +446,10 @@ export default function JobList() {
     const load = async () => {
       setFetchError("");
       try {
-        const list = await fetchJobs();
+        const list = await fetchJobs({
+          includeBrand: includeBrandFilter,
+          excludeBrand: excludeBrandFilter,
+        });
         setJobs(list || []);
         setFilteredJobs(list || []);
       } catch (err) {
@@ -312,7 +460,7 @@ export default function JobList() {
       }
     };
     load();
-  }, []);
+  }, [brandFilterKey, includeBrandFilter, excludeBrandFilter]);
 
   useEffect(() => {
   document.body.classList.add('dim-bg');
@@ -323,9 +471,6 @@ export default function JobList() {
     const normalizedFilters = { ...nextFilters };
     if ("roles" in normalizedFilters) {
       normalizedFilters.roles = normalizeRoleFilters(normalizedFilters.roles);
-      if (!includesOptometristRole(normalizedFilters.roles)) {
-        normalizedFilters.opportunityTypes = [];
-      }
     }
     if ("location" in normalizedFilters) {
       const nextLocation = collapseLocationInput(normalizedFilters.location);
@@ -338,6 +483,12 @@ export default function JobList() {
     }
     setFilters(normalizedFilters);
     setSearchParams(searchParamsForFilters(normalizedFilters, sort, 1), { replace: true });
+  };
+
+  const updateSort = (nextSort) => {
+    const normalizedSort = normalizeSortMode(nextSort);
+    setSort(normalizedSort);
+    setSearchParams(searchParamsForFilters(filters, normalizedSort, 1), { replace: true });
   };
 
 
@@ -363,9 +514,18 @@ export default function JobList() {
   const canBuyCandidateMapPlan = isAuthed && isCandidateUser;
   const displayLocation = cleanLocationInput(filters.location);
   const normalizedLocation = normalizeLocationText(filters.location);
+  const stateLocationSearch = useMemo(
+    () => detectStateLocation(filters.location),
+    [filters.location]
+  );
+  const isStateLocationSearch = Boolean(stateLocationSearch);
   const hasLocationText = Boolean(normalizedLocation);
   const hasActiveRadius =
-    canUseMapSearch && hasLocationText && geocodeStatus === "success" && Boolean(searchCenter);
+    canUseMapSearch &&
+    !isStateLocationSearch &&
+    hasLocationText &&
+    geocodeStatus === "success" &&
+    Boolean(searchCenter);
 
   // SMART PARSE: convert free-text into filter fields; keep leftovers in q
   useEffect(() => {
@@ -398,6 +558,15 @@ export default function JobList() {
     if (!location) {
       setGeocodeStatus("idle");
       setGeocodeMessage("");
+      if (filters.lat != null || filters.lng != null) {
+        setFilters((prev) => ({ ...prev, lat: null, lng: null }));
+      }
+      return;
+    }
+    const stateLocation = detectStateLocation(location);
+    if (stateLocation) {
+      setGeocodeStatus("state");
+      setGeocodeMessage(`Showing jobs in ${stateLocation.name}`);
       if (filters.lat != null || filters.lng != null) {
         setFilters((prev) => ({ ...prev, lat: null, lng: null }));
       }
@@ -498,7 +667,7 @@ export default function JobList() {
         label: TYPE_LABEL[normalizeType(value)] || titleCase(value.replace(/_/g, " ")),
       });
     });
-    if (canUseAdvancedOdFilters) {
+    if (canUseAdvancedOdFilters && includesOptometristRole(filters.roles)) {
       normalizeFilterArray(filters.opportunityTypes).forEach((value) => {
         tags.push({
           type: "opportunityTypes",
@@ -518,7 +687,7 @@ export default function JobList() {
           titleCase(value.replace(/_/g, " ")),
       });
     });
-    if (canUseAdvancedOdFilters) {
+    if (canUseAdvancedOdFilters && includesOptometristRole(filters.roles)) {
       normalizeFilterArray(filters.practiceTypes).forEach((value) => {
         tags.push({
           type: "practiceTypes",
@@ -528,12 +697,36 @@ export default function JobList() {
             titleCase(value.replace(/_/g, " ")),
         });
       });
+      normalizeFilterArray(filters.saturdaySchedules).forEach((value) => {
+        tags.push({
+          type: "saturdaySchedules",
+          value,
+          label:
+            SATURDAY_SCHEDULE_LABEL[normalizeType(value)] ||
+            titleCase(value.replace(/_/g, " ")),
+        });
+      });
     }
+    normalizeFilterArray(filters.includeBrand).forEach((value) => {
+      tags.push({
+        type: "includeBrand",
+        value,
+        label: `Include: ${BRAND_FILTER_LABELS[value] || value}`,
+      });
+    });
+    normalizeFilterArray(filters.excludeBrand).forEach((value) => {
+      tags.push({
+        type: "excludeBrand",
+        value,
+        label: `Exclude: ${BRAND_FILTER_LABELS[value] || value}`,
+      });
+    });
     if (filters.location) {
+      const stateLocation = detectStateLocation(filters.location);
       tags.push({
         type: "location",
         value: normalizeLocationText(filters.location),
-        label: titleCase(cleanLocationInput(filters.location)),
+        label: stateLocation?.name || titleCase(cleanLocationInput(filters.location)),
       });
     }
     return tags;
@@ -550,6 +743,9 @@ export default function JobList() {
         workArrangements = [],
         opportunityTypes = [],
         practiceTypes = [],
+        saturdaySchedules = [],
+        includeBrand = [],
+        excludeBrand = [],
         location = "",
         company = "",
         lat,
@@ -559,19 +755,29 @@ export default function JobList() {
       } = filters;
       const center = finitePoint(lat, lng);
       const locationText = normalizeLocationText(location);
+      const stateLocation = detectStateLocation(location);
+      const stateFilterCode = stateLocation?.code || "";
       const locationRadiusActive =
-        canUseMapSearch && geocodeStatus === "success" && Boolean(locationText && center);
+        canUseMapSearch &&
+        !stateFilterCode &&
+        geocodeStatus === "success" &&
+        Boolean(locationText && center);
       const qLower = q.trim().toLowerCase();
       const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
       const workArrangementSet = new Set(normalizeFilterArray(workArrangements).map(normalizeType));
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
+      const saturdaySet = new Set(normalizeFilterArray(saturdaySchedules).map(normalizeType));
       const roleSet = new Set(
         normalizeRoleFilters(roles)
       );
-      const opportunitySet = canUseAdvancedOdFilters && roleSet.has("optometrist")
+      const odFiltersEnabled = canUseAdvancedOdFilters && roleSet.has("optometrist");
+      const opportunitySet = odFiltersEnabled
         ? new Set(normalizeFilterArray(opportunityTypes).map(normalizeType))
         : new Set();
-      const activePracticeSet = canUseAdvancedOdFilters ? practiceSet : new Set();
+      const activePracticeSet = odFiltersEnabled ? practiceSet : new Set();
+      const activeSaturdaySet = odFiltersEnabled ? saturdaySet : new Set();
+      const includeBrandSet = new Set(expandBrandFilterValues(includeBrand).map((value) => value.toLowerCase()));
+      const excludeBrandSet = new Set(expandBrandFilterValues(excludeBrand).map((value) => value.toLowerCase()));
 
       const next = (jobs || []).filter((job) => {
         const jobId = String(job._id || job.id || "");
@@ -580,10 +786,17 @@ export default function JobList() {
         const employmentValues = jobValues(job, "employment_types", "employment_type", "type");
         const workArrangementValues = jobValues(job, "work_arrangements", "work_arrangement");
         const opportunityValues = jobValues(job, "opportunity_types", "opportunity_type");
+        const saturdaySchedule = normalizeType(job.saturday_schedule);
 
         const hay = [
           job.title,
           job.company,
+          job.employer_brand,
+          job.practice_name,
+          job.parent_company,
+          job.employer_name,
+          job.venue_brand,
+          job.venue_name,
           job.description,
           ROLE_LABELS[roleValue],
           roleValue,
@@ -596,6 +809,8 @@ export default function JobList() {
           ...opportunityValues.map((value) => OPPORTUNITY_TYPE_LABEL[value]),
           job.practice_type,
           PRACTICE_TYPE_LABEL[normalizeType(job.practice_type)],
+          saturdaySchedule,
+          SATURDAY_SCHEDULE_LABEL[saturdaySchedule],
           job.location,
         ]
           .filter(Boolean)
@@ -613,12 +828,21 @@ export default function JobList() {
           opportunitySet.size === 0 || opportunityValues.some((value) => opportunitySet.has(value));
         const matchPractice =
           activePracticeSet.size === 0 || activePracticeSet.has(normalizeType(job.practice_type));
+        const matchSaturday =
+          activeSaturdaySet.size === 0 || activeSaturdaySet.has(saturdaySchedule);
         const matchCompany =
-          !company || (job.company || "").toLowerCase().includes(String(company).toLowerCase());
-        const matchLocText =
-          !locationText ||
-          locationRadiusActive ||
-          getJobLocationText(job).includes(locationText);
+          !company ||
+          [job.company, job.employer_brand, job.practice_name, job.parent_company, job.employer_name]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+            .includes(String(company).toLowerCase());
+        const brandValue = String(job.employer_brand || "").toLowerCase();
+        const matchIncludeBrand = includeBrandSet.size === 0 || includeBrandSet.has(brandValue);
+        const matchExcludeBrand = excludeBrandSet.size === 0 || !excludeBrandSet.has(brandValue);
+        const matchLocText = stateFilterCode
+          ? stateCodeForJob(job) === stateFilterCode
+          : !locationText || locationRadiusActive || getJobLocationText(job).includes(locationText);
 
         let matchRadius = true;
         if (locationRadiusActive) {
@@ -635,13 +859,24 @@ export default function JobList() {
           matchWorkArrangement &&
           matchOpportunity &&
           matchPractice &&
+          matchSaturday &&
           matchCompany &&
+          matchIncludeBrand &&
+          matchExcludeBrand &&
           matchLocText &&
           matchRadius
         );
       });
 
-      setFilteredJobs(next);
+      setFilteredJobs(
+        rankJobs(next, {
+          sortMode: sort,
+          filters,
+          searchCenter: locationRadiusActive ? center : null,
+          radiusMi,
+          getPosition: (job) => jobDistanceFromCenter(job, center, jobLocationCoords),
+        })
+      );
     }, 200);
     return () => clearTimeout(debounceRef.current);
   }, [
@@ -652,6 +887,7 @@ export default function JobList() {
     geocodeStatus,
     jobLocationCoords,
     hiddenJobs,
+    sort,
   ]);
 
   // pagination
@@ -661,10 +897,14 @@ export default function JobList() {
   const radiusMiles = Number(filters.radiusMi || 25);
   const jobsNoun = filteredJobs.length === 1 ? "job" : "jobs";
   const resultCountText =
-    hasLocationText && canUseMapSearch && geocodeStatus === "success"
+    isStateLocationSearch
+      ? `${filteredJobs.length} ${jobsNoun} found in ${stateLocationSearch.name}`
+      : hasLocationText && canUseMapSearch && geocodeStatus === "success"
       ? `${filteredJobs.length} ${jobsNoun} found within ${radiusMiles} miles`
       : `${filteredJobs.length} ${jobsNoun} found`;
-  const noFilteredJobsMessage = hasLocationText
+  const noFilteredJobsMessage = isStateLocationSearch
+    ? `No jobs found in ${stateLocationSearch.name}.`
+    : hasLocationText
     ? `No jobs found within ${radiusMiles} miles of ${displayLocation || "that location"}`
     : "No jobs match your filters.";
   const mapEmptyMessage =
@@ -680,12 +920,16 @@ export default function JobList() {
     [filteredJobs, appliedJobs, favorites, hiddenJobs]
   );
   const shouldFitMapToJobs = useMemo(() => {
+    const odFiltersEnabled = canUseAdvancedOdFilters && includesOptometristRole(filters.roles);
     const hasArrayFilter = [
       filters.roles,
       filters.employmentTypes,
       filters.workArrangements,
-      canUseAdvancedOdFilters ? filters.opportunityTypes : [],
-      canUseAdvancedOdFilters ? filters.practiceTypes : [],
+      filters.includeBrand,
+      filters.excludeBrand,
+      odFiltersEnabled ? filters.opportunityTypes : [],
+      odFiltersEnabled ? filters.practiceTypes : [],
+      odFiltersEnabled ? filters.saturdaySchedules : [],
     ].some((value) => normalizeFilterArray(value).length > 0);
     const hasNonLocationNarrowing = Boolean(
       cleanLocationInput(filters.q) || cleanLocationInput(filters.company) || hasArrayFilter
@@ -693,8 +937,8 @@ export default function JobList() {
     const filterNarrowsVisibleJobs =
       jobs.length > 0 && filteredJobs.length > 0 && filteredJobs.length < jobs.length;
 
-    return Boolean(hasNonLocationNarrowing && filterNarrowsVisibleJobs);
-  }, [filters, canUseAdvancedOdFilters, jobs.length, filteredJobs.length]);
+    return Boolean((isStateLocationSearch || hasNonLocationNarrowing) && filterNarrowsVisibleJobs);
+  }, [filters, canUseAdvancedOdFilters, isStateLocationSearch, jobs.length, filteredJobs.length]);
 
   // chips: remove one -> clear the corresponding filter (do NOT put it back in q)
 const removeQuickTag = (tag) => {
@@ -716,7 +960,7 @@ const removeQuickTag = (tag) => {
 
   const requireAuth = (message) => {
     const go = window.confirm(message || "Please sign in to continue. Go to Sign In?");
-    if (go) window.location.assign("/login");
+    if (go) navigate("/login");
   };
 
   const savedTooltipFor = (jobId) => {
@@ -730,7 +974,8 @@ const removeQuickTag = (tag) => {
   };
 
   const appliedTooltipFor = (jobId) => {
-    return appliedJobs.has(jobId) ? "Already applied" : "Apply to this job";
+    if (!isAuthed) return "Register or log in to mark applied";
+    return appliedJobs.has(jobId) ? "Mark as not applied" : "Mark as applied";
   };
 
   const hideTooltipFor = () => {
@@ -739,6 +984,12 @@ const removeQuickTag = (tag) => {
 
   const restoreTooltipFor = () => {
     return isAuthed ? "Restore job" : "Register or log in to restore jobs";
+  };
+
+  const claimTooltipFor = (job) => {
+    if (job?.claim_status === "pending") return "Claim pending admin review";
+    if (job?.claim_status === "claimed") return "Listing claimed";
+    return "Claim this Listing";
   };
 
   const handleFavorite = async (jobId) => {
@@ -773,11 +1024,24 @@ const removeQuickTag = (tag) => {
 
   const handleApply = async (jobId) => {
     if (!isAuthed) return requireAuth("Please sign in to apply for jobs. Go to Sign In?");
-    if (appliedJobs.has(jobId)) return;
+    const wasApplied = appliedJobs.has(jobId);
+    setAppliedJobs((prev) => {
+      const next = new Set(prev);
+      wasApplied ? next.delete(jobId) : next.add(jobId);
+      return next;
+    });
     try {
-      await applyToJob(jobId);
-      setAppliedJobs((prev) => new Set(prev).add(jobId));
+      if (wasApplied) {
+        await removeJobApplication(jobId);
+      } else {
+        await applyToJob(jobId);
+      }
     } catch (error) {
+      setAppliedJobs((prev) => {
+        const next = new Set(prev);
+        wasApplied ? next.add(jobId) : next.delete(jobId);
+        return next;
+      });
       if (error?.message) {
         alert(error.message);
         return;
@@ -844,6 +1108,32 @@ const removeQuickTag = (tag) => {
     }
   };
 
+  const handleClaimListing = (jobId) => {
+    navigate(`/claim-listing/${encodeURIComponent(jobId)}`);
+  };
+
+  const handleAdminRemoveJob = async (jobId) => {
+    if (!isAdminUser) return;
+    const confirmed = window.confirm("Remove this job from public results?");
+    if (!confirmed) return;
+
+    try {
+      await archiveJob(jobId);
+      const normalizedId = String(jobId);
+      setJobs((current) =>
+        current.filter((job) => String(job._id || job.id) !== normalizedId)
+      );
+      setSelectedJob((current) =>
+        current && String(current._id || current.id) === normalizedId ? null : current
+      );
+      if (selectedJob && String(selectedJob._id || selectedJob.id) === normalizedId) {
+        setIsModalOpen(false);
+      }
+    } catch (error) {
+      alert(error?.response?.data?.error || error?.message || "Failed to remove job.");
+    }
+  };
+
   const handleCandidateUpgrade = async (planKey) => {
     setCheckoutError("");
     setCheckoutLoading(planKey);
@@ -872,6 +1162,7 @@ const removeQuickTag = (tag) => {
             onRemoveQuickTag={removeQuickTag}
             canUseMapSearch={canUseMapSearch}
             canUseAdvancedOdFilters={canUseAdvancedOdFilters}
+            isStateLocationSearch={isStateLocationSearch}
             geocodeStatus={geocodeStatus}
             geocodeMessage={geocodeMessage}
           />
@@ -954,8 +1245,20 @@ const removeQuickTag = (tag) => {
 
       {/* CARDS */}
       {!fetchError && (
-        <div className="jobs-result-summary" role="status" aria-live="polite">
-          {geocodeStatus === "searching" ? geocodeMessage : resultCountText}
+        <div className="jobs-results-toolbar">
+          <div className="jobs-result-summary" role="status" aria-live="polite">
+            {geocodeStatus === "searching" ? geocodeMessage : resultCountText}
+          </div>
+          <label className="jobs-sort-control">
+            <span>Sort</span>
+            <select value={sort} onChange={(event) => updateSort(event.target.value)}>
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 
@@ -972,10 +1275,13 @@ const removeQuickTag = (tag) => {
               appliedTooltip={appliedTooltipFor(job._id)}
               hideTooltip={hideTooltipFor(job._id)}
               restoreTooltip={restoreTooltipFor(job._id)}
+              claimTooltip={claimTooltipFor(job)}
               onFavoriteClick={handleFavorite}
               onApplyClick={handleApply}
               onHideClick={handleHideJob}
               onRestoreClick={handleRestoreJob}
+              onClaimClick={handleClaimListing}
+              onAdminRemoveClick={isAdminUser ? handleAdminRemoveJob : undefined}
               onClick={() => {
                 setSelectedJob(job);
                 setIsModalOpen(true);
@@ -1019,10 +1325,12 @@ const removeQuickTag = (tag) => {
         appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
         hideTooltip={selectedJob ? hideTooltipFor(selectedJob._id) : ""}
         restoreTooltip={selectedJob ? restoreTooltipFor(selectedJob._id) : ""}
+        claimTooltip={selectedJob ? claimTooltipFor(selectedJob) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
         onHide={handleHideJob}
         onRestore={handleRestoreJob}
+        onClaim={handleClaimListing}
         onClose={() => {
           setSelectedJob(null);
           setIsModalOpen(false);

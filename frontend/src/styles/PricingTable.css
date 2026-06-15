@@ -193,10 +193,19 @@
   height:46px; padding:0 18px; box-sizing:border-box;
   border-radius:12px;
   font-weight:800; cursor:pointer; border:none;
+  text-decoration:none;
   transition:transform .04s ease, box-shadow .2s ease, filter .15s ease;
 }
 .pricing-root .btn.primary{ background:var(--brand); color:#fff; box-shadow:0 8px 18px rgba(124,58,237,.22); }
 .pricing-root .btn.primary:hover{ transform:translateY(-1px); filter:brightness(1.05); }
+.pricing-root .btn.primary:disabled{
+  background:#cbd5e1;
+  color:#475569;
+  box-shadow:none;
+  cursor:not-allowed;
+  transform:none;
+  filter:none;
+}
 .pricing-root .btn.ghost{ background:#fff; border:1.6px solid var(--brand); color:var(--brand); }
 .pricing-root .btn.ghost:hover{ background:#fff; }
 .pricing-root .btn.disabled{
@@ -525,6 +534,17 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.56) !important;
 }
 
+.pricing-root.is-glass .card.recommended {
+  border-color: rgba(16, 185, 129, 0.82) !important;
+  box-shadow:
+    0 22px 52px rgba(5, 150, 105, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66) !important;
+}
+
+.pricing-root.is-glass .card.disabled {
+  opacity: 0.66;
+}
+
 .pricing-root.is-glass .card.plan-plus,
 .pricing-root.is-glass .card.plan-manager {
   background:
@@ -548,6 +568,13 @@
   content: "";
   display: block;
   height: 8px;
+}
+
+.pricing-root.is-glass .card.plan-free::before {
+  content: "";
+  display: block;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .pricing-root.is-glass .card.plan-plus::before,
@@ -599,4 +626,72 @@
   color: var(--jv-text, #142337);
   -webkit-backdrop-filter: blur(6px) saturate(120%);
   backdrop-filter: blur(6px) saturate(120%);
+}
+
+/* Homepage polish: crisp accents instead of teal/green frosted glass */
+.home-pricing-cards .pricing-root.is-glass .seg-tabs {
+  background: #f8fbfb;
+  border-color: rgba(8, 126, 139, 0.24);
+  box-shadow:
+    0 10px 22px rgba(20, 35, 55, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.home-pricing-cards .pricing-root.is-glass .seg-tabs .seg-btn {
+  color: #263c4d;
+}
+
+.home-pricing-cards .pricing-root.is-glass .seg-tabs .seg-btn[aria-selected="true"] {
+  color: #053536;
+}
+
+.home-pricing-cards .pricing-root.is-glass .seg-tabs .seg-thumb {
+  background: linear-gradient(135deg, #6fd8cf, #41c5bb);
+  border-color: rgba(8, 126, 139, 0.48);
+  box-shadow:
+    0 8px 18px rgba(8, 126, 139, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.home-pricing-cards .pricing-root.is-glass .card {
+  background: rgba(247, 251, 250, 0.52) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  -webkit-backdrop-filter: blur(7px) saturate(112%) !important;
+  backdrop-filter: blur(7px) saturate(112%) !important;
+  box-shadow:
+    0 16px 34px rgba(20, 35, 55, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card.plan-plus,
+.home-pricing-cards .pricing-root.is-glass .card.plan-manager {
+  background:
+    linear-gradient(180deg, rgba(247, 251, 250, 0.56) 0%, rgba(221, 243, 239, 0.44) 100%) !important;
+  border: 2px solid rgba(8, 126, 139, 0.58) !important;
+  box-shadow:
+    0 18px 40px rgba(8, 126, 139, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card.plan-premium,
+.home-pricing-cards .pricing-root.is-glass .card.plan-doctor {
+  background:
+    linear-gradient(180deg, rgba(247, 251, 250, 0.56) 0%, rgba(244, 241, 255, 0.44) 100%) !important;
+  border-color: rgba(123, 77, 216, 0.36) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card:hover {
+  border-color: rgba(8, 126, 139, 0.42) !important;
+  box-shadow:
+    0 20px 42px rgba(20, 35, 55, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .btn.ghost {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(8, 126, 139, 0.4);
+  -webkit-backdrop-filter: blur(5px) saturate(112%);
+  backdrop-filter: blur(5px) saturate(112%);
 }

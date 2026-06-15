@@ -12,7 +12,6 @@ import {
   ADMIN_VIEW_MODES,
   useAdminViewMode,
 } from "./auth/AdminViewModeProvider";
-import { useEffectiveAuth } from "./auth/useEffectiveAuth";
 import "../styles/Header.css";
 
 const AdminViewModeControl = () => {
@@ -45,7 +44,7 @@ const AdminViewModeControl = () => {
       </div>
       {viewingAs && (
         <div className="admin-view-mode-badge">
-          VIEWING AS: <strong>{config.label}</strong>
+          Viewing As: <strong>{config.label}</strong>
         </div>
       )}
     </div>
@@ -54,11 +53,7 @@ const AdminViewModeControl = () => {
 
 const Header = () => {
   // 🔐 Single source of truth for auth
-  const { session, user, profile, role: authRole, signOut } = useAuth();
-  const effectiveAuth = useEffectiveAuth();
-  const displayUser = effectiveAuth.user;
-  const displayProfile = effectiveAuth.profile;
-  const activeRole = effectiveAuth.role || authRole;
+  const { session, user, account, profile, role: authRole, signOut } = useAuth();
 
   // Keep using Redux for notifications (unchanged)
   const hasUnreadNotifications = useSelector(
@@ -160,7 +155,7 @@ const Header = () => {
   };
 
   const getProfileLink = () => {
-    const r = String(activeRole || "").toLowerCase();
+    const r = String(authRole || "").toLowerCase();
     switch (r) {
       case "candidate":
         return "/candidate/profile";
@@ -174,30 +169,47 @@ const Header = () => {
   };
 
   const displayName =
-    displayProfile?.firstName ||
-    displayUser?.user_metadata?.firstName ||
-    displayUser?.firstName ||
-    displayProfile?.email ||
-    displayUser?.email ||
+    profile?.firstName ||
+    profile?.first_name ||
+    account?.profile?.firstName ||
+    account?.profile?.first_name ||
+    user?.user_metadata?.firstName ||
+    user?.user_metadata?.first_name ||
+    user?.firstName ||
+    profile?.email ||
+    account?.profile?.email ||
+    account?.email ||
+    user?.email ||
     "User";
+  const roleLabel = String(authRole || "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
   const getInitials = () => {
     const first =
-      displayProfile?.firstName ||
-      displayUser?.user_metadata?.firstName ||
-      displayUser?.firstName ||
-      (displayProfile?.email || displayUser?.email || "").split("@")[0];
+      profile?.firstName ||
+      profile?.first_name ||
+      account?.profile?.firstName ||
+      account?.profile?.first_name ||
+      user?.user_metadata?.firstName ||
+      user?.user_metadata?.first_name ||
+      user?.firstName ||
+      (profile?.email || account?.profile?.email || account?.email || user?.email || "").split("@")[0];
     const last =
-      displayProfile?.lastName ||
-      displayUser?.user_metadata?.lastName ||
-      displayUser?.lastName ||
+      profile?.lastName ||
+      profile?.last_name ||
+      account?.profile?.lastName ||
+      account?.profile?.last_name ||
+      user?.user_metadata?.lastName ||
+      user?.user_metadata?.last_name ||
+      user?.lastName ||
       "";
     const a = (first || "").trim().charAt(0);
     const b = (last || "").trim().charAt(0);
     return (a + b || (first || "U").slice(0, 2)).toUpperCase();
   };
 
-  const isAuthed = effectiveAuth.isAuthenticated;
+  const isAuthed = !!session;
 
   return (
     <>
@@ -230,6 +242,7 @@ const Header = () => {
                     <span className="user-name">
                       Welcome, <strong>{displayName}</strong>
                     </span>
+                    {roleLabel && <span className="user-role-badge">{roleLabel}</span>}
                   </button>
                   <button
                     type="button"
@@ -294,6 +307,7 @@ const Header = () => {
               <div className={`slide-drawer ${drawerOpen ? "open" : ""}`}>
                 <div className="drawer-content">
                   <p className="drawer-greeting">Welcome, {displayName}</p>
+                  {roleLabel && <p className="drawer-role">{roleLabel}</p>}
 
                   <button
                     className="drawer-item notification-button"

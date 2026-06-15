@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getNeonAccessToken } from "./neonAuthClient";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -12,9 +13,10 @@ const axiosInstance = axios.create({
 
 // ✅ Attach token to every request (if applicable)
 axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
+  async (config) => {
+    const token = await getNeonAccessToken();
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -99,6 +101,11 @@ export const fetchAdminDashboard = async () => {
   return data;
 };
 
+export const fetchMarketplaceDashboard = async () => {
+  const { data } = await axiosInstance.get("/admin/marketplace-dashboard");
+  return data;
+};
+
 export const fetchManualOverrides = async (status = "pending") => {
   const { data } = await axiosInstance.get("/manual-overrides", { params: { status } });
   return data?.items || [];
@@ -112,6 +119,24 @@ export const decideManualOverride = async (id, decision) => {
 export const fetchJobImports = async (params = {}) => {
   const { data } = await axiosInstance.get("/admin/job-imports", { params });
   return data?.items || [];
+};
+
+export const fetchJobImportReviewSummary = async () => {
+  const { data } = await axiosInstance.get("/admin/job-imports/summary");
+  return data?.summary || data || {};
+};
+
+export const fetchJobImportClassificationBackfillStatus = async () => {
+  const { data } = await axiosInstance.get("/admin/job-imports/classification-backfill");
+  return data?.status || data || {};
+};
+
+export const backfillJobImportClassifications = async ({ force = false, limit = 1000 } = {}) => {
+  const { data } = await axiosInstance.post("/admin/job-imports/classification-backfill", {
+    force,
+    limit,
+  });
+  return data;
 };
 
 export const runJobDiscovery = async (sources) => {
@@ -131,8 +156,53 @@ export const approveJobImport = async (id, job = {}) => {
   return data;
 };
 
+export const bulkPublishJobImports = async ({ items = [], defaults = {} } = {}) => {
+  const { data } = await axiosInstance.post("/admin/job-imports/bulk-publish", {
+    items,
+    defaults,
+  });
+  return data;
+};
+
+export const batchJobImportAction = async ({ action, ids = [], defaults = {}, reason = "" } = {}) => {
+  const { data } = await axiosInstance.post("/admin/job-imports/batch-action", {
+    action,
+    ids,
+    defaults,
+    reason,
+  });
+  return data;
+};
+
 export const rejectJobImport = async (id, reason = "") => {
   const { data } = await axiosInstance.post(`/admin/job-imports/${id}/reject`, { reason });
+  return data;
+};
+
+export const fetchListingClaims = async (params = {}) => {
+  const { data } = await axiosInstance.get("/admin/listing-claims", { params });
+  return data?.items || [];
+};
+
+export const approveListingClaim = async (id, note = "") => {
+  const { data } = await axiosInstance.post(`/admin/listing-claims/${id}/approve`, { note });
+  return data;
+};
+
+export const rejectListingClaim = async (id, note = "") => {
+  const { data } = await axiosInstance.post(`/admin/listing-claims/${id}/reject`, { note });
+  return data;
+};
+
+export const fetchListingReports = async (params = {}) => {
+  const { data } = await axiosInstance.get("/admin/listing-reports", { params });
+  return data?.items || [];
+};
+
+export const transferListingOwnership = async (jobId, userId) => {
+  const { data } = await axiosInstance.patch(`/admin/jobs/${jobId}/ownership`, {
+    userId,
+  });
   return data;
 };
 
@@ -189,6 +259,21 @@ export const updateJob = async (jobId, jobData) => {
   return data;
 };
 
+export const publishJob = async (jobId, payload = {}) => {
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/publish`, payload);
+  return data;
+};
+
+export const pauseJob = async (jobId) => {
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/pause`);
+  return data;
+};
+
+export const resumeJob = async (jobId) => {
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/resume`);
+  return data;
+};
+
 export const archiveJob = async (jobId) => {
   const { data } = await axiosInstance.post(`/jobs/${jobId}/archive`);
   return data;
@@ -196,6 +281,11 @@ export const archiveJob = async (jobId) => {
 
 export const unarchiveJob = async (jobId) => {
   const { data } = await axiosInstance.post(`/jobs/${jobId}/unarchive`);
+  return data;
+};
+
+export const reportListingIssue = async (jobId, payload = {}) => {
+  const { data } = await axiosInstance.post(`/jobs/${jobId}/report`, payload);
   return data;
 };
 

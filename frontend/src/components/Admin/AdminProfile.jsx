@@ -8,7 +8,7 @@ import { useAuth } from "../auth/AuthProvider";
 import "../../styles/Profile.css";
 
 const AdminProfile = () => {
-  const { user: reduxUser, token, userRole } = useSelector((state) => state.auth);
+  const { user: reduxUser, userRole } = useSelector((state) => state.auth);
   const {
     session,
     user: authUser,
@@ -95,7 +95,6 @@ const AdminProfile = () => {
       setForm(next);
       dispatch(
         login({
-          token,
           userRole: userRole || res.userRole || res.role || profileUser?.userRole,
           user: {
             ...profileUser,

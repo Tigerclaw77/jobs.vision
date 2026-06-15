@@ -3,6 +3,10 @@ const express = require("express");
 const { buildInsert, buildUpdate, one, query } = require("../services/db.js");
 const { requireAuth, maybeAuth, requireRole } = require("../middleware/auth.js");
 const { getRecruiterJobLimitState } = require("../services/entitlements.js");
+const {
+  LOCATION_MAP_ERROR,
+  resolveJobCoordinates,
+} = require("../services/jobLocationService.js");
 
 const {
   normalizeDomain,
@@ -10,10 +14,17 @@ const {
   acceptedDomainsForBrand,
   brandByKey,
 } = require("../services/brandRegistry");
+const { inferEmployerAttribution } = require("../services/employerAttribution");
 
 const router = express.Router();
 const requireJobManager = requireRole(["recruiter", "admin"]);
-const LOCATION_MAP_ERROR = "We couldn't map this location. Please check the city and state.";
+const requireListingClaimAccount = requireRole([
+  "recruiter",
+  "employer",
+  "practice_owner",
+  "hiring_manager",
+  "admin",
+]);
 const CANONICAL_ROLES = new Set([
   "optometrist",
   "optician",
@@ -21,6 +32,7 @@ const CANONICAL_ROLES = new Set([
   "optical_lab",
   "front_desk",
   "practice_manager",
+  "optical_manager",
   "other",
 ]);
 const ROLE_ALIASES = new Map([
@@ -36,10 +48,43 @@ const ROLE_ALIASES = new Map([
   ["manager", "practice_manager"],
   ["practice manager", "practice_manager"],
   ["practice_manager", "practice_manager"],
+  ["optical manager", "optical_manager"],
+  ["optical_manager", "optical_manager"],
+  ["vision center manager", "optical_manager"],
   ["optometrist", "optometrist"],
   ["optician", "optician"],
   ["other", "other"],
 ]);
+const RECRUITER_TIER_RANK = {
+  staff: 1,
+  manager: 2,
+  doctor: 3,
+};
+const ROLE_REQUIRED_RECRUITER_TIER = {
+  optometrist: "doctor",
+  practice_manager: "manager",
+  optical_manager: "manager",
+  optician: "staff",
+  ophthalmic_technician: "staff",
+  optical_lab: "staff",
+  front_desk: "staff",
+  other: "staff",
+};
+const RECRUITER_TIER_LABELS = {
+  staff: "Staff Position",
+  manager: "Manager Position",
+  doctor: "Doctor Position",
+};
+const ROLE_LABELS = {
+  optometrist: "Optometrist",
+  optician: "Optician",
+  ophthalmic_technician: "Ophthalmic Technician",
+  optical_lab: "Optical Lab",
+  front_desk: "Front Desk",
+  practice_manager: "Practice Manager",
+  optical_manager: "Optical Manager",
+  other: "Other",
+};
 const OPPORTUNITY_TYPE_ALIASES = new Map([
   ["associate w2", "associate_w2"],
   ["associate w 2", "associate_w2"],
@@ -80,6 +125,35 @@ const COMPENSATION_TYPE_ALIASES = new Map([
   ["production", "production_based"],
   ["other", "other"],
 ]);
+const LISTING_OPPORTUNITY_TYPES = new Set(["job", "practice_sale", "partnership", "lease"]);
+const LISTING_SOURCES = new Set(["imported", "employer_submitted"]);
+const LISTING_TIERS = new Set(["imported", "standard_paid", "featured", "sponsor"]);
+const LOCATION_PRECISIONS = new Set([
+  "exact",
+  "facility",
+  "city",
+  "metro",
+  "state",
+  "remote",
+  "multiple",
+  "unknown",
+]);
+const SATURDAY_SCHEDULES = new Set([
+  "none",
+  "occasional",
+  "alternating",
+  "most",
+  "every",
+  "unknown",
+]);
+const LISTING_REPORT_REASONS = new Set([
+  "expired",
+  "broken_apply_link",
+  "incorrect_location",
+  "incorrect_employer",
+  "duplicate_listing",
+  "other",
+]);
 
 const PUBLIC_JOB_COLUMN_NAMES = [
   "id",
@@ -101,6 +175,12 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "employment_types",
   "work_arrangement",
   "work_arrangements",
+  "saturday_schedule",
+  "sign_on_bonus",
+  "relocation_assistance",
+  "benefits",
+  "ce_allowance",
+  "student_loan_assistance",
   "compensation_type",
   "salary_min",
   "salary_max",
@@ -112,10 +192,24 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "tag_ids",
   "featured",
   "posted_at",
+  "created_at",
+  "updated_at",
+  "source",
+  "seed_batch",
   "external_apply_url",
+  "application_email",
   "source_url",
+  "listing_source",
+  "listing_tier",
+  "listing_opportunity_type",
+  "location_precision",
+  "claimed_by_user_id",
+  "claimed_at",
+  "claim_status",
+  "parent_company",
   "employer_name",
   "employer_brand",
+  "practice_name",
   "employer_brand_verified",
   "venue_brand",
   "venue_name",
@@ -131,6 +225,12 @@ const PUBLIC_JOB_COLUMN_FALLBACKS = {
   employment_types: "array[]::text[] as employment_types",
   work_arrangements: "array[]::text[] as work_arrangements",
   work_arrangement: "null::text as work_arrangement",
+  saturday_schedule: "null::text as saturday_schedule",
+  sign_on_bonus: "null::text as sign_on_bonus",
+  relocation_assistance: "false::boolean as relocation_assistance",
+  benefits: "null::text as benefits",
+  ce_allowance: "null::text as ce_allowance",
+  student_loan_assistance: "false::boolean as student_loan_assistance",
   compensation_type: "null::text as compensation_type",
   salary_min: "null::numeric as salary_min",
   salary_max: "null::numeric as salary_max",
@@ -138,12 +238,44 @@ const PUBLIC_JOB_COLUMN_FALLBACKS = {
   hourly_max: "null::numeric as hourly_max",
   daily_rate: "null::numeric as daily_rate",
   compensation_notes: "null::text as compensation_notes",
+  created_at: "null::timestamptz as created_at",
+  updated_at: "null::timestamptz as updated_at",
+  source: "null::text as source",
+  seed_batch: "null::text as seed_batch",
   external_apply_url: "null::text as external_apply_url",
+  application_email: "null::text as application_email",
   source_url: "null::text as source_url",
+  listing_source:
+    "case when source in ('discovery', 'import', 'imported') or external_apply_url is not null then 'imported' else 'employer_submitted' end as listing_source",
+  listing_tier:
+    "case when featured = true then 'featured' when source in ('discovery', 'import', 'imported') or external_apply_url is not null then 'imported' else 'standard_paid' end as listing_tier",
+  listing_opportunity_type: "'job'::text as listing_opportunity_type",
+  location_precision: "'unknown'::text as location_precision",
+  claimed_by_user_id: "null::text as claimed_by_user_id",
+  claimed_at: "null::timestamptz as claimed_at",
+  claim_status: "'unclaimed'::text as claim_status",
+  parent_company: "coalesce(employer_name, company)::text as parent_company",
+  practice_name: "null::text as practice_name",
 };
 
 function isAdmin(user) {
   return String(user?.role || "").toLowerCase() === "admin";
+}
+
+function rejectedImportVisibilityFilterSql(jobAlias = "jobs") {
+  return `
+    not exists (
+      select 1
+      from public.job_imports ji
+      where ji.published_job_id = ${jobAlias}.id
+        and (
+          ji.status = 'rejected'
+          or ji.recommendation = 'reject'
+          or ji.review_action = 'reject'
+          or coalesce(ji.role_badge, '') = 'OTHER'
+        )
+    )
+  `;
 }
 
 async function getPublicJobColumns() {
@@ -173,7 +305,12 @@ async function getPublicJobColumns() {
 }
 
 function canManageJob(user, job) {
-  return isAdmin(user) || job?.recruiter_id === user?.id || job?.posted_by === user?.id;
+  return (
+    isAdmin(user) ||
+    job?.recruiter_id === user?.id ||
+    job?.posted_by === user?.id ||
+    (job?.claim_status === "claimed" && job?.claimed_by_user_id === user?.id)
+  );
 }
 
 function requestError(statusCode, message, code) {
@@ -191,6 +328,152 @@ function normalizeChoiceKey(value) {
     .replace(/[/-]+/g, " ")
     .replace(/[_]+/g, " ")
     .replace(/\s+/g, " ");
+}
+
+function normalizeEnum(value, allowed, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  return allowed.has(normalized) ? normalized : fallback;
+}
+
+function normalizeListingOpportunityType(value, fallback = "job") {
+  return normalizeEnum(value, LISTING_OPPORTUNITY_TYPES, fallback);
+}
+
+function normalizeListingSource(value, fallback = "employer_submitted") {
+  return normalizeEnum(value, LISTING_SOURCES, fallback);
+}
+
+function normalizeListingTier(value, fallback = "standard_paid") {
+  return normalizeEnum(value, LISTING_TIERS, fallback);
+}
+
+function normalizeLocationPrecision(value, fallback = "unknown") {
+  return normalizeEnum(value, LOCATION_PRECISIONS, fallback);
+}
+
+function normalizeSaturdaySchedule(value) {
+  if (value === undefined) return undefined;
+  return normalizeEnum(value, SATURDAY_SCHEDULES, "unknown");
+}
+
+const PUBLIC_SORT_MODES = new Set(["best_match", "newest", "distance", "salary"]);
+
+function normalizePublicSortMode(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (normalized === "best" || normalized === "best_match") return "best_match";
+  return PUBLIC_SORT_MODES.has(normalized) ? normalized : "best_match";
+}
+
+function publicRelevanceScoreSql(qParamIndex) {
+  if (!qParamIndex) return "0::numeric";
+
+  return `
+    (
+      case when public_jobs.title ilike $${qParamIndex} then 95 else 0 end +
+      case when coalesce(public_jobs.role, '') ilike $${qParamIndex} then 70 else 0 end +
+      case when coalesce(public_jobs.company, '') ilike $${qParamIndex} then 35 else 0 end +
+      case when coalesce(public_jobs.employer_name, '') ilike $${qParamIndex} then 35 else 0 end +
+      case when coalesce(public_jobs.employer_brand, '') ilike $${qParamIndex} then 35 else 0 end +
+      case when coalesce(public_jobs.practice_name, '') ilike $${qParamIndex} then 30 else 0 end +
+      case when coalesce(public_jobs.venue_brand, '') ilike $${qParamIndex} then 30 else 0 end +
+      case when coalesce(public_jobs.venue_name, '') ilike $${qParamIndex} then 30 else 0 end +
+      case when coalesce(public_jobs.parent_company, '') ilike $${qParamIndex} then 25 else 0 end +
+      case when coalesce(public_jobs.location, '') ilike $${qParamIndex} then 20 else 0 end +
+      case when coalesce(public_jobs.description, '') ilike $${qParamIndex} then 12 else 0 end
+    )::numeric
+  `;
+}
+
+function publicDistanceScoreSql() {
+  return "0::numeric";
+}
+
+function publicFreshnessScoreSql() {
+  return `
+    greatest(
+      0,
+      18 * (
+        1 - least(
+          extract(epoch from (now() - coalesce(public_jobs.posted_at, public_jobs.created_at, now()))) / 86400,
+          60
+        ) / 60
+      )
+    )::numeric
+  `;
+}
+
+function publicPromotionScoreSql() {
+  return `
+    (
+      case
+        when coalesce(nullif(public_jobs.listing_tier, ''), '') = 'sponsor' then 24
+        when coalesce(nullif(public_jobs.listing_tier, ''), '') = 'featured' then 18
+        when coalesce(nullif(public_jobs.listing_tier, ''), '') = 'standard_paid' then 8
+        when coalesce(nullif(public_jobs.listing_tier, ''), '') = 'imported' then -4
+        when coalesce(nullif(public_jobs.listing_source, ''), '') = 'imported' then -4
+        else 0
+      end +
+      case
+        when public_jobs.featured = true
+          and coalesce(nullif(public_jobs.listing_tier, ''), '') not in ('featured', 'sponsor')
+        then 10
+        else 0
+      end +
+      case
+        when public_jobs.source = 'seed' or public_jobs.seed_batch is not null then -3
+        else 0
+      end
+    )::numeric
+  `;
+}
+
+function publicJobOrderBy(sortMode) {
+  switch (normalizePublicSortMode(sortMode)) {
+    case "newest":
+      return `
+        freshness_score desc,
+        ranking_score desc,
+        posted_at desc nulls last,
+        created_at desc nulls last
+      `;
+    case "distance":
+      return `
+        distance_score desc,
+        relevance_score desc,
+        ranking_score desc,
+        promotion_score desc,
+        posted_at desc nulls last
+      `;
+    case "salary":
+      return `
+        ranking_score desc,
+        relevance_score desc,
+        posted_at desc nulls last,
+        created_at desc nulls last
+      `;
+    case "best_match":
+    default:
+      return `
+        ranking_score desc,
+        relevance_score desc,
+        promotion_score desc,
+        freshness_score desc,
+        posted_at desc nulls last
+      `;
+  }
+}
+
+function isImportedListing(job = {}) {
+  return (
+    job.listing_source === "imported" ||
+    job.source === "discovery" ||
+    job.source === "imported" ||
+    Boolean(job.external_apply_url)
+  );
 }
 
 function normalizeOptionalChoice(value, aliases, message, code) {
@@ -211,6 +494,15 @@ function toInputArray(value) {
     return value.split(",").map((item) => item.trim()).filter(Boolean);
   }
   return [value];
+}
+
+function normalizeFilterTerms(value) {
+  const input = toInputArray(value);
+  if (!input) return [];
+  return input
+    .flatMap((item) => String(item || "").split(","))
+    .map((item) => cleanText(item).toLowerCase())
+    .filter(Boolean);
 }
 
 function normalizeChoiceList(value, aliases, message, code) {
@@ -333,80 +625,21 @@ function didLocationChange(body, job) {
   );
 }
 
-function coordinateFrom(value, field, min, max) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < min || n > max) {
-    throw requestError(400, LOCATION_MAP_ERROR, "invalid_job_location");
-  }
-  return n;
+function recruiterTierCanPublishRole(tier, role) {
+  if (!tier || !role) return false;
+  const requiredTier = ROLE_REQUIRED_RECRUITER_TIER[role] || "staff";
+  return (RECRUITER_TIER_RANK[String(tier).toLowerCase()] || 0) >= RECRUITER_TIER_RANK[requiredTier];
 }
 
-function providedCoordinatePair(fields = {}) {
-  const hasLat = Object.prototype.hasOwnProperty.call(fields, "latitude");
-  const hasLng = Object.prototype.hasOwnProperty.call(fields, "longitude");
-  if (!hasLat && !hasLng) return undefined;
-
-  const latBlank = fields.latitude == null || fields.latitude === "";
-  const lngBlank = fields.longitude == null || fields.longitude === "";
-  if (latBlank && lngBlank) return null;
-  if (latBlank || lngBlank) {
-    throw requestError(400, LOCATION_MAP_ERROR, "invalid_job_location");
-  }
-
-  return {
-    latitude: coordinateFrom(fields.latitude, "latitude", -90, 90),
-    longitude: coordinateFrom(fields.longitude, "longitude", -180, 180),
-  };
+function recruiterRolePlanMessage(tier, role) {
+  const planLabel = RECRUITER_TIER_LABELS[String(tier || "").toLowerCase()] || "current";
+  const roleLabel = ROLE_LABELS[role] || "this role";
+  const requiredTier = ROLE_REQUIRED_RECRUITER_TIER[role] || "staff";
+  const requiredPlan = RECRUITER_TIER_LABELS[requiredTier] || "matching";
+  return `${planLabel} pricing cannot publish ${roleLabel} postings. Choose ${requiredPlan} or higher before publishing.`;
 }
 
-function geocodeAddressForJob(fields = {}) {
-  return cleanText(fields.location || [fields.city, fields.state].filter(Boolean).join(", "));
-}
-
-async function geocodeJobLocation(fields = {}) {
-  const apiKey = process.env.GOOGLE_MAPS_API_KEY || process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
-  const address = geocodeAddressForJob(fields);
-  if (!apiKey || !address) return null;
-
-  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-  url.searchParams.set("address", address);
-  url.searchParams.set("components", "country:US");
-  url.searchParams.set("key", apiKey);
-
-  let response;
-  try {
-    response = await fetch(url);
-  } catch {
-    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
-  }
-
-  const data = await response.json().catch(() => null);
-  const location = data?.results?.[0]?.geometry?.location;
-  if (!response.ok || data?.status !== "OK" || !location) {
-    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
-  }
-
-  return {
-    latitude: coordinateFrom(location.lat, "latitude", -90, 90),
-    longitude: coordinateFrom(location.lng, "longitude", -180, 180),
-  };
-}
-
-async function resolveJobCoordinates(fields, { required = false } = {}) {
-  const provided = providedCoordinatePair(fields);
-  if (provided) return provided;
-
-  const geocoded = await geocodeJobLocation(fields);
-  if (geocoded) return geocoded;
-
-  if (required) {
-    throw requestError(400, LOCATION_MAP_ERROR, "job_location_not_mappable");
-  }
-
-  return undefined;
-}
-
-async function enforceRecruiterCanPost(req, res, excludeJobId = null) {
+async function enforceRecruiterCanPost(req, res, excludeJobId = null, role = null) {
   if (isAdmin(req.user)) return false;
 
   const limitState = await getRecruiterJobLimitState(req.user.id, excludeJobId);
@@ -416,6 +649,17 @@ async function enforceRecruiterCanPost(req, res, excludeJobId = null) {
       error: "Active recruiter subscription required to post jobs.",
       code: "recruiter_subscription_required",
       entitlement: limitState.entitlement,
+    });
+    return true;
+  }
+
+  const normalizedRole = normalizeRole(role);
+  if (normalizedRole && !recruiterTierCanPublishRole(limitState.entitlement.tier, normalizedRole)) {
+    res.status(402).json({
+      error: recruiterRolePlanMessage(limitState.entitlement.tier, normalizedRole),
+      code: "recruiter_plan_role_mismatch",
+      entitlement: limitState.entitlement,
+      role: normalizedRole,
     });
     return true;
   }
@@ -454,6 +698,137 @@ function toNullableText(value) {
   if (value === null) return null;
   const text = String(value).trim();
   return text || null;
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function normalizeApplyUrl(value, { required = false } = {}) {
+  const text = toNullableText(value);
+  if (!text) {
+    if (required) {
+      throw requestError(
+        400,
+        "Enter an apply URL beginning with http:// or https://.",
+        "invalid_apply_url"
+      );
+    }
+    return null;
+  }
+
+  try {
+    const url = new URL(text);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error("Unsupported protocol");
+    }
+    return url.toString();
+  } catch {
+    throw requestError(
+      400,
+      "Enter an apply URL beginning with http:// or https://.",
+      "invalid_apply_url"
+    );
+  }
+}
+
+function normalizeApplyEmail(value, { required = false } = {}) {
+  const text = toNullableText(value);
+  if (!text) {
+    if (required) {
+      throw requestError(400, "Enter a valid apply email.", "invalid_apply_email");
+    }
+    return null;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+    throw requestError(400, "Enter a valid apply email.", "invalid_apply_email");
+  }
+  return text.toLowerCase();
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return Boolean(value);
+}
+
+async function getRecruiterApplyProfile(profileId) {
+  if (!profileId) return {};
+  return (
+    (await one(
+      `
+        select email, application_use_account_email, application_email, application_website
+        from public.profiles
+        where id = $1
+      `,
+      [profileId]
+    )) || {}
+  );
+}
+
+function resolveApplyDestination({ body = {}, existing = {}, profile = {}, forPublication = false } = {}) {
+  const urlProvided =
+    hasOwn(body, "external_apply_url") || hasOwn(body, "apply_url") || hasOwn(body, "applyUrl");
+  const emailProvided =
+    hasOwn(body, "application_email") ||
+    hasOwn(body, "applicationEmail") ||
+    hasOwn(body, "apply_email") ||
+    hasOwn(body, "applyEmail");
+
+  let externalApplyUrl = urlProvided
+    ? normalizeApplyUrl(body.external_apply_url ?? body.apply_url ?? body.applyUrl)
+    : existing.external_apply_url || null;
+  let applicationEmail = emailProvided
+    ? normalizeApplyEmail(
+        body.application_email ?? body.applicationEmail ?? body.apply_email ?? body.applyEmail
+      )
+    : existing.application_email || null;
+
+  const useDefault = normalizeBoolean(
+    body.use_default_apply_destination ?? body.useDefaultApplyDestination,
+    true
+  );
+
+  if (useDefault && !externalApplyUrl && !applicationEmail) {
+    if (profile.application_website) {
+      try {
+        externalApplyUrl = normalizeApplyUrl(profile.application_website, {
+          required: forPublication,
+        });
+      } catch (error) {
+        if (forPublication) throw error;
+        externalApplyUrl = null;
+      }
+    }
+
+    const defaultEmail =
+      profile.application_email ||
+      (profile.application_use_account_email === false ? null : profile.email);
+    if (!externalApplyUrl && defaultEmail) {
+      try {
+        applicationEmail = normalizeApplyEmail(defaultEmail, { required: forPublication });
+      } catch (error) {
+        if (forPublication) throw error;
+        applicationEmail = null;
+      }
+    }
+  }
+
+  if (forPublication && !externalApplyUrl && !applicationEmail) {
+    throw requestError(
+      400,
+      "Add an apply URL or apply email before publishing.",
+      "apply_destination_required"
+    );
+  }
+
+  return {
+    external_apply_url: externalApplyUrl,
+    application_email: applicationEmail,
+  };
 }
 
 function numberOrNull(value, fieldLabel) {
@@ -590,17 +965,60 @@ async function isBrandVerifiedForRecruiter(recruiterId, employerBrand, employerD
 
 router.get("/", maybeAuth, async (req, res) => {
   try {
-    const { q, city, state, tags, limit = "20", offset = "0" } = req.query;
+    const { q, city, state, tags, sort = "best_match", limit = "20", offset = "0" } = req.query;
     const tagIds = typeof tags === "string" && tags.length ? tags.split(",") : [];
+    const sortMode = normalizePublicSortMode(sort);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
     const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
 
-    const where = ["status = 'active'", "is_archived = false"];
+    const where = [
+      "jobs.status = 'active'",
+      "jobs.is_archived = false",
+      rejectedImportVisibilityFilterSql("jobs"),
+    ];
     const params = [];
+    let qParamIndex = null;
 
     if (q) {
       params.push(`%${q}%`);
-      where.push(`title ilike $${params.length}`);
+      qParamIndex = params.length;
+      where.push(`(
+        title ilike $${qParamIndex}
+        or coalesce(role, '') ilike $${qParamIndex}
+        or coalesce(company, '') ilike $${qParamIndex}
+        or coalesce(employer_name, '') ilike $${qParamIndex}
+        or coalesce(employer_brand, '') ilike $${qParamIndex}
+        or coalesce(practice_name, '') ilike $${qParamIndex}
+        or coalesce(venue_brand, '') ilike $${qParamIndex}
+        or coalesce(venue_name, '') ilike $${qParamIndex}
+        or coalesce(parent_company, '') ilike $${qParamIndex}
+        or coalesce(location, '') ilike $${qParamIndex}
+        or coalesce(description, '') ilike $${qParamIndex}
+      )`);
+    }
+    const includeBrands = normalizeFilterTerms(req.query.includeBrand ?? req.query.include_brand);
+    const excludeBrands = normalizeFilterTerms(req.query.excludeBrand ?? req.query.exclude_brand);
+    const includeParentCompanies = normalizeFilterTerms(
+      req.query.includeParentCompany ?? req.query.include_parent_company
+    );
+    const excludeParentCompanies = normalizeFilterTerms(
+      req.query.excludeParentCompany ?? req.query.exclude_parent_company
+    );
+    if (includeBrands.length) {
+      params.push(includeBrands);
+      where.push(`lower(coalesce(employer_brand, '')) = any($${params.length}::text[])`);
+    }
+    if (excludeBrands.length) {
+      params.push(excludeBrands);
+      where.push(`not (lower(coalesce(employer_brand, '')) = any($${params.length}::text[]))`);
+    }
+    if (includeParentCompanies.length) {
+      params.push(includeParentCompanies);
+      where.push(`lower(coalesce(parent_company, '')) = any($${params.length}::text[])`);
+    }
+    if (excludeParentCompanies.length) {
+      params.push(excludeParentCompanies);
+      where.push(`not (lower(coalesce(parent_company, '')) = any($${params.length}::text[]))`);
     }
     if (city) {
       params.push(city);
@@ -615,6 +1033,17 @@ router.get("/", maybeAuth, async (req, res) => {
       where.push(`tag_ids @> $${params.length}::text[]`);
     }
 
+    const countParams = [...params];
+    const totalResult = await query(
+      `
+        select count(*)::int as total
+        from public.jobs jobs
+        where ${where.join(" and ")}
+      `,
+      countParams
+    );
+    const total = Number(totalResult.rows?.[0]?.total || 0);
+
     params.push(safeLimit);
     const limitParam = params.length;
     params.push(safeOffset);
@@ -623,17 +1052,40 @@ router.get("/", maybeAuth, async (req, res) => {
     const publicJobColumns = await getPublicJobColumns();
     const result = await query(
       `
-        select ${publicJobColumns}
-        from public.jobs
-        where ${where.join(" and ")}
-        order by posted_at desc
+        select
+          ranked.*,
+          (
+            ranked.relevance_score +
+            ranked.distance_score +
+            ranked.freshness_score +
+            ranked.promotion_score
+          ) as ranking_score
+        from (
+          select
+            public_jobs.*,
+            ${publicRelevanceScoreSql(qParamIndex)} as relevance_score,
+            ${publicDistanceScoreSql()} as distance_score,
+            ${publicFreshnessScoreSql()} as freshness_score,
+            ${publicPromotionScoreSql()} as promotion_score
+          from (
+            select ${publicJobColumns}
+            from public.jobs jobs
+            where ${where.join(" and ")}
+          ) public_jobs
+        ) ranked
+        order by ${publicJobOrderBy(sortMode)}
         limit $${limitParam}
         offset $${offsetParam}
       `,
       params
     );
 
-    res.json(result.rows);
+    res.json({
+      items: result.rows,
+      total,
+      limit: safeLimit,
+      offset: safeOffset,
+    });
   } catch (e) {
     console.error("List jobs error:", e);
     res.status(500).json({ error: "Failed to list jobs" });
@@ -645,7 +1097,14 @@ router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
     const result = isAdmin(req.user)
       ? await query("select * from public.jobs order by posted_at desc")
       : await query(
-          "select * from public.jobs where recruiter_id = $1 or posted_by = $1 order by posted_at desc",
+          `
+            select *
+            from public.jobs
+            where recruiter_id = $1
+              or posted_by = $1
+              or (claim_status = 'claimed' and claimed_by_user_id = $1)
+            order by posted_at desc
+          `,
           [req.user.id]
         );
 
@@ -653,6 +1112,83 @@ router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
   } catch (e) {
     console.error("Recruiter jobs error:", e);
     return res.status(500).json({ error: "Failed to fetch recruiter jobs" });
+  }
+});
+
+router.get("/public/:id", maybeAuth, async (req, res) => {
+  try {
+    const publicJobColumns = await getPublicJobColumns();
+    const job = await one(
+      `
+        select *
+        from (
+          select ${publicJobColumns}
+          from public.jobs jobs
+          where jobs.id = $1
+            and jobs.status = 'active'
+            and jobs.is_archived = false
+            and ${rejectedImportVisibilityFilterSql("jobs")}
+        ) public_job
+      `,
+      [req.params.id]
+    );
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    return res.json(job);
+  } catch (e) {
+    console.error("Fetch public job error:", e);
+    return res.status(500).json({ error: "Failed to fetch job" });
+  }
+});
+
+router.post("/:id/report", maybeAuth, async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || "").trim().toLowerCase();
+    if (!LISTING_REPORT_REASONS.has(reason)) {
+      return res.status(400).json({ error: "Choose a valid report reason." });
+    }
+
+    const publicJobColumns = await getPublicJobColumns();
+    const job = await one(
+      `
+        select *
+        from (
+          select ${publicJobColumns}
+          from public.jobs jobs
+          where jobs.id = $1
+            and jobs.status = 'active'
+            and jobs.is_archived = false
+            and ${rejectedImportVisibilityFilterSql("jobs")}
+        ) public_job
+      `,
+      [req.params.id]
+    );
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const report = await one(
+      `
+        insert into public.job_listing_reports (
+          job_id,
+          reason,
+          comment,
+          reported_by_user_id
+        )
+        values ($1, $2, $3, $4)
+        returning *
+      `,
+      [
+        job.id,
+        reason,
+        toNullableText(req.body?.comment)?.slice(0, 1000) || null,
+        req.user?.id || null,
+      ]
+    );
+
+    return res.status(201).json({ ok: true, report });
+  } catch (e) {
+    console.error("Report listing issue error:", e);
+    return res.status(500).json({ error: "Failed to submit listing report" });
   }
 });
 
@@ -671,16 +1207,104 @@ router.get("/:id", requireAuth, requireJobManager, async (req, res) => {
   }
 });
 
+router.post("/:id/claim", requireAuth, requireListingClaimAccount, async (req, res) => {
+  try {
+    const job = await one("select * from public.jobs where id = $1", [req.params.id]);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    if (!isImportedListing(job)) {
+      return res.status(400).json({ error: "Only imported listings can be claimed." });
+    }
+
+    if (job.claim_status === "claimed" && job.claimed_by_user_id !== req.user.id) {
+      return res.status(409).json({ error: "This listing has already been claimed." });
+    }
+
+    if (job.claim_status === "claimed" && job.claimed_by_user_id === req.user.id) {
+      return res.json({ ok: true, claimStatus: "claimed" });
+    }
+
+    const existing = await one(
+      `
+        select *
+        from public.job_listing_claims
+        where job_id = $1
+          and requested_by_user_id = $2
+          and status = 'pending'
+        order by created_at desc
+        limit 1
+      `,
+      [job.id, req.user.id]
+    );
+
+    if (existing) {
+      return res.status(200).json({ ok: true, claimStatus: "pending", claim: existing });
+    }
+
+    const claim = await one(
+      `
+        insert into public.job_listing_claims (
+          job_id,
+          requested_by_user_id,
+          requester_email,
+          requester_name,
+          company_name,
+          company_website,
+          message
+        )
+        values ($1, $2, $3, $4, $5, $6, $7)
+        returning *
+      `,
+      [
+        job.id,
+        req.user.id,
+        req.user.email || null,
+        toNullableText(req.body?.requester_name),
+        toNullableText(req.body?.company_name),
+        toNullableText(req.body?.company_website),
+        toNullableText(req.body?.message),
+      ]
+    );
+
+    await query(
+      `
+        update public.jobs
+        set claim_status = 'pending',
+            updated_at = now()
+        where id = $1
+          and claim_status <> 'claimed'
+      `,
+      [job.id]
+    );
+
+    res.status(201).json({ ok: true, claimStatus: "pending", claim });
+  } catch (e) {
+    console.error("Claim listing error:", e);
+    res.status(500).json({ error: "Failed to submit listing claim" });
+  }
+});
+
 router.post("/", requireAuth, requireJobManager, async (req, res) => {
   try {
     const user = req.user;
     const recruiter_id = user.id;
     const nowIso = new Date().toISOString();
-
-    if (await enforceRecruiterCanPost(req, res)) return;
+    const requestedStatus = String(req.body?.status || "").toLowerCase();
+    const publishRequested =
+      req.body?.publish === true ||
+      req.body?.action === "publish" ||
+      (requestedStatus && requestedStatus !== "draft");
+    const saveAsDraft =
+      req.body?.save_as_draft === true ||
+      req.body?.saveAsDraft === true ||
+      req.body?.publish === false ||
+      requestedStatus === "draft";
+    const shouldPublish = publishRequested && !saveAsDraft;
 
     const role = normalizeRole(req.body.role, { required: true });
-    const coordinates = await resolveJobCoordinates(req.body, { required: true });
+    if (shouldPublish && (await enforceRecruiterCanPost(req, res, null, role))) return;
+
+    const coordinates = await resolveJobCoordinates(req.body, { required: shouldPublish });
     const rawEmploymentType = req.body.employment_type ?? req.body.type;
     const legacyRemoteEmployment = isLegacyRemoteEmployment(rawEmploymentType);
     let employment_types = normalizeEmploymentTypes(
@@ -701,17 +1325,24 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     const work_arrangement = firstOrNull(work_arrangements);
     const opportunity_type = firstOrNull(opportunity_types);
     const compensation = normalizeCompensation(req.body);
+    const listing_opportunity_type = normalizeListingOpportunityType(
+      req.body.listing_opportunity_type ?? req.body.marketplace_opportunity_type,
+      "job"
+    );
+    const location_precision = normalizeLocationPrecision(req.body.location_precision, "city");
+    const saturday_schedule = normalizeSaturdaySchedule(req.body.saturday_schedule);
 
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
     let employer_domain = normalizeDomain(req.body.employer_domain ?? req.body.company_domain ?? "");
     let venue_brand = normalizeBrand(req.body.venue_brand ?? null);
     let venue_name = req.body.venue_name ?? null;
+    const explicit_practice_name = toNullableText(req.body.practice_name ?? req.body.practiceName);
 
     const venue_store_id = req.body.venue_store_id ?? null;
     const venue_note = req.body.venue_note ?? null;
 
-    let status = "active";
+    let status = shouldPublish ? "active" : "draft";
     let employer_brand_verified = false;
 
     if (employer_brand && brandByKey(employer_brand)) {
@@ -721,7 +1352,7 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
         employer_domain
       );
 
-      if (!employer_brand_verified) status = "pending_domain";
+      if (!employer_brand_verified && shouldPublish) status = "pending_domain";
     }
 
     if (!employer_brand_verified && employer_name) {
@@ -738,6 +1369,21 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
         employer_domain = null;
       }
     }
+    const attribution = inferEmployerAttribution({
+      parentCompany: employer_name,
+      employerBrand: employer_brand,
+      practiceName: explicit_practice_name || venue_name || null,
+      employerName: employer_name,
+      company: employer_name,
+      title: req.body.title,
+      description: req.body.description,
+    });
+    const applyProfile = await getRecruiterApplyProfile(recruiter_id);
+    const applyDestination = resolveApplyDestination({
+      body: req.body,
+      profile: applyProfile,
+      forPublication: shouldPublish,
+    });
 
     const payload = {
       title: req.body.title,
@@ -747,8 +1393,8 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       location: req.body.location ?? null,
       city: req.body.city ?? null,
       state: req.body.state ?? null,
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       role,
       hours: null,
       type: employment_type ?? null,
@@ -759,6 +1405,18 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       employment_types,
       work_arrangement,
       work_arrangements,
+      saturday_schedule,
+      sign_on_bonus: toNullableText(req.body.sign_on_bonus ?? req.body.signOnBonus),
+      relocation_assistance: normalizeBoolean(
+        req.body.relocation_assistance ?? req.body.relocationAssistance,
+        false
+      ),
+      benefits: toNullableText(req.body.benefits),
+      ce_allowance: toNullableText(req.body.ce_allowance ?? req.body.ceAllowance),
+      student_loan_assistance: normalizeBoolean(
+        req.body.student_loan_assistance ?? req.body.studentLoanAssistance,
+        false
+      ),
       compensation_type: compensation.compensation_type,
       salary_min: compensation.salary_min,
       salary_max: compensation.salary_max,
@@ -769,8 +1427,19 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       salary: compensation.salary,
       tag_ids: toTagIds(req.body.tag_ids),
       recruiter_id,
+      parent_company: employer_name ?? null,
+      practice_name:
+        attribution.practiceName || explicit_practice_name || venue_name || (!employer_brand ? employer_name : null),
+      listing_source: "employer_submitted",
+      listing_tier: "standard_paid",
+      listing_opportunity_type,
+      location_precision,
       is_archived: false,
       posted_at: nowIso,
+      first_activated_at: shouldPublish && status === "active" ? nowIso : null,
+      last_activated_at: shouldPublish && status === "active" ? nowIso : null,
+      external_apply_url: applyDestination.external_apply_url,
+      application_email: applyDestination.application_email,
       employer_brand: employer_brand ?? null,
       employer_domain: employer_brand_verified ? employer_domain || null : null,
       employer_brand_verified,
@@ -789,8 +1458,11 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     res.status(201).json({
       job: data,
       requiresVerification: status === "pending_domain",
+      isDraft: status === "draft",
       message:
-        status === "pending_domain"
+        status === "draft"
+          ? "Draft saved. Choose a plan and publish when ready."
+          : status === "pending_domain"
           ? "Brand postings require domain verification. We saved this as Pending Domain."
           : undefined,
     });
@@ -828,6 +1500,21 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       });
     }
 
+    const marketplaceFields = [
+      "listing_source",
+      "listing_tier",
+      "listing_opportunity_type",
+      "marketplace_opportunity_type",
+      "location_precision",
+    ].filter((field) => field in req.body);
+
+    if (marketplaceFields.length && !isAdmin(req.user)) {
+      return res.status(403).json({
+        error: "Only admins can change listing marketplace metadata.",
+        fields: marketplaceFields,
+      });
+    }
+
     const allowed = [
       "title",
       "description",
@@ -845,6 +1532,12 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "employment_types",
       "work_arrangement",
       "work_arrangements",
+      "saturday_schedule",
+      "sign_on_bonus",
+      "relocation_assistance",
+      "benefits",
+      "ce_allowance",
+      "student_loan_assistance",
       "compensation_type",
       "salary_min",
       "salary_max",
@@ -854,21 +1547,84 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "compensation_notes",
       "salary",
       "tag_ids",
+      "external_apply_url",
+      "application_email",
       "employer_name",
+      "practice_name",
       "employer_brand",
       "employer_domain",
       "venue_brand",
       "venue_name",
       "venue_store_id",
       "venue_note",
+      "listing_source",
+      "listing_tier",
+      "listing_opportunity_type",
+      "location_precision",
     ];
     const updates = {};
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key];
     }
     updates.hours = null;
-    if ("role" in updates) updates.role = normalizeRole(updates.role, { required: true });
+    if ("role" in updates) {
+      updates.role = normalizeRole(updates.role, { required: true });
+      const roleChanged = updates.role !== normalizeRole(job.role);
+      const hasBeenPublished = Boolean(job.first_activated_at) || !["draft"].includes(job.status);
+      if (roleChanged && hasBeenPublished) {
+        throw requestError(
+          400,
+          "Role category is locked after publication. Create a new posting for a different role category.",
+          "role_category_locked"
+        );
+      }
+    }
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
+    if ("external_apply_url" in updates) {
+      updates.external_apply_url = normalizeApplyUrl(updates.external_apply_url);
+    }
+    if ("application_email" in updates) {
+      updates.application_email = normalizeApplyEmail(updates.application_email);
+    }
+    if ("listing_source" in updates) {
+      updates.listing_source = normalizeListingSource(updates.listing_source, job.listing_source || "employer_submitted");
+    }
+    if ("listing_tier" in updates) {
+      updates.listing_tier = normalizeListingTier(updates.listing_tier, job.listing_tier || "standard_paid");
+      updates.featured = updates.listing_tier === "featured" || updates.listing_tier === "sponsor";
+    }
+    if ("listing_opportunity_type" in updates) {
+      updates.listing_opportunity_type = normalizeListingOpportunityType(
+        updates.listing_opportunity_type,
+        job.listing_opportunity_type || "job"
+      );
+    }
+    if ("marketplace_opportunity_type" in req.body) {
+      updates.listing_opportunity_type = normalizeListingOpportunityType(
+        req.body.marketplace_opportunity_type,
+        job.listing_opportunity_type || "job"
+      );
+    }
+    if ("location_precision" in updates) {
+      updates.location_precision = normalizeLocationPrecision(
+        updates.location_precision,
+        job.location_precision || "unknown"
+      );
+    }
+    if ("saturday_schedule" in updates) {
+      updates.saturday_schedule = normalizeSaturdaySchedule(updates.saturday_schedule);
+    }
+    if ("sign_on_bonus" in updates) {
+      updates.sign_on_bonus = toNullableText(updates.sign_on_bonus);
+    }
+    if ("relocation_assistance" in updates) {
+      updates.relocation_assistance = normalizeBoolean(updates.relocation_assistance, false);
+    }
+    if ("benefits" in updates) updates.benefits = toNullableText(updates.benefits);
+    if ("ce_allowance" in updates) updates.ce_allowance = toNullableText(updates.ce_allowance);
+    if ("student_loan_assistance" in updates) {
+      updates.student_loan_assistance = normalizeBoolean(updates.student_loan_assistance, false);
+    }
     const nextRole = updates.role || job.role;
 
     const locationChanged = didLocationChange(req.body, job);
@@ -898,6 +1654,7 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       updates.opportunity_type = normalizeOpportunityType(updates.opportunity_type);
     }
     if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
+    if ("practice_name" in updates) updates.practice_name = toNullableText(updates.practice_name);
     const hasEmploymentInput = "employment_types" in req.body || "employment_type" in req.body || "type" in req.body;
     const rawEmploymentType = req.body.employment_type ?? req.body.type;
     const legacyRemoteEmployment = hasEmploymentInput && isLegacyRemoteEmployment(rawEmploymentType);
@@ -956,7 +1713,9 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "venue_brand" in updates ? updates.venue_brand : job.venue_brand
     );
     let venue_name = ("venue_name" in updates ? updates.venue_name : job.venue_name) ?? null;
+    let practice_name = ("practice_name" in updates ? updates.practice_name : job.practice_name) ?? null;
     let status = job.status || "active";
+    const preserveDraft = status === "draft";
     let employer_brand_verified = job.employer_brand_verified || false;
 
     if ("employer_name" in updates || "employer_brand" in updates || "employer_domain" in updates) {
@@ -971,11 +1730,13 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
         );
         status = job.is_archived
           ? "archived"
+          : preserveDraft
+          ? "draft"
           : employer_brand_verified
           ? "active"
           : "pending_domain";
       } else {
-        status = job.is_archived ? "archived" : "active";
+        status = job.is_archived ? "archived" : preserveDraft ? "draft" : "active";
       }
 
       if (!employer_brand_verified && employer_name) {
@@ -995,7 +1756,19 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
 
       updates.employer_name = employer_name;
       updates.company = employer_name;
+      updates.parent_company = employer_name;
       updates.employer_brand = employer_brand;
+      const attribution = inferEmployerAttribution({
+        parentCompany: employer_name,
+        employerBrand: employer_brand,
+        practiceName: practice_name || venue_name || null,
+        employerName: employer_name,
+        company: employer_name,
+        title: updates.title || job.title,
+        description: updates.description || job.description,
+      });
+      updates.practice_name =
+        attribution.practiceName || practice_name || venue_name || (!employer_brand ? employer_name : null);
       updates.employer_brand_verified = employer_brand_verified;
       updates.status = status;
       updates.employer_domain = employer_brand_verified ? employer_domain || null : null;
@@ -1019,6 +1792,67 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
   }
 });
 
+router.post("/:id/publish", requireAuth, requireJobManager, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const nowIso = new Date().toISOString();
+    const job = await one("select * from public.jobs where id = $1", [jobId]);
+
+    if (!job || !canManageJob(req.user, job)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const role = normalizeRole(job.role, { required: true });
+    if (await enforceRecruiterCanPost(req, res, jobId, role)) return;
+
+    const ownerRecruiterId = job.recruiter_id || job.posted_by || req.user.id;
+    const applyProfile = await getRecruiterApplyProfile(ownerRecruiterId);
+    const applyDestination = resolveApplyDestination({
+      body: req.body,
+      existing: job,
+      profile: applyProfile,
+      forPublication: true,
+    });
+    const coordinates = await resolveJobCoordinates({ ...job, ...req.body }, { required: true });
+    const nextStatus =
+      job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
+
+    const update = buildUpdate(
+      "public.jobs",
+      {
+        status: nextStatus,
+        is_archived: false,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        external_apply_url: applyDestination.external_apply_url,
+        application_email: applyDestination.application_email,
+        last_activated_at: nextStatus === "active" ? nowIso : job.last_activated_at,
+        first_activated_at:
+          nextStatus === "active" ? job.first_activated_at ?? nowIso : job.first_activated_at,
+        updated_at: nowIso,
+      },
+      "id = $10",
+      [jobId]
+    );
+    const data = await one(update.text, update.params);
+
+    res.json({
+      job: data,
+      requiresVerification: nextStatus === "pending_domain",
+      message:
+        nextStatus === "pending_domain"
+          ? "Brand postings require domain verification. We saved this as Pending Domain."
+          : "Job published.",
+    });
+  } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
+    console.error("Publish job error:", e);
+    res.status(500).json({ error: "Failed to publish job" });
+  }
+});
+
 router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -1033,7 +1867,15 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
       job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
 
     if (!job.is_archived && job.status === nextStatus) return res.json(job);
-    if (await enforceRecruiterCanPost(req, res, jobId)) return;
+    const role = normalizeRole(job.role, { required: true });
+    if (await enforceRecruiterCanPost(req, res, jobId, role)) return;
+    const ownerRecruiterId = job.recruiter_id || job.posted_by || req.user.id;
+    const applyProfile = await getRecruiterApplyProfile(ownerRecruiterId);
+    const applyDestination = resolveApplyDestination({
+      existing: job,
+      profile: applyProfile,
+      forPublication: true,
+    });
     const coordinates = await resolveJobCoordinates(job, { required: true });
 
     const update = buildUpdate(
@@ -1043,12 +1885,14 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
         is_archived: false,
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
+        external_apply_url: applyDestination.external_apply_url,
+        application_email: applyDestination.application_email,
         archived_at: null,
         last_activated_at: now,
         first_activated_at: job.first_activated_at ?? now,
         updated_at: now,
       },
-      "id = $9",
+      "id = $11",
       [jobId]
     );
     const data = await one(update.text, update.params);
@@ -1063,6 +1907,124 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
   }
 });
 
+router.post("/:id/pause", requireAuth, requireJobManager, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const now = new Date();
+    const job = await one("select * from public.jobs where id = $1", [jobId]);
+
+    if (!job || !canManageJob(req.user, job)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    if (job.is_archived || job.status === "archived") {
+      return res.status(400).json({
+        error: "Archived jobs cannot be paused. Unarchive the job first.",
+        code: "archived_job_cannot_pause",
+      });
+    }
+
+    if (job.status === "draft") {
+      return res.status(400).json({
+        error: "Draft jobs are not public yet and do not need to be paused.",
+        code: "draft_job_cannot_pause",
+      });
+    }
+
+    if (job.status === "paused") return res.json(job);
+
+    const addSeconds =
+      job.status === "active" && job.last_activated_at
+        ? Math.max(0, Math.floor((now - new Date(job.last_activated_at)) / 1000))
+        : 0;
+
+    const update = buildUpdate(
+      "public.jobs",
+      {
+        status: "paused",
+        is_archived: false,
+        total_active_seconds: (job.total_active_seconds ?? 0) + addSeconds,
+        updated_at: now.toISOString(),
+      },
+      "id = $5",
+      [jobId]
+    );
+    const data = await one(update.text, update.params);
+
+    res.json(data);
+  } catch (e) {
+    console.error("Pause job error:", e);
+    res.status(500).json({ error: "Failed to pause job" });
+  }
+});
+
+router.post("/:id/resume", requireAuth, requireJobManager, async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const nowIso = new Date().toISOString();
+    const job = await one("select * from public.jobs where id = $1", [jobId]);
+
+    if (!job || !canManageJob(req.user, job)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    if (job.is_archived || job.status === "archived") {
+      return res.status(400).json({
+        error: "Archived jobs must be unarchived before they can resume.",
+        code: "archived_job_cannot_resume",
+      });
+    }
+
+    const role = normalizeRole(job.role, { required: true });
+    if (await enforceRecruiterCanPost(req, res, jobId, role)) return;
+
+    const ownerRecruiterId = job.recruiter_id || job.posted_by || req.user.id;
+    const applyProfile = await getRecruiterApplyProfile(ownerRecruiterId);
+    const applyDestination = resolveApplyDestination({
+      existing: job,
+      profile: applyProfile,
+      forPublication: true,
+    });
+    const coordinates = await resolveJobCoordinates(job, { required: true });
+    const nextStatus =
+      job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
+
+    const update = buildUpdate(
+      "public.jobs",
+      {
+        status: nextStatus,
+        is_archived: false,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        external_apply_url: applyDestination.external_apply_url,
+        application_email: applyDestination.application_email,
+        last_activated_at: nextStatus === "active" ? nowIso : job.last_activated_at,
+        first_activated_at:
+          nextStatus === "active" ? job.first_activated_at ?? nowIso : job.first_activated_at,
+        updated_at: nowIso,
+      },
+      "id = $10",
+      [jobId]
+    );
+    const data = await one(update.text, update.params);
+
+    res.json({
+      job: data,
+      requiresVerification: nextStatus === "pending_domain",
+      message:
+        nextStatus === "pending_domain"
+          ? "Brand postings require domain verification. We saved this as Pending Domain."
+          : "Job resumed.",
+    });
+  } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
+    console.error("Resume job error:", e);
+    res.status(500).json({ error: "Failed to resume job" });
+  }
+});
+
 router.post("/:id/archive", requireAuth, requireJobManager, async (req, res) => {
   try {
     const jobId = req.params.id;
@@ -1074,7 +2036,7 @@ router.post("/:id/archive", requireAuth, requireJobManager, async (req, res) => 
     }
 
     const addSeconds =
-      job.last_activated_at && !job.is_archived
+      job.status === "active" && job.last_activated_at && !job.is_archived
         ? Math.max(0, Math.floor((now - new Date(job.last_activated_at)) / 1000))
         : 0;
 

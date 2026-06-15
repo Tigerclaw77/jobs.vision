@@ -72,7 +72,25 @@
 
 .discovery-sources .MuiButton-root {
   text-transform: none;
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.discovery-sources .MuiButton-outlined {
+  border-color: #93c5fd;
+  color: #dbeafe;
+}
+
+.discovery-sources .MuiButton-outlined:hover,
+.discovery-sources .MuiButton-outlined:focus-visible {
+  border-color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.2);
+  color: #ffffff;
+}
+
+.discovery-sources .MuiButton-root.Mui-disabled {
+  border-color: rgba(148, 163, 184, 0.42);
+  color: rgba(203, 213, 225, 0.7);
+  opacity: 1;
 }
 
 @media (max-width: 720px) {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -6,6 +6,8 @@ import {
   fetchUserProfile,
   fetchRecruiterApplications,
   fetchRecruiterJobs,
+  pauseJob,
+  resumeJob,
   unarchiveJob,
 } from "../../utils/api";
 
@@ -54,9 +56,27 @@ const RecruiterDashboard = () => {
   } = useEffectiveAuth();
   const user = effectiveUser ?? reduxUser;
   const userRole = effectiveRole || reduxUserRole;
+  const profileFallbackUser = useMemo(
+    () => ({
+      firstName: user?.firstName || user?.first_name || "",
+      lastName: user?.lastName || user?.last_name || "",
+      email: user?.email || "",
+      company: user?.company || "",
+    }),
+    [
+      user?.firstName,
+      user?.first_name,
+      user?.lastName,
+      user?.last_name,
+      user?.email,
+      user?.company,
+    ]
+  );
   const [categorizedJobs, setCategorizedJobs] = useState({
     active: [],
     pending: [],
+    draft: [],
+    paused: [],
     archived: [],
     featured: [],
     expired: [],
@@ -75,11 +95,13 @@ const RecruiterDashboard = () => {
     const pending = jobs.filter(
       (job) => job.status === "pending_domain" && !job.is_archived
     );
+    const draft = jobs.filter((job) => job.status === "draft" && !job.is_archived);
+    const paused = jobs.filter((job) => job.status === "paused" && !job.is_archived);
     const archived = jobs.filter((job) => job.status === "archived" || job.is_archived);
     const featured = jobs.filter((job) => job.featured === true);
     const expired = jobs.filter((job) => job.isExpired === true);
 
-    setCategorizedJobs({ active, pending, archived, featured, expired });
+    setCategorizedJobs({ draft, active, paused, expired, archived, pending, featured });
   }, []);
 
   const getRecruiterDashboard = useCallback(async () => {
@@ -119,7 +141,7 @@ const RecruiterDashboard = () => {
         setProfileCompletion(apiCompletion);
       } else {
         setProfileCompletion(
-          recruiterCompletionSummary(shapeProfileForm(profileResult.value?.profile, user))
+          recruiterCompletionSummary(shapeProfileForm(profileResult.value?.profile, profileFallbackUser))
         );
       }
     } else {
@@ -127,7 +149,7 @@ const RecruiterDashboard = () => {
     }
 
     setLoading(false);
-  }, [categorizeJobs, user]);
+  }, [categorizeJobs, profileFallbackUser]);
 
   const recruiterEntitlement = user?.entitlements?.recruiter || null;
   const isAdmin = String(userRole || user?.userRole || "").toLowerCase() === "admin";
@@ -138,7 +160,7 @@ const RecruiterDashboard = () => {
     maxActiveJobs === null ? null : Math.max(0, Number(maxActiveJobs || 0) - slotJobsUsed);
   const atSlotCapacity =
     subscriptionActive && maxActiveJobs !== null && remainingSlots === 0;
-  const canCreateJob =
+  const canPublishJob =
     isAdmin || (subscriptionActive && (maxActiveJobs === null || remainingSlots > 0));
   const planName = isAdmin ? "Admin Access" : formatPlanName(recruiterEntitlement, user);
   const statusLabel = isAdmin
@@ -150,7 +172,7 @@ const RecruiterDashboard = () => {
   const slotSummary =
     maxActiveJobs === null ? `${slotJobsUsed} used` : `${slotJobsUsed} / ${slotLimit} used`;
   const nextAction = !subscriptionActive
-    ? "Choose a recruiter plan before posting jobs."
+    ? "Create a draft now. Choose a recruiter plan when you are ready to publish."
     : atSlotCapacity
     ? "Archive a live job or upgrade before creating another one."
     : maxActiveJobs === null
@@ -158,7 +180,6 @@ const RecruiterDashboard = () => {
     : `${remainingSlots} job slot${remainingSlots === 1 ? "" : "s"} available.`;
 
   const handleAddJobClick = () => {
-    if (!canCreateJob) return;
     setEditingJob(null);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -178,6 +199,28 @@ const RecruiterDashboard = () => {
     } catch (error) {
       console.error("Error archiving job:", error.message);
       alert("Failed to archive job.");
+    }
+  };
+
+  const handlePause = async (jobId) => {
+    try {
+      await pauseJob(jobId);
+      await getRecruiterDashboard();
+      alert("Job paused. It is no longer visible in public search or map.");
+    } catch (error) {
+      console.error("Error pausing job:", error.message);
+      alert("Failed to pause job.");
+    }
+  };
+
+  const handleResume = async (jobId) => {
+    try {
+      await resumeJob(jobId);
+      await getRecruiterDashboard();
+      alert("Job resumed.");
+    } catch (error) {
+      console.error("Error resuming job:", error.message);
+      alert(error?.response?.data?.error || "Failed to resume job.");
     }
   };
 
@@ -217,13 +260,13 @@ const RecruiterDashboard = () => {
           <div className="recruiter-summary-card">
             <span className="summary-label">Active Jobs</span>
             <strong>{loading ? "-" : categorizedJobs.active.length}</strong>
-            <p>Live jobs visible to candidates.</p>
+            <p>Published jobs visible to candidates.</p>
           </div>
 
           <div className="recruiter-summary-card">
             <span className="summary-label">Job Slots Used</span>
             <strong>{loading ? "-" : slotSummary}</strong>
-            <p>Active and pending verification jobs count toward slots.</p>
+            <p>Published and pending verification jobs count toward paid slots. Drafts do not.</p>
           </div>
 
           <div className="recruiter-summary-card">
@@ -235,10 +278,10 @@ const RecruiterDashboard = () => {
           </div>
 
           <div className="recruiter-summary-card">
-            <span className="summary-label">Applications Received</span>
+            <span className="summary-label">Internal Applications</span>
             <strong>{loading ? "-" : applications.length}</strong>
             <p>
-              <Link to="/recruiter/applications">Review applicants</Link>
+              <Link to="/recruiter/applications">Review internal applicant records</Link>
             </p>
           </div>
         </section>
@@ -265,7 +308,7 @@ const RecruiterDashboard = () => {
               Archive an active or pending job to free a slot, or upgrade for more capacity.
               Manager includes 5 active slots and Doctor includes 10.
             </p>
-            <Link to="/">View recruiter plans</Link>
+            <Link to="/pricing">View recruiter plans</Link>
           </div>
         )}
 
@@ -274,8 +317,8 @@ const RecruiterDashboard = () => {
             <p>
               <strong>No active recruiter plan is attached to this account.</strong>
             </p>
-            <p>Choose a recruiter plan before creating a public job post.</p>
-            <Link to="/">View recruiter plans</Link>
+            <p>You can create and preview drafts now. Choose a plan before publishing.</p>
+            <Link to="/pricing">View recruiter plans</Link>
           </div>
         )}
 
@@ -284,10 +327,9 @@ const RecruiterDashboard = () => {
             <button
               type="button"
               onClick={handleAddJobClick}
-              disabled={!canCreateJob}
               aria-describedby="recruiter-slot-state"
             >
-              Add New Job
+              Add Job Draft
             </button>
             <span id="recruiter-slot-state">{nextAction}</span>
           </div>
@@ -295,6 +337,11 @@ const RecruiterDashboard = () => {
           <>
             <AddJob
               jobToEdit={editingJob}
+              canPublish={canPublishJob}
+              planRequired={!subscriptionActive && !isAdmin}
+              slotLimitReached={atSlotCapacity && !isAdmin}
+              recruiterTier={recruiterEntitlement?.tier || user?.tier || ""}
+              isAdmin={isAdmin}
               onSuccess={() => {
                 setShowForm(false);
                 setEditingJob(null);
@@ -316,6 +363,8 @@ const RecruiterDashboard = () => {
         <JobTabs
           jobsByStatus={categorizedJobs}
           onEdit={handleEdit}
+          onPause={handlePause}
+          onResume={handleResume}
           onArchive={handleArchive}
           onUnarchive={handleUnarchive}
         />

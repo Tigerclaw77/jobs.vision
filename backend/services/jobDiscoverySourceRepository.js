@@ -7,6 +7,8 @@ function sourcePayload(input = {}, userId = null) {
     careers_url: input.careersUrl || null,
     industry_key: input.industryKey || null,
     source_type: input.sourceType || "unknown",
+    contact_email: input.contactEmail || null,
+    contact_status: input.contactStatus || "not_contacted",
     enabled: input.enabled !== false,
     notes: input.notes || null,
     updated_by: userId,
@@ -20,6 +22,8 @@ function toSourceInput(row = {}) {
     careersUrl: row.careers_url || null,
     industryKey: row.industry_key || null,
     sourceType: row.source_type || "unknown",
+    contactEmail: row.contact_email || null,
+    contactStatus: row.contact_status || "not_contacted",
   };
 }
 

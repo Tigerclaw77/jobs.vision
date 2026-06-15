@@ -573,7 +573,25 @@
 
 import React from "react";
 import JobForm from "../JobForm"; // adjust path if needed
+import { useEffectiveAuth } from "../auth/useEffectiveAuth";
 
 export default function AddJobPage(props) {
-  return <JobForm {...props} />;
+  const { user, role } = useEffectiveAuth();
+  const isAdmin = String(role || user?.userRole || "").toLowerCase() === "admin";
+  const entitlement = user?.entitlements?.recruiter || null;
+  const subscriptionActive = isAdmin || entitlement?.active === true;
+  const maxActiveJobs = isAdmin ? null : entitlement?.maxActiveJobs ?? 0;
+  const canPublish =
+    props.canPublish ??
+    (isAdmin || (subscriptionActive && (maxActiveJobs === null || Number(maxActiveJobs) > 0)));
+
+  return (
+    <JobForm
+      {...props}
+      canPublish={canPublish}
+      planRequired={props.planRequired ?? (!subscriptionActive && !isAdmin)}
+      recruiterTier={props.recruiterTier ?? entitlement?.tier ?? user?.tier ?? ""}
+      isAdmin={props.isAdmin ?? isAdmin}
+    />
+  );
 }

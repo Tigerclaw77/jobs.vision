@@ -1,10 +1,19 @@
 const { fetchPage } = require("./fetcher");
-const { extractJobsFromHtml, findCareerLinks } = require("./extractors");
+const { extractJobsFromPage, findCareerLinks } = require("./extractors");
 const { normalizeDiscoveryResult } = require("./normalizer");
 const { scoreDiscovery } = require("./scoring");
 const { normalizeUrl } = require("./utils");
 
-const SOURCE_TYPES = new Set(["career_page", "greenhouse", "lever", "workday", "unknown"]);
+const SOURCE_TYPES = new Set([
+  "career_page",
+  "smartrecruiters",
+  "greenhouse",
+  "lever",
+  "workday",
+  "icims",
+  "taleo",
+  "unknown",
+]);
 
 function validateSource(source) {
   if (!source || typeof source !== "object") throw new Error("Source input is required.");
@@ -53,8 +62,18 @@ async function discoverJobsForSource(source, options = {}) {
 
   const { pages, notes } = await fetchSourcePages(sourceForPipeline, options);
   const rawResults = [];
+  const rejectedClassifications = {};
   for (const page of pages) {
-    rawResults.push(...extractJobsFromHtml(page.html, page.finalUrl, sourceForPipeline));
+    const extracted = await extractJobsFromPage(page, sourceForPipeline, options);
+    notes.push(...(extracted.notes || []));
+    for (const result of extracted.jobs || []) {
+      if (result.classification === "job_posting") {
+        rawResults.push(result);
+      } else {
+        const key = result.classification || "unknown";
+        rejectedClassifications[key] = (rejectedClassifications[key] || 0) + 1;
+      }
+    }
   }
 
   const normalizedJobs = rawResults
@@ -69,6 +88,7 @@ async function discoverJobsForSource(source, options = {}) {
         },
         normalizedJob: {
           ...normalized,
+          classification: result.classification || "job_posting",
           status: "needs_review",
         },
       };
@@ -81,6 +101,7 @@ async function discoverJobsForSource(source, options = {}) {
       careersUrl: sourceForPipeline.careersUrl,
       employerWebsiteUrl: sourceForPipeline.employerWebsiteUrl,
       notes,
+      rejectedClassifications,
     });
   }
 
@@ -88,6 +109,7 @@ async function discoverJobsForSource(source, options = {}) {
     source: sourceForPipeline,
     discoveredAt: new Date().toISOString(),
     notes,
+    rejectedClassifications,
     jobs: normalizedJobs,
   };
 }

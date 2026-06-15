@@ -76,7 +76,6 @@ export default function VerifyEmail() {
             userRole: role,
             isVerified: true,
           },
-          token: activeSession.access_token,
         })
       );
       setPhase("success");

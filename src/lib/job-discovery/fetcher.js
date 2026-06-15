@@ -71,7 +71,9 @@ async function fetchText(url, options = {}) {
       signal: timeout.signal,
       headers: {
         "User-Agent": options.userAgent || DEFAULT_USER_AGENT,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8",
+        Accept:
+          options.accept ||
+          "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8",
       },
     });
     const text = await response.text();
@@ -125,8 +127,48 @@ async function fetchPage(url, options = {}) {
   };
 }
 
+async function fetchJson(url, options = {}) {
+  const normalizedUrl = normalizeUrl(url);
+  if (!normalizedUrl) {
+    return { ok: false, status: 0, json: null, finalUrl: url, notes: ["Invalid JSON URL."] };
+  }
+
+  try {
+    const response = await fetchText(normalizedUrl, {
+      ...options,
+      accept: "application/json,text/plain;q=0.8,*/*;q=0.5",
+    });
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        json: null,
+        finalUrl: response.finalUrl,
+        notes: [`JSON fetch returned HTTP ${response.status}.`],
+      };
+    }
+
+    return {
+      ok: true,
+      status: response.status,
+      json: JSON.parse(response.text),
+      finalUrl: response.finalUrl,
+      notes: [],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      json: null,
+      finalUrl: normalizedUrl,
+      notes: [`JSON fetch failed: ${error.message}`],
+    };
+  }
+}
+
 module.exports = {
   DEFAULT_USER_AGENT,
+  fetchJson,
   fetchPage,
   isAllowedByRobots,
 };

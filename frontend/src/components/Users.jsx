@@ -6,6 +6,7 @@ import {
   CircularProgress, Stack
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import { getNeonAccessToken } from "../utils/neonAuthClient";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -13,20 +14,6 @@ function apiBaseUrl() {
 }
 
 const API_BASE = apiBaseUrl();
-
-// Normalize token retrieval
-function getAuthToken() {
-  const rawUser = localStorage.getItem("user") || sessionStorage.getItem("user");
-  if (rawUser) {
-    try {
-      const parsed = JSON.parse(rawUser);
-      if (parsed?.token) return parsed.token;
-      if (parsed?.user?.token) return parsed.user.token;
-    } catch {}
-  }
-  return localStorage.getItem("token") ||
-         sessionStorage.getItem("token") || "";
-}
 
 // Normalize server response into an array
 function toArray(json) {
@@ -108,7 +95,7 @@ export default function Users() {
     setLoading(true);
     setError("");
     try {
-      const token = getAuthToken();
+      const token = await getNeonAccessToken();
       if (!token) throw new Error("No token found. Please log in.");
 
       const url = `${API_BASE}/users`;

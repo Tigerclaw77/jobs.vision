@@ -8,6 +8,8 @@ create table if not exists public.job_discovery_sources (
   careers_url text,
   industry_key text,
   source_type text not null default 'unknown',
+  contact_email text,
+  contact_status text not null default 'not_contacted',
   enabled boolean not null default true,
   notes text,
   last_run_at timestamptz,
@@ -19,7 +21,10 @@ create table if not exists public.job_discovery_sources (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint job_discovery_sources_source_type_check check (
-    source_type in ('career_page', 'greenhouse', 'lever', 'workday', 'unknown')
+    source_type in ('career_page', 'smartrecruiters', 'greenhouse', 'lever', 'workday', 'icims', 'taleo', 'unknown')
+  ),
+  constraint job_discovery_sources_contact_status_check check (
+    contact_status in ('not_contacted', 'contacted', 'responded', 'claimed', 'declined')
   ),
   constraint job_discovery_sources_last_run_status_check check (
     last_run_status is null or last_run_status in ('success', 'failed')
@@ -31,3 +36,6 @@ create index if not exists job_discovery_sources_enabled_idx
 
 create index if not exists job_discovery_sources_industry_idx
   on public.job_discovery_sources (industry_key, enabled);
+
+create index if not exists job_discovery_sources_contact_status_idx
+  on public.job_discovery_sources (contact_status, employer_name);

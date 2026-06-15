@@ -19,10 +19,10 @@ const Footer = () => {
 
         {/* Middle Section - Navigation Links */}
         <div className="footer-links">
-          <a href="/about">About</a>
-          <a href="/jobs">Jobs</a>
-          <a href="/contact">Contact</a>
-          <a href="/privacy">Privacy Policy</a>
+          <Link to="/about">About</Link>
+          <Link to="/jobs">Jobs</Link>
+          <Link to="/contact">Contact</Link>
+          <Link to="/privacy">Privacy Policy</Link>
         </div>
 
         {/* Right Section - Social Media */}

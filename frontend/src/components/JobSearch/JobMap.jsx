@@ -17,6 +17,7 @@ function getPosition(job) {
 
 const DEFAULT_CENTER = { lat: 39.0, lng: -98.0 };
 const DEFAULT_ZOOM = 4;
+const MILES_TO_METERS = 1609.344;
 const LOWER_48_BOUNDS = {
   north: 49.5,
   south: 24,
@@ -41,6 +42,16 @@ function zoomForRadius(radiusMi) {
   if (radius <= 50) return 9;
   if (radius <= 100) return 8;
   return 7;
+}
+
+function boundsForRadius(google, center, radiusMi) {
+  if (!google?.maps || !center) return null;
+  const radiusMeters = Math.max(1, Number(radiusMi) || 25) * MILES_TO_METERS;
+  const circle = new google.maps.Circle({
+    center,
+    radius: radiusMeters,
+  });
+  return circle.getBounds();
 }
 
 function isLower48Position(position) {
@@ -224,25 +235,31 @@ const JobMap = ({
 
     const applyViewport = () => {
       if (cancelled || !map.current) return;
+      if (activeCenter) {
+        const radiusBounds = boundsForRadius(window.google, activeCenter, radiusMi);
+        if (radiusBounds) {
+          map.current.fitBounds(radiusBounds, 40);
+          map.current.setCenter(activeCenter);
+        } else {
+          map.current.setCenter(activeCenter);
+          map.current.setZoom(zoomForRadius(radiusMi));
+        }
+        return;
+      }
+
       if (shouldFitJobs && markerPositions.length > 0) {
         const viewportPositions = positionsForViewport(markerPositions, explicitMapContext);
         const distinctViewportPositions = uniquePositions(viewportPositions);
 
         if (distinctViewportPositions.length === 1) {
           map.current.setCenter(distinctViewportPositions[0]);
-          map.current.setZoom(activeCenter ? zoomForRadius(radiusMi) : 10);
+          map.current.setZoom(10);
           return;
         }
 
         const bounds = new window.google.maps.LatLngBounds();
         viewportPositions.forEach((position) => bounds.extend(position));
         map.current.fitBounds(bounds, 48);
-        return;
-      }
-
-      if (activeCenter) {
-        map.current.setCenter(activeCenter);
-        map.current.setZoom(zoomForRadius(radiusMi));
         return;
       }
 

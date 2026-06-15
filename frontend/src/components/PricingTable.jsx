@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createStripeCheckout } from "../utils/api";
 import "../styles/PricingTable.css";
 
@@ -13,7 +13,6 @@ const RECRUITER_PLANS = [
     bullets: [
       "Front desk, techs, assistants",
       "30-day listing, basic visibility",
-      "Email notifications for candidate interest",
     ],
   },
   {
@@ -25,7 +24,6 @@ const RECRUITER_PLANS = [
     bullets: [
       "Office/optical managers",
       "30-day listing with enhanced visibility",
-      "Email + dashboard notifications",
     ],
   },
   {
@@ -37,7 +35,6 @@ const RECRUITER_PLANS = [
     bullets: [
       "Optometrist-focused listing",
       "30-day listing with strongest visibility",
-      "Priority candidate interest alerts",
     ],
   },
 ];
@@ -45,11 +42,11 @@ const RECRUITER_PLANS = [
 const CANDIDATE_PLANS = [
   {
     key: "free",
-    name: "Free",
+    name: "Basic",
     price: 0,
     period: "month",
     bullets: ["Browse jobs", "Apply to jobs", "Save up to 5 jobs"],
-    cta: { label: "Create free account", href: "/candidate/register" },
+    cta: { label: "Browse Jobs", href: "/jobs" },
   },
   {
     key: "plus",
@@ -74,6 +71,12 @@ const CANDIDATE_PLANS = [
   },
 ];
 
+const RECRUITER_PLAN_RANK = {
+  staff: 1,
+  manager: 2,
+  doctor: 3,
+};
+
 const PricingTable = ({ user, showAudienceToggle = true }) => {
   const defaultAudience = useMemo(() => {
     const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
@@ -82,10 +85,25 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
   const [activeTab, setActiveTab] = useState(defaultAudience); // recruiter | candidate
   const [loadingPlan, setLoadingPlan] = useState("");
   const nav = useNavigate();
+  const location = useLocation();
+  const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const requestedAudience = query.get("audience");
+  const recommendedPlanParam = String(query.get("recommendedPlan") || "").toLowerCase();
+  const recommendedPlan = RECRUITER_PLAN_RANK[recommendedPlanParam]
+    ? recommendedPlanParam
+    : "";
 
   useEffect(() => {
+    if (requestedAudience === "recruiter" || recommendedPlan) {
+      setActiveTab("recruiter");
+      return;
+    }
+    if (requestedAudience === "candidate") {
+      setActiveTab("candidate");
+      return;
+    }
     setActiveTab(defaultAudience);
-  }, [defaultAudience]);
+  }, [defaultAudience, requestedAudience, recommendedPlan]);
 
   const isRecruiter = activeTab === "recruiter";
   const plans = isRecruiter ? RECRUITER_PLANS : CANDIDATE_PLANS;
@@ -163,10 +181,17 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
           className="card-grid"
         >
           {plans.map((p) => {
+            const belowRecommended =
+              isRecruiter &&
+              recommendedPlan &&
+              RECRUITER_PLAN_RANK[p.key] < RECRUITER_PLAN_RANK[recommendedPlan];
+            const isRecommended = isRecruiter && recommendedPlan === p.key;
             const cardClass = [
               "card",
               isRecruiter ? "recruiter" : "candidate",
               `plan-${p.key}`,
+              isRecommended ? "recommended" : "",
+              belowRecommended ? "disabled" : "",
             ].join(" ");
             return (
               <article
@@ -175,6 +200,7 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
               >
                 <header className="card-head">
                   <h3 className="title">{p.name}</h3>
+                  {isRecommended && <p className="subtitle">Recommended for this posting</p>}
                   {isRecruiter && <p className="subtitle">{p.headline}</p>}
                 </header>
 
@@ -209,9 +235,15 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                       <button
                         className="btn primary"
                         onClick={() => startCheckout(p, "recruiter")}
-                        disabled={loadingPlan === p.key}
+                        disabled={loadingPlan === p.key || belowRecommended}
                       >
-                        {loadingPlan === p.key ? "Starting..." : "Post this listing"}
+                        {belowRecommended
+                          ? "Not valid for this posting"
+                          : loadingPlan === p.key
+                          ? "Starting..."
+                          : isRecommended
+                          ? "Choose recommended plan"
+                          : "Upgrade to this plan"}
                       </button>
                       <p className="fineprint">
                         Recurring 30-day listing cycle. Cancel anytime. Prices shown in USD.
@@ -222,11 +254,19 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                   <div className="card-body">
                     <div className="price-block">
                       <div className="price-line">
-                        <span className="price">
-                          <span className="currency">$</span>
-                          <span className="amount">{p.price}</span>
-                        </span>
-                        <span className="period">/{p.period}</span>
+                        {p.key === "free" ? (
+                          <span className="price price-free">
+                            <span className="amount">FREE</span>
+                          </span>
+                        ) : (
+                          <>
+                            <span className="price">
+                              <span className="currency">$</span>
+                              <span className="amount">{p.price}</span>
+                            </span>
+                            <span className="period">/{p.period}</span>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -240,9 +280,9 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
 
                     <div className="actions">
                       {p.key === "free" ? (
-                        <a className="btn ghost" href={p.cta.href}>
+                        <Link className="btn ghost" to={p.cta.href}>
                           {p.cta.label}
-                        </a>
+                        </Link>
                       ) : (
                         <button
                           className="btn ghost"

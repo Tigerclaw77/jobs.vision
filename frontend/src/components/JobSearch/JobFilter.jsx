@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Lock, Navigation, SlidersHorizontal } from "lucide-react";
 import {
   EMPLOYMENT_TYPE_OPTIONS,
+  BRAND_FILTER_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
   PRACTICE_TYPE_OPTIONS,
   ROLE_OPTIONS,
+  SATURDAY_SCHEDULE_OPTIONS,
   WORK_ARRANGEMENT_OPTIONS,
   normalizeRole,
 } from "../../utils/jobTaxonomy";
@@ -14,16 +16,17 @@ const RADIUS_OPTIONS = [
   { value: 25, label: "25 mi" },
   { value: 50, label: "50 mi" },
   { value: 100, label: "100 mi" },
+  { value: 250, label: "250 mi" },
 ];
 
 const cleanLocationInput = (value = "") => String(value).replace(/\s+/g, " ").trim();
 const collapseLocationInput = (value = "") => String(value).replace(/\s+/g, " ");
 
-function FilterChecks({ legend, options, selected = [], onToggle }) {
+function FilterChecks({ legend, options, selected = [], onToggle, disabled = false }) {
   const values = Array.isArray(selected) ? selected : [];
 
   return (
-    <fieldset className="field field-checks">
+    <fieldset className={`field field-checks ${disabled ? "field-checks-disabled" : ""}`} disabled={disabled}>
       <legend>{legend}</legend>
       <div className="filter-check-group">
         {options.map((option) => (
@@ -47,9 +50,36 @@ function selectedSummary(label) {
 
 function CheckboxDropdown({ label, options, selected = [], onToggle }) {
   const values = Array.isArray(selected) ? selected : [];
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const closeDropdown = () => {
+      if (dropdownRef.current?.open) {
+        dropdownRef.current.open = false;
+      }
+    };
+    const handlePointerDown = (event) => {
+      if (dropdownRef.current?.open && !dropdownRef.current.contains(event.target)) {
+        closeDropdown();
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && dropdownRef.current?.open) {
+        closeDropdown();
+        dropdownRef.current.querySelector("summary")?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   return (
-    <details className="field field-role filter-dropdown">
+    <details className="field field-role filter-dropdown" ref={dropdownRef}>
       <summary className="filter-dropdown-summary">
         <span>{selectedSummary(label)}</span>
       </summary>
@@ -77,6 +107,7 @@ export default function JobFilter({
   onRemoveQuickTag,
   canUseMapSearch = true,
   canUseAdvancedOdFilters = false,
+  isStateLocationSearch = false,
   geocodeStatus = "idle",
   geocodeMessage = "",
 }) {
@@ -86,11 +117,11 @@ export default function JobFilter({
   const hasLocation =
     Boolean(String(filters.location || "").trim()) ||
     (Number.isFinite(Number(filters.lat)) && Number.isFinite(Number(filters.lng)));
-  const canUseRadius = canUseMapSearch && hasLocation;
+  const canUseRadius = canUseMapSearch && hasLocation && !isStateLocationSearch;
   const selectedRoles = Array.isArray(filters.roles)
     ? filters.roles.map((role) => normalizeRole(role) || role).filter(Boolean)
     : [];
-  const showOpportunityTypes =
+  const odFiltersEnabled =
     canUseAdvancedOdFilters && selectedRoles.includes("optometrist");
 
   const toggleMulti = (key, value) => {
@@ -105,9 +136,22 @@ export default function JobFilter({
         .filter(Boolean);
       set({
         roles: normalizedRoles,
-        opportunityTypes: normalizedRoles.includes("optometrist")
-          ? filters.opportunityTypes || []
-          : [],
+      });
+      return;
+    }
+
+    if (key === "includeBrand") {
+      set({
+        includeBrand: nextValues,
+        excludeBrand: (filters.excludeBrand || []).filter((item) => item !== value),
+      });
+      return;
+    }
+
+    if (key === "excludeBrand") {
+      set({
+        excludeBrand: nextValues,
+        includeBrand: (filters.includeBrand || []).filter((item) => item !== value),
       });
       return;
     }
@@ -176,7 +220,7 @@ export default function JobFilter({
           <label>Location</label>
           <input
             type="text"
-            placeholder="City, ST"
+            placeholder="City, State, ZIP"
             value={filters.location || ""}
             onChange={(e) =>
               set({ location: collapseLocationInput(e.target.value), lat: null, lng: null })
@@ -208,6 +252,8 @@ export default function JobFilter({
             title={
               !canUseMapSearch
                 ? "Map search requires Plus or Premium"
+                : isStateLocationSearch
+                ? "State searches include all matching jobs in the state"
                 : hasLocation
                 ? "Search radius"
                 : "Enter a location to use radius"
@@ -252,6 +298,21 @@ export default function JobFilter({
           </div>
         </div>
 
+        <div className="filter-brand-row">
+          <CheckboxDropdown
+            label="Include Brand"
+            options={BRAND_FILTER_OPTIONS}
+            selected={filters.includeBrand}
+            onToggle={(value) => toggleMulti("includeBrand", value)}
+          />
+          <CheckboxDropdown
+            label="Exclude Brand"
+            options={BRAND_FILTER_OPTIONS}
+            selected={filters.excludeBrand}
+            onToggle={(value) => toggleMulti("excludeBrand", value)}
+          />
+        </div>
+
         <FilterChecks
           legend="Employment Type"
           options={EMPLOYMENT_TYPE_OPTIONS}
@@ -287,20 +348,32 @@ export default function JobFilter({
           </button>
 
           {advancedOpen && (
-            <div className="advanced-filter-content">
-              {showOpportunityTypes && (
-                <FilterChecks
-                  legend="Opportunity Type"
-                  options={OPPORTUNITY_TYPE_OPTIONS}
-                  selected={filters.opportunityTypes}
-                  onToggle={(value) => toggleMulti("opportunityTypes", value)}
-                />
+            <div className={`advanced-filter-content ${!odFiltersEnabled ? "advanced-filter-content-disabled" : ""}`}>
+              {!odFiltersEnabled && (
+                <p className="advanced-filter-helper">
+                  Select Optometrist to enable OD-specific filters.
+                </p>
               )}
+              <FilterChecks
+                legend="Opportunity Type"
+                options={OPPORTUNITY_TYPE_OPTIONS}
+                selected={filters.opportunityTypes}
+                onToggle={(value) => toggleMulti("opportunityTypes", value)}
+                disabled={!odFiltersEnabled}
+              />
               <FilterChecks
                 legend="Practice Type"
                 options={PRACTICE_TYPE_OPTIONS}
                 selected={filters.practiceTypes}
                 onToggle={(value) => toggleMulti("practiceTypes", value)}
+                disabled={!odFiltersEnabled}
+              />
+              <FilterChecks
+                legend="Saturday Schedule"
+                options={SATURDAY_SCHEDULE_OPTIONS}
+                selected={filters.saturdaySchedules}
+                onToggle={(value) => toggleMulti("saturdaySchedules", value)}
+                disabled={!odFiltersEnabled}
               />
             </div>
           )}

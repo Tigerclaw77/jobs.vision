@@ -8,9 +8,6 @@ const helmet = require("helmet");
 
 // Initialize Stripe after dotenv
 const stripeKey = process.env.STRIPE_SECRET_KEY;
-if (stripeKey && !stripeKey.startsWith("sk_test_")) {
-  throw new Error("Only Stripe test-mode secret keys are supported in this integration pass.");
-}
 const stripe = stripeKey ? require("stripe")(stripeKey) : null;
 const stripeSkipVerify = process.env.STRIPE_SKIP_VERIFY === "true";
 
@@ -361,10 +358,25 @@ const allowedOrigins = [
   "https://www.jobs.vision",
 ].filter(Boolean);
 
+function isLocalDevOrigin(origin) {
+  if (process.env.NODE_ENV === "production") return false;
+
+  try {
+    const url = new URL(origin);
+    return (
+      ["http:", "https:"].includes(url.protocol) &&
+      ["localhost", "127.0.0.1"].includes(url.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin(origin, cb) {
     if (!origin) return cb(null, true); // server-to-server or curl
     if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (isLocalDevOrigin(origin)) return cb(null, true);
     return cb(new Error("Not allowed by CORS"));
   },
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
