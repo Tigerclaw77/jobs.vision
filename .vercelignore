@@ -20,12 +20,11 @@ frontend/build/
 *.log
 *.pid
 
-# Local screenshots and audit artifacts
-*.png
-*.jpg
-*.jpeg
-*.webp
-*.gif
+# Local screenshots and audit artifacts in the workspace root
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
 
 # Local/editor/system files
 .git/
