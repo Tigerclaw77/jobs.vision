@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Local builds and Vercel output
+build/
+dist/
+out/
+.next/
+.vercel/output/
+frontend/build/
+
+# Environment and logs
+.env
+.env.*
+*.env
+*.env.*
+**/.env
+**/.env.*
+*.log
+*.pid
+
+# Local screenshots and audit artifacts
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+
+# Local/editor/system files
+.git/
+.cache/
+coverage/
+.DS_Store
+Thumbs.db
