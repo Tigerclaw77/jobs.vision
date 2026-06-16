@@ -203,7 +203,7 @@ input:focus, textarea:focus, select:focus {
 }
 
 .dashboard-container a:hover {
-  color: var(--jv-secondary);
+  color: #075985;
 }
 
 .premium-highlight {
@@ -277,7 +277,7 @@ input:focus, textarea:focus, select:focus {
 
 .recruiter-action-row button:hover,
 .recruiter-cancel-form-button:hover {
-  background: var(--jv-secondary);
+  background: #075985;
 }
 
 .recruiter-cancel-form-button {
@@ -294,15 +294,21 @@ input:focus, textarea:focus, select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .tab-buttons button {
+  flex: 0 1 auto;
+  max-width: 100%;
   min-height: 40px;
   border: 1px solid rgba(12, 74, 110, 0.22);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
   color: #263c4d;
   font-weight: 850;
+  white-space: nowrap;
 }
 
 .tab-buttons button.active {
@@ -587,7 +593,8 @@ input:focus, textarea:focus, select:focus {
 .recruiter-job-list {
   display: grid;
   gap: 8px;
-  overflow-x: auto;
+  max-width: 100%;
+  overflow-x: visible;
   padding-bottom: 4px;
 }
 
@@ -595,17 +602,17 @@ input:focus, textarea:focus, select:focus {
 .recruiter-job-row-main {
   display: grid;
   grid-template-columns:
-    minmax(220px, 1.9fr)
-    minmax(105px, 0.8fr)
-    minmax(150px, 1fr)
-    minmax(120px, 0.85fr)
-    minmax(86px, 0.65fr)
-    minmax(104px, 0.75fr)
-    minmax(84px, 0.6fr)
-    minmax(250px, 1.35fr);
-  gap: 10px;
+    minmax(150px, 1.7fr)
+    minmax(76px, 0.7fr)
+    minmax(110px, 1fr)
+    minmax(82px, 0.7fr)
+    minmax(68px, 0.56fr)
+    minmax(82px, 0.68fr)
+    minmax(58px, 0.48fr)
+    minmax(150px, 1fr);
+  gap: 8px;
   align-items: center;
-  min-width: 1120px;
+  min-width: 0;
 }
 
 .recruiter-job-list-header {
@@ -620,7 +627,8 @@ input:focus, textarea:focus, select:focus {
 .recruiter-job-row {
   display: grid;
   gap: 0;
-  min-width: 1120px;
+  min-width: 0;
+  max-width: 100%;
   color: #102033;
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(12, 74, 110, 0.14);
@@ -704,7 +712,8 @@ input:focus, textarea:focus, select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .recruiter-job-actions button,
@@ -712,14 +721,15 @@ input:focus, textarea:focus, select:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
-  padding: 5px 9px;
+  flex: 1 1 64px;
+  min-height: 28px;
+  padding: 4px 7px;
   box-sizing: border-box;
   border: 1px solid rgba(12, 74, 110, 0.18);
   border-radius: 7px;
   color: #075985;
   background: rgba(224, 242, 254, 0.82);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 850;
   text-decoration: none;
 }
@@ -926,6 +936,41 @@ input:focus, textarea:focus, select:focus {
   border: 1px solid rgba(14, 116, 144, 0.24);
 }
 
+@media (max-width: 1100px) {
+  .recruiter-job-list-header {
+    display: none;
+  }
+
+  .recruiter-job-row,
+  .recruiter-job-row-main {
+    min-width: 0;
+  }
+
+  .recruiter-job-row-main {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .recruiter-job-cell:not(.recruiter-job-title-cell) {
+    display: grid;
+    grid-template-columns: 108px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .recruiter-job-cell:not(.recruiter-job-title-cell)::before {
+    content: attr(data-label);
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .recruiter-job-actions button,
+  .recruiter-row-action-link {
+    flex: 0 1 auto;
+  }
+}
+
 @media (max-width: 720px) {
   .dashboard-container {
     width: min(100% - 20px, 1040px);
@@ -1064,6 +1109,10 @@ input:focus, textarea:focus, select:focus {
 }
 .job-card h3 { font-size: 1.4rem; margin-bottom: 10px; }
 .job-card p { font-size: 1rem; color: #fff; }
+.recruiter-preview-card.job-card p,
+.recruiter-card.job-card p {
+  color: #334155;
+}
 
 /* Modal */
 .modal-overlay {

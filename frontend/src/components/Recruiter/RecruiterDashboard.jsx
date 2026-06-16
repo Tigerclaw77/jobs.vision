@@ -18,29 +18,6 @@ import ProfileCompletionModule from "../Profile/ProfileCompletionModule";
 import { recruiterCompletionSummary, shapeProfileForm } from "../Profile/profileUtils";
 import "../../styles/Profile.css";
 
-const POSTING_LABELS = {
-  staff: "Staff Position",
-  manager: "Manager Position",
-  doctor: "Doctor Position",
-};
-
-const PAID_POSTING_STATUS_LABELS = {
-  active: "Active",
-  trialing: "Trialing",
-  past_due: "Past Due",
-  canceled: "Canceled",
-  inactive: "Inactive",
-};
-
-function formatCurrentPosting(entitlement, user) {
-  const tier = entitlement?.tier || user?.tier || "";
-  if (tier && POSTING_LABELS[tier]) return POSTING_LABELS[tier];
-  if (entitlement?.plan) {
-    return String(entitlement.plan).replace(/^recruiter_/, "").replace(/_/g, " ");
-  }
-  return "No active paid posting";
-}
-
 const RecruiterDashboard = () => {
   const { user: reduxUser, userRole: reduxUserRole } = useSelector((state) => state.auth);
   const {
@@ -126,26 +103,22 @@ const RecruiterDashboard = () => {
 
   }, [categorizeJobs, profileFallbackUser]);
 
-  const recruiterEntitlement = user?.entitlements?.recruiter || null;
   const isAdmin = String(userRole || user?.userRole || "").toLowerCase() === "admin";
-  const subscriptionActive = isAdmin || recruiterEntitlement?.active === true;
-  const maxActiveJobs = isAdmin ? null : recruiterEntitlement?.maxActiveJobs ?? 0;
-  const slotJobsUsed = categorizedJobs.active.length + categorizedJobs.pending.length;
-  const remainingSlots =
-    maxActiveJobs === null ? null : Math.max(0, Number(maxActiveJobs || 0) - slotJobsUsed);
-  const atSlotCapacity =
-    subscriptionActive && maxActiveJobs !== null && remainingSlots === 0;
-  const canPublishJob =
-    isAdmin || (subscriptionActive && (maxActiveJobs === null || remainingSlots > 0));
-  const currentPosting = isAdmin ? "Admin Posting View" : formatCurrentPosting(recruiterEntitlement, user);
-  const paidPostingStatus = isAdmin
-    ? "Active"
-    : PAID_POSTING_STATUS_LABELS[String(recruiterEntitlement?.status || "inactive").toLowerCase()] ||
-      recruiterEntitlement?.status ||
-      "Inactive";
-  const nextAction = !subscriptionActive
-    ? "Create the posting first. Checkout appears when it is ready."
-    : "Manage your listings.";
+  const uniqueJobs = useMemo(() => {
+    const byId = new Map();
+    Object.values(categorizedJobs).forEach((jobs = []) => {
+      jobs.forEach((job) => {
+        const id = job.id || job._id;
+        if (id && !byId.has(id)) byId.set(id, job);
+      });
+    });
+    return Array.from(byId.values());
+  }, [categorizedJobs]);
+  const paidPostingCount = uniqueJobs.filter((job) => job.payment?.active === true).length;
+  const paidPostingSummary = paidPostingCount
+    ? `${paidPostingCount} paid posting${paidPostingCount === 1 ? "" : "s"}`
+    : "No paid postings yet";
+  const nextAction = "Post a job or manage your listings.";
 
   const handleAddJobClick = useCallback(() => {
     setEditingJob(null);
@@ -233,10 +206,6 @@ const RecruiterDashboard = () => {
             <>
               <AddJob
                 jobToEdit={editingJob}
-                canPublish={canPublishJob}
-                planRequired={!subscriptionActive && !isAdmin}
-                slotLimitReached={atSlotCapacity && !isAdmin}
-                recruiterTier={recruiterEntitlement?.tier || user?.tier || ""}
                 isAdmin={isAdmin}
                 onSuccess={() => {
                   setShowForm(false);
@@ -271,9 +240,9 @@ const RecruiterDashboard = () => {
           <summary>Account tools</summary>
           <div className="recruiter-secondary-content">
             <div className="recruiter-current-posting">
-              <span>Current Posting</span>
-              <strong>{currentPosting}</strong>
-              <p>{subscriptionActive ? `${paidPostingStatus} Paid Posting` : "No active paid posting yet."}</p>
+              <span>Posting checkout</span>
+              <strong>{isAdmin ? "Admin posting view" : paidPostingSummary}</strong>
+              <p>Checkout is handled per job after the role is selected.</p>
             </div>
 
             {profileCompletion && (

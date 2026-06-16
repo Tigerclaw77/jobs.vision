@@ -2,6 +2,12 @@ const express = require("express");
 const { requireAuth } = require("../middleware/auth.js");
 const { one, query } = require("../services/db.js");
 const { getPlanByKey } = require("../services/stripeCatalog.js");
+const {
+  getRequiredRecruiterPlanKey,
+  normalizeRecruiterPostingRole,
+  paymentMetadataForJob,
+  upsertRecruiterPostingPayment,
+} = require("../services/recruiterPostingPayments.js");
 
 const router = express.Router();
 
@@ -59,13 +65,29 @@ async function getOrCreateCustomer(profile) {
   return customer.id;
 }
 
+function isAdmin(user = {}) {
+  return String(user.role || user.userRole || "").toLowerCase() === "admin";
+}
+
+function canCheckoutJob(user = {}, job = {}) {
+  if (isAdmin(user)) return true;
+  const userId = String(user.id || "");
+  return [job.recruiter_id, job.posted_by, job.claimed_by_user_id]
+    .filter(Boolean)
+    .map(String)
+    .includes(userId);
+}
+
 router.post("/checkout", requireAuth, async (req, res) => {
   try {
     if (!stripe) {
       return res.status(503).json({ error: "Stripe is not configured." });
     }
 
-    const plan = getPlanByKey(req.body?.planKey || req.body?.plan);
+    const requestedPlanKey = String(req.body?.planKey || req.body?.plan || "")
+      .trim()
+      .toLowerCase();
+    let plan = getPlanByKey(requestedPlanKey);
     if (!plan) {
       return res.status(400).json({ error: "Unknown Stripe plan." });
     }
@@ -80,6 +102,65 @@ router.post("/checkout", requireAuth, async (req, res) => {
     );
 
     if (!profile) return res.status(404).json({ error: "Profile not found." });
+
+    let recruiterPostingMetadata = null;
+    if (plan.audience === "recruiter") {
+      const jobId = req.body?.jobId || req.body?.job_id;
+      if (!jobId) {
+        return res.status(400).json({
+          error: "A saved posting is required before recruiter checkout.",
+          code: "recruiter_posting_job_required",
+        });
+      }
+
+      const job = await one(
+        `
+          select id, recruiter_id, posted_by, claimed_by_user_id, role, status, is_archived
+          from public.jobs
+          where id = $1
+        `,
+        [jobId]
+      );
+
+      if (!job) {
+        return res.status(404).json({ error: "Posting not found." });
+      }
+
+      if (!canCheckoutJob(req.user, job)) {
+        return res.status(403).json({ error: "You cannot checkout for this posting." });
+      }
+
+      if (job.is_archived) {
+        return res.status(400).json({ error: "Removed postings cannot be checked out." });
+      }
+
+      const role = normalizeRecruiterPostingRole(job.role);
+      if (!role) {
+        return res.status(400).json({
+          error: "Choose a valid posting role before checkout.",
+          code: "invalid_job_role",
+        });
+      }
+
+      const requiredPlanKey = getRequiredRecruiterPlanKey(role);
+      if (requestedPlanKey && requestedPlanKey !== requiredPlanKey) {
+        return res.status(400).json({
+          error: "Checkout plan does not match this posting role.",
+          code: "recruiter_posting_plan_mismatch",
+          jobId: job.id,
+          role,
+          requiredPlanKey,
+        });
+      }
+
+      plan = getPlanByKey(requiredPlanKey);
+      recruiterPostingMetadata = paymentMetadataForJob({
+        jobId: job.id,
+        profileId: profile.id,
+        role,
+        requiredPlanKey,
+      });
+    }
 
     const recurringPrice = await findActivePriceByLookupKey(plan.recurringLookupKey);
     if (!recurringPrice) {
@@ -109,6 +190,17 @@ router.post("/checkout", requireAuth, async (req, res) => {
     const successPath = plan.audience === "recruiter" ? "/recruiter/dashboard" : "/profile";
     const cancelPath = plan.audience === "recruiter" ? "/pricing?audience=recruiter" : "/";
 
+    const metadata = {
+      app: "jobs.vision",
+      userId: profile.id,
+      profileId: profile.id,
+      productKey: plan.planKey,
+      planKey: plan.planKey,
+      audience: plan.audience,
+      dbPlan: plan.dbPlan,
+      ...(recruiterPostingMetadata || {}),
+    };
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
@@ -117,31 +209,37 @@ router.post("/checkout", requireAuth, async (req, res) => {
       allow_promotion_codes: true,
       success_url: `${baseUrl}${successPath}?checkout=success&plan=${encodeURIComponent(
         plan.planKey
-      )}`,
+      )}${
+        recruiterPostingMetadata?.jobId
+          ? `&jobId=${encodeURIComponent(recruiterPostingMetadata.jobId)}`
+          : ""
+      }`,
       cancel_url: `${baseUrl}${cancelPath}${
         cancelPath.includes("?") ? "&" : "?"
-      }checkout=cancelled&plan=${encodeURIComponent(plan.planKey)}`,
-      metadata: {
-        app: "jobs.vision",
-        userId: profile.id,
-        profileId: profile.id,
-        productKey: plan.planKey,
-        planKey: plan.planKey,
-        audience: plan.audience,
-        dbPlan: plan.dbPlan,
-      },
+      }checkout=cancelled&plan=${encodeURIComponent(plan.planKey)}${
+        recruiterPostingMetadata?.jobId
+          ? `&jobId=${encodeURIComponent(recruiterPostingMetadata.jobId)}`
+          : ""
+      }`,
+      metadata,
       subscription_data: {
-        metadata: {
-          app: "jobs.vision",
-          userId: profile.id,
-          profileId: profile.id,
-          productKey: plan.planKey,
-          planKey: plan.planKey,
-          audience: plan.audience,
-          dbPlan: plan.dbPlan,
-        },
+        metadata,
       },
     });
+
+    if (recruiterPostingMetadata) {
+      await upsertRecruiterPostingPayment({
+        jobId: recruiterPostingMetadata.jobId,
+        profileId: profile.id,
+        role: recruiterPostingMetadata.role,
+        requiredPlanKey: recruiterPostingMetadata.requiredPlanKey,
+        status: "incomplete",
+        stripeCustomerId: customerId,
+        stripeCheckoutSessionId: session.id,
+        stripePriceId: recurringPrice.id,
+        stripeLookupKey: recurringPrice.lookup_key || plan.recurringLookupKey,
+      });
+    }
 
     return res.json({ url: session.url, sessionId: session.id });
   } catch (err) {

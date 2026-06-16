@@ -304,8 +304,11 @@ export const fetchRecruiterApplications = async () => {
   return Array.isArray(data) ? data : data?.items || [];
 };
 
-export const createStripeCheckout = async (planKey) => {
-  const { data } = await axiosInstance.post("/stripe/checkout", { planKey });
+export const createStripeCheckout = async (planKey, options = {}) => {
+  const { data } = await axiosInstance.post("/stripe/checkout", {
+    planKey,
+    jobId: options.jobId || options.job_id || undefined,
+  });
   return data;
 };
 

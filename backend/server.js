@@ -24,6 +24,12 @@ const {
   markSubscriptionCanceled,
   upsertStripeEntitlement,
 } = require("./services/entitlements");
+const {
+  findRecruiterPostingPaymentBySubscription,
+  markRecruiterPostingPaymentCanceled,
+  normalizeRecruiterPostingRole,
+  upsertRecruiterPostingPayment,
+} = require("./services/recruiterPostingPayments");
 
 // ✅ Billing engine
 const { billJobsMonthly } = require("./controllers/billingController");
@@ -69,10 +75,69 @@ async function findProfileForStripeCustomer(customerId, metadata = {}) {
 
 async function retrieveSubscription(subscriptionId) {
   if (!subscriptionId) return null;
-  if (typeof subscriptionId === "object") return subscriptionId;
-  return stripe.subscriptions.retrieve(subscriptionId, {
+  const id = typeof subscriptionId === "object" ? subscriptionId.id : subscriptionId;
+  if (typeof subscriptionId === "object" && subscriptionId?.items?.data?.[0]?.price?.id) {
+    return subscriptionId;
+  }
+  return stripe.subscriptions.retrieve(id, {
     expand: ["items.data.price"],
   });
+}
+
+function isRecruiterPostingMetadata(metadata = {}) {
+  return (
+    metadata.paymentScope === "recruiter_posting" ||
+    Boolean(metadata.jobId || metadata.job_id)
+  );
+}
+
+function firstSubscriptionPrice(subscription = {}) {
+  return subscription?.items?.data?.find((item) => item?.price)?.price || null;
+}
+
+async function syncRecruiterPostingPayment(subscription, fallbackMetadata = {}) {
+  const sub = await retrieveSubscription(subscription);
+  if (!sub) {
+    console.warn("No subscription found for recruiter posting payment sync.");
+    return null;
+  }
+
+  const existing = await findRecruiterPostingPaymentBySubscription(sub.id);
+  const metadata = {
+    ...(existing || {}),
+    ...(fallbackMetadata || {}),
+    ...(sub.metadata || {}),
+  };
+
+  const jobId = metadata.jobId || metadata.job_id;
+  if (!jobId) {
+    return null;
+  }
+
+  const profile = await findProfileForStripeCustomer(sub.customer, metadata);
+  const profileId = profile?.id || metadata.profileId || metadata.userId || metadata.profile_id;
+  const price = firstSubscriptionPrice(sub);
+  const status = normalizeStripeStatus(sub.status);
+  const role = normalizeRecruiterPostingRole(metadata.role || existing?.role);
+  const requiredPlanKey = metadata.requiredPlanKey || metadata.required_plan_key;
+
+  const payload = await upsertRecruiterPostingPayment({
+    jobId,
+    profileId,
+    role,
+    requiredPlanKey,
+    status,
+    stripeCustomerId: sub.customer,
+    stripeCheckoutSessionId:
+      metadata.stripeCheckoutSessionId ||
+      metadata.stripe_checkout_session_id ||
+      existing?.stripe_checkout_session_id,
+    stripeSubscriptionId: sub.id,
+    stripePriceId: price?.id || existing?.stripe_price_id || null,
+    stripeLookupKey: price?.lookup_key || existing?.stripe_lookup_key || null,
+  });
+  console.log(`Stripe posting payment synced for job ${jobId}`, payload);
+  return payload;
 }
 
 async function syncSubscriptionEntitlement(subscription, fallbackMetadata = {}) {
@@ -131,16 +196,27 @@ if (stripe) {
         switch (event.type) {
           case "checkout.session.completed": {
             const session = event.data.object;
-            await syncSubscriptionEntitlement(session.subscription, {
+            const metadata = {
               ...(session.metadata || {}),
               profileId: session.metadata?.profileId || session.client_reference_id,
-            });
+              stripeCheckoutSessionId: session.id,
+            };
+            if (isRecruiterPostingMetadata(metadata)) {
+              await syncRecruiterPostingPayment(session.subscription, metadata);
+            } else {
+              await syncSubscriptionEntitlement(session.subscription, metadata);
+            }
             return res.json({ received: true });
           }
 
           case "invoice.paid": {
             const invoice = event.data.object;
-            await syncSubscriptionEntitlement(invoice.subscription);
+            const sub = await retrieveSubscription(invoice.subscription);
+            if (sub && (isRecruiterPostingMetadata(sub.metadata) || (await findRecruiterPostingPaymentBySubscription(sub.id)))) {
+              await syncRecruiterPostingPayment(sub);
+            } else {
+              await syncSubscriptionEntitlement(sub || invoice.subscription);
+            }
             return res.json({ received: true });
           }
 
@@ -149,20 +225,43 @@ if (stripe) {
             const sub = await retrieveSubscription(invoice.subscription);
             if (sub) {
               sub.status = "past_due";
-              await syncSubscriptionEntitlement(sub);
+              if (
+                isRecruiterPostingMetadata(sub.metadata) ||
+                (await findRecruiterPostingPaymentBySubscription(sub.id))
+              ) {
+                await syncRecruiterPostingPayment(sub);
+              } else {
+                await syncSubscriptionEntitlement(sub);
+              }
             }
             return res.json({ received: true });
           }
 
           case "customer.subscription.updated": {
-            await syncSubscriptionEntitlement(event.data.object);
+            const sub = await retrieveSubscription(event.data.object);
+            if (
+              sub &&
+              (isRecruiterPostingMetadata(sub.metadata) ||
+                (await findRecruiterPostingPaymentBySubscription(sub.id)))
+            ) {
+              await syncRecruiterPostingPayment(sub);
+            } else {
+              await syncSubscriptionEntitlement(sub || event.data.object);
+            }
             return res.json({ received: true });
           }
 
           case "customer.subscription.deleted": {
             const sub = event.data.object;
-            const profile = await findProfileForStripeCustomer(sub.customer, sub.metadata);
+            if (
+              isRecruiterPostingMetadata(sub.metadata) ||
+              (await findRecruiterPostingPaymentBySubscription(sub.id))
+            ) {
+              await markRecruiterPostingPaymentCanceled(sub.id, "canceled");
+              return res.json({ received: true });
+            }
 
+            const profile = await findProfileForStripeCustomer(sub.customer, sub.metadata);
             if (profile) {
               await markSubscriptionCanceled(profile.id, sub.id);
             }

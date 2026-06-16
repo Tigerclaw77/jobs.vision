@@ -123,6 +123,11 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
       return;
     }
 
+    if (audience === "recruiter") {
+      nav("/recruiter/addjob");
+      return;
+    }
+
     try {
       setLoadingPlan(plan.key);
       const { url } = await createStripeCheckout(plan.key);

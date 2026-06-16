@@ -186,8 +186,17 @@
 }
 
 .recruiter-position-options button:disabled {
-  opacity: 0.72;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.92);
+  border-color: rgba(203, 213, 225, 0.38);
+  opacity: 1;
   cursor: not-allowed;
+}
+
+.recruiter-position-options button.selected:disabled {
+  color: #082f49;
+  background: #bae6fd;
+  border-color: #7dd3fc;
 }
 
 .recruiter-position-step p,
@@ -273,20 +282,20 @@
 .recruiter-job-plan-required button {
   border: 1px solid rgba(186, 230, 253, 0.72);
   border-radius: 8px;
-  background: #0ea5e9;
-  color: #082f49;
+  background: #075985;
+  color: #ffffff;
   cursor: pointer;
   font-weight: 900;
   padding: 9px 12px;
 }
 
 .recruiter-job-plan-required button:hover:not(:disabled) {
-  background: #38bdf8;
+  background: #0f5061;
 }
 
 .recruiter-job-plan-required button:disabled {
   cursor: wait;
-  opacity: 0.72;
+  opacity: 0.86;
 }
 
 .recruiter-apply-default {
@@ -312,7 +321,7 @@
   padding: 12px;
   border: 1px solid rgba(147, 197, 253, 0.48);
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(15, 23, 42, 0.94);
   color: #f8fafc;
   cursor: pointer;
 }
@@ -341,7 +350,7 @@
 .recruiter-apply-option small,
 .recruiter-apply-current,
 .recruiter-apply-summary {
-  color: #e2e8f0 !important;
+  color: #f8fafc !important;
   font-weight: 700;
   line-height: 1.45;
 }
@@ -397,8 +406,8 @@
 }
 
 .recruiter-additional-details summary small {
-  color: #e2e8f0;
-  font-weight: 750;
+  color: #ffffff;
+  font-weight: 800;
 }
 
 .recruiter-additional-details[open] summary {
@@ -439,13 +448,13 @@
 }
 
 .recruiter-job-form-actions .MuiButton-contained {
-  background: #0085b2;
+  background: #075985;
   color: #ffffff;
   font-weight: 800;
 }
 
 .recruiter-job-form-actions .MuiButton-contained:hover {
-  background: #00739a;
+  background: #0f5061;
 }
 
 .recruiter-job-form-card .MuiTypography-body2 {

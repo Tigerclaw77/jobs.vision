@@ -363,6 +363,24 @@ create table if not exists public.recruiter_entitlements (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.recruiter_posting_payments (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  role text not null,
+  required_plan_key text not null,
+  db_plan text not null,
+  status text not null default 'incomplete',
+  stripe_customer_id text,
+  stripe_checkout_session_id text,
+  stripe_subscription_id text,
+  stripe_price_id text,
+  stripe_lookup_key text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.candidate_entitlements (
   profile_id uuid primary key references public.profiles(id) on delete cascade,
   plan text not null default 'candidate_free',
@@ -430,6 +448,10 @@ drop trigger if exists set_recruiter_entitlements_updated_at on public.recruiter
 create trigger set_recruiter_entitlements_updated_at before update on public.recruiter_entitlements
   for each row execute function public.set_updated_at();
 
+drop trigger if exists set_recruiter_posting_payments_updated_at on public.recruiter_posting_payments;
+create trigger set_recruiter_posting_payments_updated_at before update on public.recruiter_posting_payments
+  for each row execute function public.set_updated_at();
+
 drop trigger if exists set_candidate_entitlements_updated_at on public.candidate_entitlements;
 create trigger set_candidate_entitlements_updated_at before update on public.candidate_entitlements
   for each row execute function public.set_updated_at();
@@ -478,6 +500,12 @@ begin
   end if;
   if not exists (select 1 from pg_constraint where conname = 'recruiter_entitlements_max_jobs_nonnegative') then
     alter table public.recruiter_entitlements add constraint recruiter_entitlements_max_jobs_nonnegative check (max_active_jobs >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'recruiter_posting_payments_plan_check') then
+    alter table public.recruiter_posting_payments add constraint recruiter_posting_payments_plan_check check (required_plan_key in ('staff', 'manager', 'doctor') and db_plan in ('recruiter_staff', 'recruiter_manager', 'recruiter_doctor'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'recruiter_posting_payments_status_check') then
+    alter table public.recruiter_posting_payments add constraint recruiter_posting_payments_status_check check (status in ('inactive', 'active', 'trialing', 'past_due', 'canceled', 'incomplete'));
   end if;
   if not exists (select 1 from pg_constraint where conname = 'candidate_entitlements_status_check') then
     alter table public.candidate_entitlements add constraint candidate_entitlements_status_check check (status in ('inactive', 'active', 'trialing', 'past_due', 'canceled', 'incomplete'));
@@ -568,5 +596,10 @@ create index if not exists manual_overrides_email_lower_idx on public.manual_ove
 
 create index if not exists recruiter_entitlements_status_idx on public.recruiter_entitlements (status);
 create unique index if not exists recruiter_entitlements_stripe_subscription_unique on public.recruiter_entitlements (stripe_subscription_id) where stripe_subscription_id is not null;
+create unique index if not exists recruiter_posting_payments_job_unique on public.recruiter_posting_payments (job_id);
+create index if not exists recruiter_posting_payments_profile_status_idx on public.recruiter_posting_payments (profile_id, status, updated_at desc);
+create index if not exists recruiter_posting_payments_job_status_idx on public.recruiter_posting_payments (job_id, status);
+create unique index if not exists recruiter_posting_payments_checkout_session_unique on public.recruiter_posting_payments (stripe_checkout_session_id) where stripe_checkout_session_id is not null;
+create unique index if not exists recruiter_posting_payments_subscription_unique on public.recruiter_posting_payments (stripe_subscription_id) where stripe_subscription_id is not null;
 create index if not exists candidate_entitlements_status_idx on public.candidate_entitlements (status);
 create unique index if not exists candidate_entitlements_stripe_subscription_unique on public.candidate_entitlements (stripe_subscription_id) where stripe_subscription_id is not null;

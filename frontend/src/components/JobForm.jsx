@@ -46,12 +46,6 @@ const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const LOCATION_MAP_ERROR = "We couldn't map this location. Please check the city and state.";
 let googleMapsPromise;
 
-const RECRUITER_PLAN_RANK = {
-  staff: 1,
-  manager: 2,
-  doctor: 3,
-};
-
 const ROLE_REQUIRED_RECRUITER_PLAN = {
   optometrist: "doctor",
   practice_manager: "manager",
@@ -262,18 +256,23 @@ function isEmail(value = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
 }
 
-function planSupportsRole(tier, role, isAdmin = false) {
-  if (isAdmin || !role) return true;
-  const requiredPlan = ROLE_REQUIRED_RECRUITER_PLAN[role] || "staff";
-  return (RECRUITER_PLAN_RANK[String(tier || "").toLowerCase()] || 0) >= RECRUITER_PLAN_RANK[requiredPlan];
+function postingPaymentCoversRole(payment, role, isAdmin = false) {
+  if (isAdmin) return true;
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) return false;
+  const requiredPlan = ROLE_REQUIRED_RECRUITER_PLAN[normalizedRole] || "staff";
+  return (
+    payment?.active === true &&
+    payment?.requiredPlanKey === requiredPlan &&
+    normalizeRole(payment?.role || normalizedRole) === normalizedRole
+  );
 }
 
-function rolePlanRequirementMessage(tier, role) {
-  const planLabel = RECRUITER_PLAN_LABELS[String(tier || "").toLowerCase()] || "Current plan";
+function rolePlanRequirementMessage(role) {
   const roleLabel = ROLE_LABELS[role] || "this role";
   const requiredPlan = ROLE_REQUIRED_RECRUITER_PLAN[role] || "staff";
   const requiredLabel = RECRUITER_PLAN_LABELS[requiredPlan] || "matching plan";
-  return `${roleLabel} postings require ${requiredLabel} checkout. Current paid posting: ${planLabel}.`;
+  return `${roleLabel} postings require ${requiredLabel} checkout before publishing.`;
 }
 
 function profileDefaultDestination(profile = {}) {
@@ -529,10 +528,6 @@ export default function JobForm({
   jobToEdit = null,
   onCreated,
   onSuccess,
-  canPublish = true,
-  planRequired = false,
-  slotLimitReached = false,
-  recruiterTier = "",
   isAdmin = false,
 }) {
   const editingJobId = jobToEdit?.id || jobToEdit?._id || null;
@@ -837,18 +832,8 @@ export default function JobForm({
       setMessage("Please fix the highlighted fields before publishing.");
       return;
     }
-    if (!canPublish) {
-      setMessage(
-        planRequired
-          ? "Checkout is required before this job can go live."
-          : slotLimitReached
-          ? "Another paid posting is already active for this account. Remove a live job or review options before publishing."
-          : "Publishing is not available for this account yet."
-      );
-      return;
-    }
-    if (rolePlanBlocked) {
-      setMessage(rolePlanRequirementMessage(recruiterTier, values.role_type));
+    if (!postingPaymentActive) {
+      setMessage(rolePlanRequirementMessage(values.role_type));
       return;
     }
 
@@ -876,24 +861,23 @@ export default function JobForm({
 
   const destinationSummary = applyDestinationSummary(values, profile || {});
   const defaultDestination = profileDefaultDestination(profile || {});
+  const currentPayment = savedJob?.payment || jobToEdit?.payment || null;
+  const postingPaymentActive = postingPaymentCoversRole(
+    currentPayment,
+    values.role_type,
+    isAdmin
+  );
   const previewUsesApplyUrl = Boolean(
     values.external_apply_url?.trim() ||
       (!values.application_email?.trim() &&
         values.use_default_apply_destination &&
         defaultDestination.applyUrl)
   );
-  const rolePlanBlocked =
-    Boolean(values.role_type) && canPublish && !planSupportsRole(recruiterTier, values.role_type, isAdmin);
-  const publishBlockedMessage = planRequired
-    ? "Checkout is required before this job can go live."
-    : slotLimitReached
-    ? "Another paid posting is already active for this account."
-    : rolePlanBlocked
-    ? rolePlanRequirementMessage(recruiterTier, values.role_type)
-    : !canPublish
-    ? "Publishing is not available for this account yet."
+  const paymentRequired = Boolean(values.role_type) && !postingPaymentActive;
+  const publishBlockedMessage = paymentRequired
+    ? rolePlanRequirementMessage(values.role_type)
     : "";
-  const publishActionBlocked = !canPublish || rolePlanBlocked;
+  const publishActionBlocked = paymentRequired;
   const roleLabel = ROLE_LABELS[values.role_type] || "Select position type";
   const previewCompany = values.company.trim() || profileEmployerName(profile || {});
   const previewCompensation = compensationSummary({
@@ -919,8 +903,7 @@ export default function JobForm({
   ].filter(Boolean);
   const canShowPostingFields = Boolean(values.role_type);
   const requiredPlanKey = ROLE_REQUIRED_RECRUITER_PLAN[values.role_type] || "staff";
-  const capacityPricingHref = "/pricing?audience=recruiter";
-  const checkoutRequired = (planRequired || rolePlanBlocked) && !slotLimitReached;
+  const checkoutRequired = paymentRequired;
   const checkoutPostingLabel = RECRUITER_POSTING_LABELS[requiredPlanKey] || "Posting";
   const checkoutButtonLabel = `Continue with ${checkoutPostingLabel}`;
 
@@ -932,9 +915,11 @@ export default function JobForm({
     try {
       const draft = await saveServerDraft();
       if (!draft) return;
+      const jobId = draft.id || draft._id;
+      if (!jobId) throw new Error("Save this posting before checkout.");
 
       setMessage(`Posting saved. Starting checkout for ${checkoutPostingLabel}.`);
-      const { url } = await createStripeCheckout(requiredPlanKey);
+      const { url } = await createStripeCheckout(requiredPlanKey, { jobId });
       if (!url) throw new Error("Stripe did not return a checkout URL.");
       window.location.assign(url);
     } catch (err) {
@@ -1014,8 +999,6 @@ export default function JobForm({
                   <button type="button" onClick={handleCheckout} disabled={checkoutLoading || submitting}>
                     {checkoutLoading ? "Starting Checkout..." : checkoutButtonLabel}
                   </button>
-                ) : slotLimitReached ? (
-                  <a href={capacityPricingHref}>Review Options</a>
                 ) : null}
               </div>
             ) : null}
@@ -1511,10 +1494,6 @@ export default function JobForm({
                 onClick={handleCheckout}
               >
                 {checkoutLoading ? "Starting Checkout..." : checkoutButtonLabel}
-              </Button>
-            ) : publishActionBlocked && slotLimitReached ? (
-              <Button component="a" href={capacityPricingHref} variant="contained">
-                Review Options
               </Button>
             ) : publishActionBlocked ? (
               <Button type="button" variant="contained" disabled>

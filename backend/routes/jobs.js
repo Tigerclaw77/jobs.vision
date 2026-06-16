@@ -2,7 +2,11 @@
 const express = require("express");
 const { buildInsert, buildUpdate, one, query } = require("../services/db.js");
 const { requireAuth, maybeAuth, requireRole } = require("../middleware/auth.js");
-const { getRecruiterJobLimitState } = require("../services/entitlements.js");
+const {
+  RECRUITER_POSTING_PLAN_LABELS,
+  getRecruiterPostingPaymentState,
+  getRequiredRecruiterPlanKey,
+} = require("../services/recruiterPostingPayments.js");
 const {
   LOCATION_MAP_ERROR,
   resolveJobCoordinates,
@@ -55,26 +59,6 @@ const ROLE_ALIASES = new Map([
   ["optician", "optician"],
   ["other", "other"],
 ]);
-const RECRUITER_TIER_RANK = {
-  staff: 1,
-  manager: 2,
-  doctor: 3,
-};
-const ROLE_REQUIRED_RECRUITER_TIER = {
-  optometrist: "doctor",
-  practice_manager: "manager",
-  optical_manager: "manager",
-  optician: "staff",
-  ophthalmic_technician: "staff",
-  optical_lab: "staff",
-  front_desk: "staff",
-  other: "staff",
-};
-const RECRUITER_TIER_LABELS = {
-  staff: "Staff Position",
-  manager: "Manager Position",
-  doctor: "Doctor Position",
-};
 const ROLE_LABELS = {
   optometrist: "Optometrist",
   optician: "Optician",
@@ -625,53 +609,35 @@ function didLocationChange(body, job) {
   );
 }
 
-function recruiterTierCanPublishRole(tier, role) {
-  if (!tier || !role) return false;
-  const requiredTier = ROLE_REQUIRED_RECRUITER_TIER[role] || "staff";
-  return (RECRUITER_TIER_RANK[String(tier).toLowerCase()] || 0) >= RECRUITER_TIER_RANK[requiredTier];
-}
-
-function recruiterRolePlanMessage(tier, role) {
-  const planLabel = RECRUITER_TIER_LABELS[String(tier || "").toLowerCase()] || "current";
-  const roleLabel = ROLE_LABELS[role] || "this role";
-  const requiredTier = ROLE_REQUIRED_RECRUITER_TIER[role] || "staff";
-  const requiredPlan = RECRUITER_TIER_LABELS[requiredTier] || "matching";
-  return `${planLabel} pricing cannot publish ${roleLabel} postings. Choose ${requiredPlan} or higher before publishing.`;
-}
-
 async function enforceRecruiterCanPost(req, res, excludeJobId = null, role = null) {
   if (isAdmin(req.user)) return false;
 
-  const limitState = await getRecruiterJobLimitState(req.user.id, excludeJobId);
-
-  if (!limitState.entitlement.active) {
-    res.status(402).json({
-      error: "Active recruiter subscription required to post jobs.",
-      code: "recruiter_subscription_required",
-      entitlement: limitState.entitlement,
-    });
-    return true;
-  }
-
   const normalizedRole = normalizeRole(role);
-  if (normalizedRole && !recruiterTierCanPublishRole(limitState.entitlement.tier, normalizedRole)) {
+  const requiredPlanKey = getRequiredRecruiterPlanKey(normalizedRole);
+  const roleLabel = ROLE_LABELS[normalizedRole] || "This role";
+  const requiredPlanLabel = RECRUITER_POSTING_PLAN_LABELS[requiredPlanKey] || "matching posting";
+
+  if (!excludeJobId) {
     res.status(402).json({
-      error: recruiterRolePlanMessage(limitState.entitlement.tier, normalizedRole),
-      code: "recruiter_plan_role_mismatch",
-      entitlement: limitState.entitlement,
+      error: `${roleLabel} requires ${requiredPlanLabel} checkout before publishing. Save the posting first, then continue to checkout.`,
+      code: "recruiter_posting_payment_required",
       role: normalizedRole,
+      requiredPlanKey,
     });
     return true;
   }
 
-  if (!limitState.canPost) {
-    const max = limitState.maxActiveJobs;
+  const payment = await getRecruiterPostingPaymentState(excludeJobId, {
+    role: normalizedRole,
+  });
+  if (!payment.active) {
     res.status(402).json({
-      error: `Your ${limitState.entitlement.tier || "current"} posting access allows ${max} active job${max === 1 ? "" : "s"}. Remove a job or review capacity options to post more.`,
-      code: "job_limit_reached",
-      entitlement: limitState.entitlement,
-      activeJobCount: limitState.activeJobCount,
-      maxActiveJobs: limitState.maxActiveJobs,
+      error: `${roleLabel} requires ${requiredPlanLabel} checkout before publishing.`,
+      code: "recruiter_posting_payment_required",
+      jobId: excludeJobId,
+      role: normalizedRole,
+      requiredPlanKey,
+      payment,
     });
     return true;
   }
@@ -1094,16 +1060,44 @@ router.get("/", maybeAuth, async (req, res) => {
 
 router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
   try {
+    const selectWithPayment = `
+      select
+        j.*,
+        case
+          when rpp.id is null then null
+          else json_build_object(
+            'active', rpp.status in ('active', 'trialing'),
+            'status', rpp.status,
+            'role', rpp.role,
+            'requiredPlanKey', rpp.required_plan_key,
+            'dbPlan', rpp.db_plan,
+            'stripeCustomerId', rpp.stripe_customer_id,
+            'stripeCheckoutSessionId', rpp.stripe_checkout_session_id,
+            'stripeSubscriptionId', rpp.stripe_subscription_id,
+            'stripePriceId', rpp.stripe_price_id,
+            'stripeLookupKey', rpp.stripe_lookup_key,
+            'paidAt', rpp.paid_at,
+            'updatedAt', rpp.updated_at
+          )
+        end as payment
+      from public.jobs j
+      left join lateral (
+        select *
+        from public.recruiter_posting_payments
+        where job_id = j.id
+        order by updated_at desc nulls last, created_at desc
+        limit 1
+      ) rpp on true
+    `;
     const result = isAdmin(req.user)
-      ? await query("select * from public.jobs order by posted_at desc")
+      ? await query(`${selectWithPayment} order by j.posted_at desc`)
       : await query(
           `
-            select *
-            from public.jobs
-            where recruiter_id = $1
-              or posted_by = $1
-              or (claim_status = 'claimed' and claimed_by_user_id = $1)
-            order by posted_at desc
+            ${selectWithPayment}
+            where j.recruiter_id = $1
+              or j.posted_by = $1
+              or (j.claim_status = 'claimed' and j.claimed_by_user_id = $1)
+            order by j.posted_at desc
           `,
           [req.user.id]
         );
@@ -1200,7 +1194,8 @@ router.get("/:id", requireAuth, requireJobManager, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    return res.json(job);
+    const payment = await getRecruiterPostingPaymentState(job.id, { role: job.role });
+    return res.json({ ...job, payment });
   } catch (e) {
     console.error("Fetch job error:", e);
     return res.status(500).json({ error: "Failed to fetch job" });
@@ -1454,9 +1449,10 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
 
     const insert = buildInsert("public.jobs", payload);
     const data = await one(insert.text, insert.params);
+    const payment = await getRecruiterPostingPaymentState(data.id, { role: data.role });
 
     res.status(201).json({
-      job: data,
+      job: { ...data, payment },
       requiresVerification: status === "pending_domain",
       isDraft: status === "draft",
       message:
@@ -1781,8 +1777,9 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     const valueCount = Object.values(updates).filter((value) => value !== undefined).length;
     const update = buildUpdate("public.jobs", updates, `id = $${valueCount + 1}`, [jobId]);
     const data = await one(update.text, update.params);
+    const payment = await getRecruiterPostingPaymentState(data.id, { role: data.role });
 
-    res.json(data);
+    res.json({ ...data, payment });
   } catch (e) {
     if (e?.statusCode) {
       return res.status(e.statusCode).json({ error: e.message, code: e.code });
@@ -1835,9 +1832,10 @@ router.post("/:id/publish", requireAuth, requireJobManager, async (req, res) => 
       [jobId]
     );
     const data = await one(update.text, update.params);
+    const payment = await getRecruiterPostingPaymentState(data.id, { role: data.role });
 
     res.json({
-      job: data,
+      job: { ...data, payment },
       requiresVerification: nextStatus === "pending_domain",
       message:
         nextStatus === "pending_domain"
