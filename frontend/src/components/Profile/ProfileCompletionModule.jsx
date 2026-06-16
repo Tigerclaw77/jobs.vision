@@ -18,6 +18,9 @@ export default function ProfileCompletionModule({
   showNote = true,
   showTaskDetails = true,
   collapseWhenComplete = false,
+  titleLabel = "Profile Completion",
+  completeLabel = "Profile Complete",
+  readyText = "Candidate contact details are ready",
 }) {
   if (!completion || completion.score === null || completion.score === undefined) return null;
 
@@ -43,14 +46,14 @@ export default function ProfileCompletionModule({
   const attentionText =
     statusCount > 0
       ? `${statusCount} item${statusCount === 1 ? "" : "s"} need attention`
-      : "Candidate contact details are ready";
+      : readyText;
 
   if (collapseWhenComplete && groupedTasks.length === 0) {
     return (
       <section className={`profile-completion-module complete ${compact ? "compact" : ""}`}>
         <div className="profile-complete-badge">
           <span className="profile-complete-mark" aria-hidden="true" />
-          <strong>Profile Complete</strong>
+          <strong>{completeLabel}</strong>
         </div>
       </section>
     );
@@ -60,7 +63,7 @@ export default function ProfileCompletionModule({
     <section className={`profile-completion-module ${compact ? "compact" : ""}`}>
       <div className="profile-completion-topline">
         <div>
-          <span className="profile-completion-label">Profile Completion</span>
+          <span className="profile-completion-label">{titleLabel}</span>
           <strong>{completion.score}%</strong>
         </div>
         <span className={`profile-completion-status ${hasCritical ? "critical" : ""}`}>

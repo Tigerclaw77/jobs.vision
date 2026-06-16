@@ -16,7 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import { createJob, fetchUserProfile, publishJob, updateJob } from "../utils/api";
+import { createJob, createStripeCheckout, fetchUserProfile, publishJob, updateJob } from "../utils/api";
 import {
   JOB_TAG_OPTIONS,
   canonicalizeJobTagInput,
@@ -67,6 +67,12 @@ const RECRUITER_PLAN_LABELS = {
   staff: "Staff Position",
   manager: "Manager Position",
   doctor: "Doctor Position",
+};
+
+const RECRUITER_POSTING_LABELS = {
+  staff: "Staff Posting",
+  manager: "Manager Posting",
+  doctor: "Doctor Posting",
 };
 
 const defaultValues = {
@@ -267,7 +273,7 @@ function rolePlanRequirementMessage(tier, role) {
   const roleLabel = ROLE_LABELS[role] || "this role";
   const requiredPlan = ROLE_REQUIRED_RECRUITER_PLAN[role] || "staff";
   const requiredLabel = RECRUITER_PLAN_LABELS[requiredPlan] || "matching plan";
-  return `${planLabel} pricing cannot publish ${roleLabel} postings. Choose ${requiredLabel} or higher before publishing.`;
+  return `${roleLabel} postings require ${requiredLabel} checkout. Your current posting access is ${planLabel}.`;
 }
 
 function profileDefaultDestination(profile = {}) {
@@ -551,6 +557,7 @@ export default function JobForm({
   const [savedJob, setSavedJob] = useState(jobToEdit || null);
   const [touched, setTouched] = useState({});
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -695,17 +702,6 @@ export default function JobForm({
     setValues((p) => ({ ...p, tags: p.tags.filter((t) => t !== tag) }));
   };
 
-  const saveDraft = () => {
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(values));
-      setMessage("Draft saved locally.");
-      setTimeout(() => setMessage(""), 1500);
-    } catch {
-      setMessage("Could not save draft.");
-      setTimeout(() => setMessage(""), 2000);
-    }
-  };
-
   const clearDraft = () => {
     setValues(jobToEdit ? valuesFromJob(jobToEdit) : defaultValues);
     setErrors({});
@@ -811,7 +807,7 @@ export default function JobForm({
       const nextJob = result?.job || result;
 
       setSavedJob(nextJob || null);
-      setMessage("Draft saved. Preview it, then publish when a plan and apply destination are ready.");
+      setMessage("Posting saved. Continue to checkout when it is ready.");
       try {
         localStorage.removeItem(DRAFT_KEY);
       } catch {}
@@ -819,8 +815,8 @@ export default function JobForm({
       setErrors({});
       return nextJob || null;
     } catch (err) {
-      console.error("Draft save failed:", err);
-      setMessage(err?.response?.data?.error || err?.message || "Failed to save draft.");
+      console.error("Posting save failed:", err);
+      setMessage(err?.response?.data?.error || err?.message || "Failed to save this posting.");
       return null;
     } finally {
       setSubmitting(false);
@@ -844,9 +840,9 @@ export default function JobForm({
     if (!canPublish) {
       setMessage(
         planRequired
-          ? "Plan required before publishing. Choose a recruiter plan, then publish this draft."
+          ? "Checkout is required before this job can go live."
           : slotLimitReached
-          ? "Your current plan has no open job slots. Archive a job or upgrade before publishing."
+          ? "Your current posting access has no open job slots. Remove a job or review capacity options before publishing."
           : "Publishing is not available for this account yet."
       );
       return;
@@ -862,7 +858,7 @@ export default function JobForm({
       const payload = await hydrateCoordinates(buildPayload(), { required: true });
       const currentJob = savedJob || (isEditing ? jobToEdit : null) || (await saveServerDraft());
       const jobId = currentJob?.id || currentJob?._id || editingJobId;
-      if (!jobId) throw new Error("Save a draft before publishing.");
+      if (!jobId) throw new Error("Save this posting before publishing.");
       await updateJob(jobId, payload);
       const result = await publishJob(jobId, payload);
       const nextJob = result?.job || result;
@@ -889,9 +885,9 @@ export default function JobForm({
   const rolePlanBlocked =
     Boolean(values.role_type) && canPublish && !planSupportsRole(recruiterTier, values.role_type, isAdmin);
   const publishBlockedMessage = planRequired
-    ? "A recruiter plan is required before this draft can go public."
+    ? "Checkout is required before this job can go live."
     : slotLimitReached
-    ? "Your current plan has no open job slots."
+    ? "Your current posting access has no open job slots."
     : rolePlanBlocked
     ? rolePlanRequirementMessage(recruiterTier, values.role_type)
     : !canPublish
@@ -923,9 +919,31 @@ export default function JobForm({
   ].filter(Boolean);
   const canShowPostingFields = Boolean(values.role_type);
   const requiredPlanKey = ROLE_REQUIRED_RECRUITER_PLAN[values.role_type] || "staff";
-  const pricingHref = `/pricing?audience=recruiter&recommendedPlan=${encodeURIComponent(
-    requiredPlanKey
-  )}`;
+  const capacityPricingHref = "/pricing?audience=recruiter";
+  const checkoutRequired = (planRequired || rolePlanBlocked) && !slotLimitReached;
+  const checkoutPostingLabel = RECRUITER_POSTING_LABELS[requiredPlanKey] || "Posting";
+  const checkoutButtonLabel = `Continue with ${checkoutPostingLabel}`;
+
+  const handleCheckout = async (e) => {
+    if (e) e.preventDefault();
+    if (!checkoutRequired) return;
+
+    setCheckoutLoading(true);
+    try {
+      const draft = await saveServerDraft();
+      if (!draft) return;
+
+      setMessage(`Posting saved. Starting checkout for ${checkoutPostingLabel}.`);
+      const { url } = await createStripeCheckout(requiredPlanKey);
+      if (!url) throw new Error("Stripe did not return a checkout URL.");
+      window.location.assign(url);
+    } catch (err) {
+      console.error("Checkout failed:", err);
+      setMessage(err?.response?.data?.error || err?.message || "Unable to start checkout.");
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
 
   return (
     <Box className="recruiter-job-form-page">
@@ -935,7 +953,7 @@ export default function JobForm({
         className="recruiter-job-form-card"
       >
         <Typography variant="h5" className="recruiter-job-form-title">
-          {isEditing ? "Edit Job" : "Add a Job"}
+          {isEditing ? "Edit Job" : "Post a Job"}
         </Typography>
 
         {showPreview && (
@@ -990,9 +1008,15 @@ export default function JobForm({
             <p>{destinationSummary}</p>
             {publishBlockedMessage ? (
               <div className="recruiter-job-plan-required">
-                <strong>Plan Required</strong>
+                <strong>{checkoutRequired ? "Checkout Required" : "Publishing Blocked"}</strong>
                 <span>{publishBlockedMessage}</span>
-                <a href={pricingHref}>Choose Plan / Checkout</a>
+                {checkoutRequired ? (
+                  <button type="button" onClick={handleCheckout} disabled={checkoutLoading || submitting}>
+                    {checkoutLoading ? "Starting Checkout..." : checkoutButtonLabel}
+                  </button>
+                ) : slotLimitReached ? (
+                  <a href={capacityPricingHref}>Review Capacity Options</a>
+                ) : null}
               </div>
             ) : null}
           </Box>
@@ -1016,7 +1040,7 @@ export default function JobForm({
           {roleLocked ? (
             <p>Role category is locked after publication. Create a new posting for a different role.</p>
           ) : (
-            <p>Pricing and future templates follow this category.</p>
+            <p>Checkout is based on this position type.</p>
           )}
           {!!errors.role_type && <p className="recruiter-job-form-error">{errors.role_type}</p>}
         </Box>
@@ -1075,122 +1099,11 @@ export default function JobForm({
         </Grid>
 
         <Grid item xs={12}>
-          <TextField
-            label="Description*"
-            fullWidth
-            multiline
-            minRows={6}
-            value={values.description}
-            onChange={handleChange("description")}
-            onBlur={handleBlur("description")}
-            error={showError("description")}
-            helperText={helperTextFor("description", "Paste the essentials: responsibilities, schedule, requirements, and why someone should apply.")}
-          />
-        </Grid>
-
-        <Grid item xs={12}>
-          <Box className="recruiter-apply-destination">
-            <Typography variant="subtitle2">Application Destination</Typography>
-            <div className="recruiter-apply-options" role="radiogroup" aria-label="Application destination">
-              <label className="recruiter-apply-option">
-                <input
-                  type="radio"
-                  name="apply_destination_mode"
-                  value="default"
-                  checked={values.apply_destination_mode === "default"}
-                  onChange={() => handleApplyDestinationModeChange("default")}
-                />
-                <span>
-                  <strong>Use Recruiter Profile Default</strong>
-                  <small>Best for practices with one careers page or hiring inbox.</small>
-                </span>
-              </label>
-              <label className="recruiter-apply-option">
-                <input
-                  type="radio"
-                  name="apply_destination_mode"
-                  value="url"
-                  checked={values.apply_destination_mode === "url"}
-                  onChange={() => handleApplyDestinationModeChange("url")}
-                />
-                <span>
-                  <strong>Custom Apply URL</strong>
-                  <small>Use a unique employer-hosted page for this opening.</small>
-                </span>
-              </label>
-              <label className="recruiter-apply-option">
-                <input
-                  type="radio"
-                  name="apply_destination_mode"
-                  value="email"
-                  checked={values.apply_destination_mode === "email"}
-                  onChange={() => handleApplyDestinationModeChange("email")}
-                />
-                <span>
-                  <strong>Custom Apply Email</strong>
-                  <small>Send applicants directly to a job-specific inbox.</small>
-                </span>
-              </label>
-            </div>
-
-            {values.apply_destination_mode === "default" ? (
-              <div className="recruiter-apply-summary">
-                <span>Recruiter Default:</span>
-                {defaultDestination.applyUrl ? (
-                  <a href={defaultDestination.applyUrl} target="_blank" rel="noreferrer">
-                    {defaultDestination.applyUrl}
-                  </a>
-                ) : defaultDestination.applyEmail ? (
-                  <a href={`mailto:${defaultDestination.applyEmail}`}>{defaultDestination.applyEmail}</a>
-                ) : (
-                  <strong>No default set. Choose a custom URL or email for this posting.</strong>
-                )}
-              </div>
-            ) : null}
-
-            {values.apply_destination_mode === "url" ? (
-              <TextField
-                label="Custom Apply URL*"
-                fullWidth
-                value={values.external_apply_url}
-                onChange={handleChange("external_apply_url")}
-                onBlur={handleBlur("external_apply_url")}
-                error={showError("external_apply_url")}
-                helperText={helperTextFor("external_apply_url", "Use the candidate-facing job page, not an internal ATS API URL.")}
-                placeholder="https://example.com/careers/job"
-              />
-            ) : null}
-
-            {values.apply_destination_mode === "email" ? (
-              <TextField
-                label="Custom Apply Email*"
-                fullWidth
-                value={values.application_email}
-                onChange={handleChange("application_email")}
-                onBlur={handleBlur("application_email")}
-                error={showError("application_email")}
-                helperText={helperTextFor("application_email", "Applicants will be instructed to email this address.")}
-                placeholder="hiring@example.com"
-              />
-            ) : null}
-
-            <Typography variant="body2" className="recruiter-apply-current">
-              {destinationSummary}
+          <Box className="recruiter-search-details">
+            <Typography variant="subtitle2">Details Candidates Search For</Typography>
+            <Typography variant="body2">
+              These fields help the right candidates find the posting.
             </Typography>
-            {showError("apply_destination") ? (
-              <Typography variant="body2" className="recruiter-job-form-error">
-                {errors.apply_destination}
-              </Typography>
-            ) : null}
-          </Box>
-        </Grid>
-
-        <Grid item xs={12}>
-          <details className="recruiter-additional-details">
-            <summary>
-              <span>Additional Details</span>
-              <small>Optional compensation, schedule, benefits, and search tags.</small>
-            </summary>
 
             <Grid container spacing={2}>
               {values.role_type === "optometrist" && (
@@ -1201,28 +1114,32 @@ export default function JobForm({
                     value={values.opportunity_types}
                     onChange={handleMultiChange("opportunity_types")}
                     options={OPPORTUNITY_TYPE_OPTIONS}
+                    helperText="Recommended for optometrist postings."
                   />
                 </Grid>
               )}
 
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel id="practice-type-label">Practice Type</InputLabel>
-                  <Select
-                    labelId="practice-type-label"
-                    label="Practice Type"
-                    value={values.practice_type}
-                    onChange={handleChange("practice_type")}
-                  >
-                    <MenuItem value="">Optional</MenuItem>
-                    {PRACTICE_TYPE_OPTIONS.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
+              {values.role_type === "optometrist" && (
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel id="practice-type-label">Practice Type</InputLabel>
+                    <Select
+                      labelId="practice-type-label"
+                      label="Practice Type"
+                      value={values.practice_type}
+                      onChange={handleChange("practice_type")}
+                    >
+                      <MenuItem value="">Optional</MenuItem>
+                      {PRACTICE_TYPE_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>Recommended for optometrist postings.</FormHelperText>
+                  </FormControl>
+                </Grid>
+              )}
 
               <Grid item xs={12} md={6}>
                 <MultiSelectField
@@ -1231,9 +1148,31 @@ export default function JobForm({
                   value={values.work_arrangements}
                   onChange={handleMultiChange("work_arrangements")}
                   options={WORK_ARRANGEMENT_OPTIONS}
-                  helperText="Optional. Helps candidates understand remote, hybrid, or in-office expectations."
+                  helperText="Optional. Candidates can filter for on-site, hybrid, or remote work."
                 />
               </Grid>
+
+              {values.role_type === "optometrist" && (
+                <Grid item xs={12} md={6}>
+                  <FormControl fullWidth>
+                    <InputLabel id="saturday-schedule-label">Saturday Schedule</InputLabel>
+                    <Select
+                      labelId="saturday-schedule-label"
+                      label="Saturday Schedule"
+                      value={values.saturday_schedule}
+                      onChange={handleChange("saturday_schedule")}
+                    >
+                      <MenuItem value="">Optional</MenuItem>
+                      {SATURDAY_SCHEDULE_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                    <FormHelperText>Recommended for optometrist postings.</FormHelperText>
+                  </FormControl>
+                </Grid>
+              )}
 
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
@@ -1251,7 +1190,7 @@ export default function JobForm({
                       </MenuItem>
                     ))}
                   </Select>
-                  <FormHelperText>Optional. Add pay only when you want it visible to candidates.</FormHelperText>
+                  <FormHelperText>Optional. Pay transparency can improve candidate response.</FormHelperText>
                 </FormControl>
               </Grid>
 
@@ -1339,7 +1278,129 @@ export default function JobForm({
                   />
                 </Grid>
               )}
+            </Grid>
+          </Box>
+        </Grid>
 
+        <Grid item xs={12}>
+          <TextField
+            label="Description*"
+            fullWidth
+            multiline
+            minRows={6}
+            value={values.description}
+            onChange={handleChange("description")}
+            onBlur={handleBlur("description")}
+            error={showError("description")}
+            helperText={helperTextFor("description", "Paste the essentials: responsibilities, schedule, requirements, and why someone should apply.")}
+          />
+        </Grid>
+
+        <Grid item xs={12}>
+          <Box className="recruiter-apply-destination">
+            <Typography variant="subtitle2">Application Destination</Typography>
+            <div className="recruiter-apply-options" role="radiogroup" aria-label="Application destination">
+              <label className="recruiter-apply-option">
+                <input
+                  type="radio"
+                  name="apply_destination_mode"
+                  value="default"
+                  checked={values.apply_destination_mode === "default"}
+                  onChange={() => handleApplyDestinationModeChange("default")}
+                />
+                <span>
+                  <strong>Use Account Apply Method</strong>
+                  <small>Best for practices with one careers page or hiring inbox.</small>
+                </span>
+              </label>
+              <label className="recruiter-apply-option">
+                <input
+                  type="radio"
+                  name="apply_destination_mode"
+                  value="url"
+                  checked={values.apply_destination_mode === "url"}
+                  onChange={() => handleApplyDestinationModeChange("url")}
+                />
+                <span>
+                  <strong>Custom Apply URL</strong>
+                  <small>Use a unique employer-hosted page for this opening.</small>
+                </span>
+              </label>
+              <label className="recruiter-apply-option">
+                <input
+                  type="radio"
+                  name="apply_destination_mode"
+                  value="email"
+                  checked={values.apply_destination_mode === "email"}
+                  onChange={() => handleApplyDestinationModeChange("email")}
+                />
+                <span>
+                  <strong>Custom Apply Email</strong>
+                  <small>Send applicants directly to a job-specific inbox.</small>
+                </span>
+              </label>
+            </div>
+
+            {values.apply_destination_mode === "default" ? (
+              <div className="recruiter-apply-summary">
+                <span>Account Apply Method:</span>
+                {defaultDestination.applyUrl ? (
+                  <a href={defaultDestination.applyUrl} target="_blank" rel="noreferrer">
+                    {defaultDestination.applyUrl}
+                  </a>
+                ) : defaultDestination.applyEmail ? (
+                  <a href={`mailto:${defaultDestination.applyEmail}`}>{defaultDestination.applyEmail}</a>
+                ) : (
+                  <strong>No default set. Choose a custom URL or email for this posting.</strong>
+                )}
+              </div>
+            ) : null}
+
+            {values.apply_destination_mode === "url" ? (
+              <TextField
+                label="Custom Apply URL*"
+                fullWidth
+                value={values.external_apply_url}
+                onChange={handleChange("external_apply_url")}
+                onBlur={handleBlur("external_apply_url")}
+                error={showError("external_apply_url")}
+                helperText={helperTextFor("external_apply_url", "Use the candidate-facing job page, not an internal ATS API URL.")}
+                placeholder="https://example.com/careers/job"
+              />
+            ) : null}
+
+            {values.apply_destination_mode === "email" ? (
+              <TextField
+                label="Custom Apply Email*"
+                fullWidth
+                value={values.application_email}
+                onChange={handleChange("application_email")}
+                onBlur={handleBlur("application_email")}
+                error={showError("application_email")}
+                helperText={helperTextFor("application_email", "Applicants will be instructed to email this address.")}
+                placeholder="hiring@example.com"
+              />
+            ) : null}
+
+            <Typography variant="body2" className="recruiter-apply-current">
+              {destinationSummary}
+            </Typography>
+            {showError("apply_destination") ? (
+              <Typography variant="body2" className="recruiter-job-form-error">
+                {errors.apply_destination}
+              </Typography>
+            ) : null}
+          </Box>
+        </Grid>
+
+        <Grid item xs={12}>
+          <details className="recruiter-additional-details">
+            <summary>
+              <span>Optional Extras</span>
+              <small>Optional benefits, bonuses, relocation, and search tags.</small>
+            </summary>
+
+            <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Sign-on Bonus"
@@ -1358,25 +1419,6 @@ export default function JobForm({
                   onChange={handleChange("ce_allowance")}
                   placeholder="e.g., $1,500 annually"
                 />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth>
-                  <InputLabel id="saturday-schedule-label">Saturday Schedule</InputLabel>
-                  <Select
-                    labelId="saturday-schedule-label"
-                    label="Saturday Schedule"
-                    value={values.saturday_schedule}
-                    onChange={handleChange("saturday_schedule")}
-                  >
-                    <MenuItem value="">Optional</MenuItem>
-                    {SATURDAY_SCHEDULE_OPTIONS.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
               </Grid>
 
               <Grid item xs={12} md={4}>
@@ -1451,26 +1493,32 @@ export default function JobForm({
 
         <Grid item xs={12}>
           <Stack className="recruiter-job-form-actions" direction="row" spacing={1}>
-            <Button type="button" variant="outlined" onClick={saveDraft}>
-              Save Draft (Local)
-            </Button>
             <Button type="button" variant="outlined" onClick={handleSaveDraft} disabled={submitting}>
-              Save Draft
+              Save for Later
             </Button>
             <Button type="button" variant="text" color="warning" onClick={clearDraft}>
               {isEditing ? "Reset" : "Clear"}
             </Button>
             <Box sx={{ flexGrow: 1 }} />
             <Button type="submit" variant="outlined" disabled={submitting}>
-              Preview Draft
+              Preview Posting
             </Button>
-            {publishActionBlocked && showPreview ? (
-              <Button component="a" href={pricingHref} variant="contained">
-                {rolePlanBlocked ? "Choose Matching Plan" : "Choose Plan / Checkout"}
+            {checkoutRequired ? (
+              <Button
+                type="button"
+                variant="contained"
+                disabled={submitting || checkoutLoading}
+                onClick={handleCheckout}
+              >
+                {checkoutLoading ? "Starting Checkout..." : checkoutButtonLabel}
+              </Button>
+            ) : publishActionBlocked && slotLimitReached ? (
+              <Button component="a" href={capacityPricingHref} variant="contained">
+                Review Capacity Options
               </Button>
             ) : publishActionBlocked ? (
               <Button type="button" variant="contained" disabled>
-                Preview Before Checkout
+                Complete Details First
               </Button>
             ) : (
               <Button type="button" variant="contained" disabled={submitting} onClick={handlePublish}>

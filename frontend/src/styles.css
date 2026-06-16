@@ -256,6 +256,70 @@ input:focus, textarea:focus, select:focus {
   gap: 14px;
 }
 
+.recruiter-listings-section {
+  display: grid;
+  gap: 14px;
+}
+
+.recruiter-action-row {
+  justify-content: space-between;
+  padding: 8px 0 2px;
+}
+
+.recruiter-action-row button,
+.recruiter-cancel-form-button {
+  min-height: 42px;
+  border-radius: 10px;
+  background: var(--jv-primary);
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.recruiter-action-row button:hover,
+.recruiter-cancel-form-button:hover {
+  background: var(--jv-secondary);
+}
+
+.recruiter-cancel-form-button {
+  justify-self: start;
+  padding: 10px 16px;
+}
+
+.job-tabs {
+  display: grid;
+  gap: 14px;
+}
+
+.tab-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tab-buttons button {
+  min-height: 40px;
+  border: 1px solid rgba(12, 74, 110, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #263c4d;
+  font-weight: 850;
+}
+
+.tab-buttons button.active {
+  border-color: rgba(8, 126, 139, 0.46);
+  background: var(--jv-primary);
+  color: #ffffff;
+}
+
+.tab-content > p {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed rgba(12, 74, 110, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  font-weight: 700;
+}
+
 .recruiter-summary-card {
   min-height: 132px;
   padding: 18px;
@@ -269,7 +333,7 @@ input:focus, textarea:focus, select:focus {
 .recruiter-summary-card .summary-label {
   display: block;
   margin-bottom: 8px;
-  color: #475569;
+  color: #334155;
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -356,12 +420,20 @@ input:focus, textarea:focus, select:focus {
   margin-top: 0;
 }
 
-.recruiter-action-row {
-  padding: 14px 0 4px;
-}
-
 .recruiter-action-row span {
   font-weight: 700;
+}
+
+.recruiter-secondary-panel {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(12, 74, 110, 0.12);
+}
+
+.recruiter-secondary-panel h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .dashboard-error {
@@ -516,6 +588,11 @@ input:focus, textarea:focus, select:focus {
   }
 
   .recruiter-profile-completion-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recruiter-action-row {
     align-items: stretch;
     flex-direction: column;
   }

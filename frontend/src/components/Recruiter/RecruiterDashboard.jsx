@@ -130,7 +130,7 @@ const RecruiterDashboard = () => {
         applicationsResult.reason?.message || applicationsResult.reason
       );
       setDashboardError((current) =>
-        current ? `${current} Could not load applications.` : "Could not load applications."
+        current ? `${current} Could not load applicants.` : "Could not load applicants."
       );
       setApplications([]);
     }
@@ -172,9 +172,9 @@ const RecruiterDashboard = () => {
   const slotSummary =
     maxActiveJobs === null ? `${slotJobsUsed} used` : `${slotJobsUsed} / ${slotLimit} used`;
   const nextAction = !subscriptionActive
-    ? "Create a draft now. Choose a recruiter plan when you are ready to publish."
+    ? "Write the job now. Checkout starts when the posting is ready."
     : atSlotCapacity
-    ? "Archive a live job or upgrade before creating another one."
+    ? "Remove a live job or review capacity options before publishing another one."
     : maxActiveJobs === null
     ? "You can create jobs without a slot limit."
     : `${remainingSlots} job slot${remainingSlots === 1 ? "" : "s"} available.`;
@@ -195,10 +195,10 @@ const RecruiterDashboard = () => {
     try {
       await archiveJob(jobId);
       await getRecruiterDashboard();
-      alert("Job archived successfully!");
+      alert("Posting removed.");
     } catch (error) {
       console.error("Error archiving job:", error.message);
-      alert("Failed to archive job.");
+      alert("Failed to remove posting.");
     }
   };
 
@@ -206,10 +206,10 @@ const RecruiterDashboard = () => {
     try {
       await pauseJob(jobId);
       await getRecruiterDashboard();
-      alert("Job paused. It is no longer visible in public search or map.");
+      alert("Posting hidden. It is no longer visible in public search or map.");
     } catch (error) {
       console.error("Error pausing job:", error.message);
-      alert("Failed to pause job.");
+      alert("Failed to hide posting.");
     }
   };
 
@@ -217,10 +217,10 @@ const RecruiterDashboard = () => {
     try {
       await resumeJob(jobId);
       await getRecruiterDashboard();
-      alert("Job resumed.");
+      alert("Posting is live again.");
     } catch (error) {
       console.error("Error resuming job:", error.message);
-      alert(error?.response?.data?.error || "Failed to resume job.");
+      alert(error?.response?.data?.error || "Failed to make posting live.");
     }
   };
 
@@ -228,10 +228,10 @@ const RecruiterDashboard = () => {
     try {
       await unarchiveJob(jobId);
       await getRecruiterDashboard();
-      alert("Job unarchived successfully!");
+      alert("Posting restored.");
     } catch (error) {
       console.error("Error unarchiving job:", error.message);
-      alert("Failed to unarchive job.");
+      alert("Failed to restore posting.");
     }
   };
 
@@ -244,33 +244,78 @@ const RecruiterDashboard = () => {
       <div className="dashboard-container recruiter-dashboard-container">
         <div className="recruiter-dashboard-header">
           <div>
-            <h1>Recruiter Dashboard</h1>
+            <h1>My Jobs</h1>
             <p className="dashboard-subtitle">{nextAction}</p>
-          </div>
-
-          <div className="recruiter-dashboard-links">
-            <Link to="/recruiter/domains">Domain Verification</Link>
-            <Link to="/recruiter/applications">Applications</Link>
           </div>
         </div>
 
         {dashboardError && <p className="dashboard-error">{dashboardError}</p>}
 
+        <section className="recruiter-listings-section" aria-label="My jobs">
+          {!showForm ? (
+            <div className="recruiter-action-row">
+              <button
+                type="button"
+                onClick={handleAddJobClick}
+                aria-describedby="recruiter-slot-state"
+              >
+                Post New Job
+              </button>
+              <span id="recruiter-slot-state">{nextAction}</span>
+            </div>
+          ) : (
+            <>
+              <AddJob
+                jobToEdit={editingJob}
+                canPublish={canPublishJob}
+                planRequired={!subscriptionActive && !isAdmin}
+                slotLimitReached={atSlotCapacity && !isAdmin}
+                recruiterTier={recruiterEntitlement?.tier || user?.tier || ""}
+                isAdmin={isAdmin}
+                onSuccess={() => {
+                  setShowForm(false);
+                  setEditingJob(null);
+                  getRecruiterDashboard();
+                }}
+              />
+              <button
+                type="button"
+                className="recruiter-cancel-form-button"
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingJob(null);
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+
+          <JobTabs
+            jobsByStatus={categorizedJobs}
+            onEdit={handleEdit}
+            onPause={handlePause}
+            onResume={handleResume}
+            onArchive={handleArchive}
+            onUnarchive={handleUnarchive}
+          />
+        </section>
+
         <section className="recruiter-summary-grid" aria-label="Recruiter account summary">
           <div className="recruiter-summary-card">
-            <span className="summary-label">Active Jobs</span>
+            <span className="summary-label">Live Jobs</span>
             <strong>{loading ? "-" : categorizedJobs.active.length}</strong>
             <p>Published jobs visible to candidates.</p>
           </div>
 
           <div className="recruiter-summary-card">
-            <span className="summary-label">Job Slots Used</span>
+            <span className="summary-label">Live Posting Limit</span>
             <strong>{loading ? "-" : slotSummary}</strong>
-            <p>Published and pending verification jobs count toward paid slots. Drafts do not.</p>
+            <p>Live and pending jobs count toward your posting limit. Unfinished jobs do not.</p>
           </div>
 
           <div className="recruiter-summary-card">
-            <span className="summary-label">Current Plan</span>
+            <span className="summary-label">Posting Access</span>
             <strong>{planName}</strong>
             <p>
               {statusLabel} - {slotLimit} job slot{slotLimit === "1" ? "" : "s"}.
@@ -278,10 +323,10 @@ const RecruiterDashboard = () => {
           </div>
 
           <div className="recruiter-summary-card">
-            <span className="summary-label">Internal Applications</span>
+            <span className="summary-label">Applicants</span>
             <strong>{loading ? "-" : applications.length}</strong>
             <p>
-              <Link to="/recruiter/applications">Review internal applicant records</Link>
+              <Link to="/recruiter/applications">View applicants</Link>
             </p>
           </div>
         </section>
@@ -292,9 +337,12 @@ const RecruiterDashboard = () => {
               completion={profileCompletion}
               compact
               includeOptional={false}
+              titleLabel="Business Details"
+              completeLabel="Business Details Ready"
+              readyText="Business details are ready"
             />
             <Link to="/recruiter/profile" className="profile-completion-banner-link">
-              Review profile
+              Edit business details
             </Link>
           </div>
         )}
@@ -305,69 +353,30 @@ const RecruiterDashboard = () => {
               <strong>You are using all available job slots.</strong>
             </p>
             <p>
-              Archive an active or pending job to free a slot, or upgrade for more capacity.
+              Remove a live or pending job to free a posting, or review capacity options.
               Manager includes 5 active slots and Doctor includes 10.
             </p>
-            <Link to="/pricing">View recruiter plans</Link>
+            <Link to="/pricing">Review capacity options</Link>
           </div>
         )}
 
         {!subscriptionActive && !isAdmin && (
           <div className="upgrade-banner recruiter-capacity-banner">
             <p>
-              <strong>No active recruiter plan is attached to this account.</strong>
+              <strong>No paid posting is active yet.</strong>
             </p>
-            <p>You can create and preview drafts now. Choose a plan before publishing.</p>
-            <Link to="/pricing">View recruiter plans</Link>
+            <p>You can write the job first. Checkout appears when the posting is ready.</p>
           </div>
         )}
 
-        {!showForm ? (
-          <div className="recruiter-action-row">
-            <button
-              type="button"
-              onClick={handleAddJobClick}
-              aria-describedby="recruiter-slot-state"
-            >
-              Add Job Draft
-            </button>
-            <span id="recruiter-slot-state">{nextAction}</span>
+        <section className="recruiter-secondary-panel" aria-label="Recruiter account tools">
+          <h2>Settings</h2>
+          <div className="recruiter-dashboard-links">
+            <Link to="/recruiter/domains">Employer Verification</Link>
+            <Link to="/recruiter/applications">Applicants</Link>
+            <Link to="/recruiter/profile">Business Details</Link>
           </div>
-        ) : (
-          <>
-            <AddJob
-              jobToEdit={editingJob}
-              canPublish={canPublishJob}
-              planRequired={!subscriptionActive && !isAdmin}
-              slotLimitReached={atSlotCapacity && !isAdmin}
-              recruiterTier={recruiterEntitlement?.tier || user?.tier || ""}
-              isAdmin={isAdmin}
-              onSuccess={() => {
-                setShowForm(false);
-                setEditingJob(null);
-                getRecruiterDashboard();
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setEditingJob(null);
-              }}
-            >
-              Cancel
-            </button>
-          </>
-        )}
-
-        <JobTabs
-          jobsByStatus={categorizedJobs}
-          onEdit={handleEdit}
-          onPause={handlePause}
-          onResume={handleResume}
-          onArchive={handleArchive}
-          onUnarchive={handleUnarchive}
-        />
+        </section>
       </div>
     </AccessGate>
   );

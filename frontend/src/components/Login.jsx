@@ -88,6 +88,7 @@ export default function Login() {
     refreshAuth,
   } = useAuth();
   const nextPath = searchParams.get("next") || null;
+  const emailParam = normalizeEmail(searchParams.get("email") || "");
 
   const [formError, setFormError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
@@ -114,7 +115,10 @@ export default function Login() {
     clearErrors,
     formState: { errors },
     watch,
-  } = useForm({ resolver: yupResolver(passwordSchema) });
+  } = useForm({
+    resolver: yupResolver(passwordSchema),
+    defaultValues: { email: emailParam },
+  });
 
   const email = watch("email", "");
   const rememberMe = watch("rememberMe", false);
@@ -440,6 +444,11 @@ export default function Login() {
   };
 
   const resendButtonLabel = resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code";
+  const goToVerification = (candidateEmail = "") => {
+    const targetEmail = normalizeEmail(candidateEmail || pendingVerificationEmail || email);
+    const suffix = targetEmail ? `?email=${encodeURIComponent(targetEmail)}` : "";
+    navigate(`/verify-email${suffix}`);
+  };
 
   // Don’t render the login form while we’re about to redirect
   if (redirecting) return null;
@@ -448,7 +457,7 @@ export default function Login() {
     <Container maxWidth="sm">
       <Paper elevation={5} className="glass-form login-form">
         <Typography variant="h4" align="center" gutterBottom>
-          Log In
+          Sign In
         </Typography>
 
         {formError && (
@@ -511,7 +520,7 @@ export default function Login() {
 
             <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
               <Button type="submit" variant="contained" className="glass-button" disabled={signingIn}>
-                {signingIn ? "Logging in…" : "Log In"}
+                {signingIn ? "Signing in..." : "Sign In"}
               </Button>
 
               <Button
@@ -526,7 +535,7 @@ export default function Login() {
                   "&:hover": { bgcolor: "#f8fafc" },
                 }}
               >
-                {sendingSignInCode ? "Sending..." : "Send Sign-in Code"}
+                {sendingSignInCode ? "Sending..." : "Email Me a Sign-In Code"}
               </Button>
             </Stack>
 
@@ -535,6 +544,12 @@ export default function Login() {
                 Forgot Password?
               </Link>
             </Typography>
+
+            <Stack alignItems="center" sx={{ mt: 1 }}>
+              <Button type="button" variant="text" onClick={() => goToVerification()}>
+                Continue Verification
+              </Button>
+            </Stack>
           </form>
         )}
 
@@ -607,6 +622,10 @@ export default function Login() {
 
               <Button type="button" variant="text" onClick={usePasswordMode}>
                 Use password instead
+              </Button>
+
+              <Button type="button" variant="text" onClick={() => goToVerification(signInCodeEmail)}>
+                Continue Verification
               </Button>
             </Stack>
           </form>

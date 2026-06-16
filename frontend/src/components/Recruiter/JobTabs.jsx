@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from "react";
 import RecruiterJobCard from "./RecruiterJobCard";
 
-const TAB_ORDER = ["draft", "active", "paused", "expired", "archived", "pending", "featured"];
+const TAB_ORDER = ["active", "pending", "draft", "paused", "expired", "archived", "featured"];
 
 const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchive }) => {
-  const [activeTab, setActiveTab] = useState("draft");
+  const [activeTab, setActiveTab] = useState("active");
 
   const tabLabels = {
-    draft: "Drafts",
-    active: "Active",
-    paused: "Paused",
+    draft: "Unfinished",
+    active: "Live Jobs",
+    paused: "Hidden",
     expired: "Expired",
-    archived: "Archived",
-    pending: "Pending Verification",
+    archived: "Removed",
+    pending: "Pending Jobs",
     featured: "Featured",
   };
 
@@ -53,7 +53,7 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
             />
           ))
         ) : (
-          <p>No jobs found in this tab.</p>
+          <p>No jobs here yet.</p>
         )}
       </div>
     </div>

@@ -667,7 +667,7 @@ async function enforceRecruiterCanPost(req, res, excludeJobId = null, role = nul
   if (!limitState.canPost) {
     const max = limitState.maxActiveJobs;
     res.status(402).json({
-      error: `Your ${limitState.entitlement.tier || "current"} plan allows ${max} active job${max === 1 ? "" : "s"}. Archive a job or upgrade to post more.`,
+      error: `Your ${limitState.entitlement.tier || "current"} posting access allows ${max} active job${max === 1 ? "" : "s"}. Remove a job or review capacity options to post more.`,
       code: "job_limit_reached",
       entitlement: limitState.entitlement,
       activeJobCount: limitState.activeJobCount,
@@ -1461,7 +1461,7 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       isDraft: status === "draft",
       message:
         status === "draft"
-          ? "Draft saved. Choose a plan and publish when ready."
+          ? "Posting saved. Continue to checkout when ready."
           : status === "pending_domain"
           ? "Brand postings require domain verification. We saved this as Pending Domain."
           : undefined,

@@ -15,7 +15,7 @@ export default function RecruiterApplications() {
         const applications = await fetchRecruiterApplications();
         if (mounted) setItems(applications);
       } catch (err) {
-        if (mounted) setError(err?.message || "Failed to load applications.");
+        if (mounted) setError(err?.message || "Failed to load applicants.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -28,10 +28,10 @@ export default function RecruiterApplications() {
 
   return (
     <div className="dashboard-container">
-      <h1>Applications</h1>
-      {loading && <p>Loading applications...</p>}
+      <h1>Applicants</h1>
+      {loading && <p>Loading applicants...</p>}
       {error && <p style={{ color: "#991b1b" }}>{error}</p>}
-      {!loading && !error && items.length === 0 && <p>No applications yet.</p>}
+      {!loading && !error && items.length === 0 && <p>No applicants yet.</p>}
 
       {items.length > 0 && (
         <table style={styles.table}>

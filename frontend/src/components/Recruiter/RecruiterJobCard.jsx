@@ -14,12 +14,12 @@ import {
 } from "../../utils/jobTaxonomy";
 
 const STATUS_LABELS = {
-  draft: "Draft",
-  active: "Active",
-  paused: "Paused",
-  pending_domain: "Pending Verification",
+  draft: "Unfinished",
+  active: "Live",
+  paused: "Hidden",
+  pending_domain: "Pending",
   expired: "Expired",
-  archived: "Archived",
+  archived: "Removed",
 };
 
 function formatDate(value) {
@@ -40,7 +40,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
 
   const handleArchive = async () => {
     if (onArchive) {
-      const confirmed = window.confirm(`Archive job "${job.title}"?`);
+      const confirmed = window.confirm(`Remove "${job.title}" from your active postings?`);
       if (confirmed) {
         await onArchive(job.id || job._id);
       }
@@ -49,7 +49,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
 
   const handlePause = async () => {
     if (onPause) {
-      const confirmed = window.confirm(`Pause job "${job.title}"? It will be removed from public search and map.`);
+      const confirmed = window.confirm(`Hide "${job.title}" from public search and the map?`);
       if (confirmed) {
         await onPause(job.id || job._id);
       }
@@ -58,7 +58,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
 
   const handleResume = async () => {
     if (onResume) {
-      const confirmed = window.confirm(`Resume job "${job.title}"? It will become public again if eligible.`);
+      const confirmed = window.confirm(`Make "${job.title}" visible to candidates again?`);
       if (confirmed) {
         await onResume(job.id || job._id);
       }
@@ -67,7 +67,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
 
   const handleUnarchive = async () => {
     if (onUnarchive) {
-      const confirmed = window.confirm(`Unarchive job "${job.title}"?`);
+      const confirmed = window.confirm(`Restore "${job.title}" to your postings?`);
       if (confirmed) {
         await onUnarchive(job.id || job._id);
       }
@@ -81,10 +81,10 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
       : [];
   const details = [
     ["Role", ROLE_LABELS[role] || job.role],
-    ["Opportunity", opportunityLabels.join(", ")],
-    ["Practice", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Opportunity Type", opportunityLabels.join(", ")],
+    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
     ["Employment", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
-    ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
+    ["Work Setting", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
     ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
     ["Compensation", compensationSummary(job)],
     ["Sign-on Bonus", job.sign_on_bonus || ""],
@@ -98,10 +98,10 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
     (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
   const listingOpportunityType = job.listing_opportunity_type || "job";
   const badges = [
-    job.status === "draft" && ["Draft", "job-listing-badge draft"],
-    job.status === "active" && ["Active", "job-listing-badge active"],
-    job.status === "paused" && ["Paused", "job-listing-badge paused"],
-    job.status === "pending_domain" && ["Pending Verification", "job-listing-badge review"],
+    job.status === "draft" && ["Unfinished", "job-listing-badge draft"],
+    job.status === "active" && ["Live", "job-listing-badge active"],
+    job.status === "paused" && ["Hidden", "job-listing-badge paused"],
+    job.status === "pending_domain" && ["Pending", "job-listing-badge review"],
     listingTier === "imported" && ["Imported", "job-listing-badge imported"],
     listingTier === "featured" && [LISTING_TIER_LABELS.featured, "job-listing-badge featured"],
     listingTier === "sponsor" && [LISTING_TIER_LABELS.sponsor, "job-listing-badge sponsor"],
@@ -114,8 +114,8 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
     ? "Apply URL set"
     : job.application_email
     ? "Apply email set"
-    : "Apply destination missing";
-  const statusLabel = STATUS_LABELS[job.status] || (job.is_archived ? "Archived" : job.status || "Unknown");
+    : "Add an apply method";
+  const statusLabel = STATUS_LABELS[job.status] || (job.is_archived ? "Removed" : job.status || "Unknown");
   const createdDate = formatDate(job.created_at || job.createdAt || job.posted_at);
   const publishedDate = formatDate(job.first_activated_at || job.firstActivatedAt);
 
@@ -150,9 +150,9 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
         <span>Status: {statusLabel}</span>
         <span>{job.views || 0} views</span>
         <span>{job.saves || 0} saves</span>
-        <span>{job.applies || 0} internal applies</span>
-        <span>Created: {createdDate}</span>
-        <span>Published: {publishedDate}</span>
+        <span>{job.applies || 0} applicants</span>
+        <span>Started: {createdDate}</span>
+        <span>Went live: {publishedDate}</span>
         <span>{applyDestination}</span>
       </div>
 
@@ -160,16 +160,16 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
       <div className="job-actions">
         <button onClick={handleEdit}>Edit</button>
         {onPause && (
-          <button onClick={handlePause}>Pause</button>
+          <button onClick={handlePause}>Hide</button>
         )}
         {onResume && (
-          <button onClick={handleResume}>Resume</button>
+          <button onClick={handleResume}>Make Live</button>
         )}
         {onArchive && (
-          <button onClick={handleArchive} className="danger">Archive</button>
+          <button onClick={handleArchive} className="danger">Remove</button>
         )}
         {onUnarchive && (
-          <button onClick={handleUnarchive}>Unarchive</button>
+          <button onClick={handleUnarchive}>Restore</button>
         )}
       </div>
     </div>

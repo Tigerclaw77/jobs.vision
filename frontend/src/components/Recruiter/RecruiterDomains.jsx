@@ -52,11 +52,11 @@ export default function RecruiterDomains() {
 
   return (
     <div className="dashboard-container">
-      <h1>Domain Verification</h1>
+      <h1>Employer Verification</h1>
 
       <form onSubmit={submit} style={styles.form}>
         <label>
-          Domain
+          Employer Website Domain
           <input
             value={form.domain}
             onChange={(e) => setForm((p) => ({ ...p, domain: e.target.value }))}
@@ -75,14 +75,14 @@ export default function RecruiterDomains() {
           />
         </label>
         <button type="submit" disabled={loading}>
-          {loading ? "Sending..." : "Request Verification"}
+          {loading ? "Sending..." : "Send Verification Email"}
         </button>
       </form>
 
       {message && <p style={styles.success}>{message}</p>}
       {error && <p style={styles.error}>{error}</p>}
 
-      <h2>Verification Status</h2>
+      <h2>Employer Status</h2>
       {items.length === 0 ? (
         <p>No domains requested yet.</p>
       ) : (

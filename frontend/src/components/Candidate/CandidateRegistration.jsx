@@ -10,6 +10,7 @@ import {
   Button,
   Snackbar,
   Alert,
+  Stack,
 } from "@mui/material";
 import GlassTextField from "../ui/GlassTextField";
 import { neonAuth, normalizeSessionResult } from "../../utils/neonAuthClient";
@@ -46,6 +47,21 @@ async function sendSignupVerificationCode(email, emailRedirectTo) {
   throw error;
 }
 
+function isExistingAccountError(error) {
+  const msg = String(error?.message || "").toLowerCase();
+  return (
+    msg.includes("already") ||
+    msg.includes("exists") ||
+    msg.includes("registered") ||
+    (error?.status === 400 && msg.includes("user"))
+  );
+}
+
+function isExistingAccountResponse(result) {
+  const user = result?.data?.user || result?.user || null;
+  return Array.isArray(user?.identities) && user.identities.length === 0;
+}
+
 const candidateSchema = Yup.object().shape({
   firstName: Yup.string().required("First name is required."),
   lastName: Yup.string().required("Last name is required."),
@@ -73,6 +89,7 @@ export default function CandidateRegistration() {
     severity: "info",
     duration: 4000,
   });
+  const [existingAccountEmail, setExistingAccountEmail] = useState("");
 
   const showToast = (message, severity = "info", duration = 4000) =>
     setToast({ open: true, message, severity, duration });
@@ -81,6 +98,7 @@ export default function CandidateRegistration() {
     const email = data.email.trim().toLowerCase();
     const verifyPath = `/verify-email?email=${encodeURIComponent(email)}`;
     const emailRedirectTo = `${base}${verifyPath}`;
+    setExistingAccountEmail("");
     const profilePayload = {
       accountRole: "candidate",
       firstName: data.firstName,
@@ -104,13 +122,21 @@ export default function CandidateRegistration() {
 
       if (error) {
         const msg = (error.message || "").toLowerCase();
-        if (error.status === 400 || msg.includes("already") || msg.includes("exists")) {
-          await sendSignupVerificationCode(email, emailRedirectTo).catch(() => {});
+        if (isExistingAccountError(error)) {
+          setExistingAccountEmail(email);
+          showToast("Account already exists. Choose your next step below.", "info", 6000);
+          return;
         } else if (error.status === 401 && msg.includes("failed to retrieve user session")) {
           // Some verified-email flows create the auth user but do not return a session yet.
         } else {
           throw error;
         }
+      }
+
+      if (isExistingAccountResponse(result)) {
+        setExistingAccountEmail(email);
+        showToast("Account already exists. Choose your next step below.", "info", 6000);
+        return;
       }
 
       const session = normalizeSessionResult(result);
@@ -122,9 +148,13 @@ export default function CandidateRegistration() {
       }
 
       await sendSignupVerificationCode(email, emailRedirectTo);
-      showToast("We sent a verification code.", "success");
       reset();
-      navigate(verifyPath);
+      navigate(verifyPath, {
+        state: {
+          flash: "Registration successful. Check your email for a 6-digit verification code.",
+          severity: "success",
+        },
+      });
     } catch (err) {
       showToast(err?.message || "Registration failed. Please try again.", "error");
     }
@@ -145,6 +175,37 @@ export default function CandidateRegistration() {
         >
           Back to Home
         </Button>
+
+        {existingAccountEmail && (
+          <Alert severity="info" sx={{ mb: 2, textAlign: "left" }}>
+            <Typography fontWeight={700}>Account already exists</Typography>
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              We found an account for {existingAccountEmail}. Sign in, reset your password, or
+              continue verification if you still need to enter a code.
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
+              <Button
+                component={RouterLink}
+                to={`/login?email=${encodeURIComponent(existingAccountEmail)}`}
+                size="small"
+                variant="contained"
+              >
+                Sign In
+              </Button>
+              <Button component={RouterLink} to="/forgot-password" size="small" variant="outlined">
+                Forgot Password
+              </Button>
+              <Button
+                component={RouterLink}
+                to={`/verify-email?email=${encodeURIComponent(existingAccountEmail)}`}
+                size="small"
+                variant="outlined"
+              >
+                Continue Verification
+              </Button>
+            </Stack>
+          </Alert>
+        )}
 
         {/* autofill suppression: off + honeypots */}
         <form onSubmit={handleSubmit(onSubmit)} noValidate autoComplete="off">

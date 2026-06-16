@@ -1,6 +1,6 @@
 // frontend/src/pages/VerifyEmail.jsx
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Button,
@@ -72,16 +72,22 @@ function otpErrorMessage(err) {
 
 export default function VerifyEmail() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { refreshAuth } = useAuth();
   const initialEmail = normalizeEmail(getParam("email") || "");
   const [phase, setPhase] = useState(initialEmail ? "otp" : "loading");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState(initialEmail);
+  const [emailLocked, setEmailLocked] = useState(Boolean(initialEmail));
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
-  const [status, setStatus] = useState(null);
+  const [status, setStatus] = useState(() => {
+    const flash = location.state?.flash;
+    if (!flash) return null;
+    return { severity: location.state?.severity || "info", message: flash };
+  });
 
   const hydrateAndRedirect = useCallback(
     async (session, fallbackMessage) => {
@@ -136,6 +142,7 @@ export default function VerifyEmail() {
       if (emailParam) {
         if (!mounted) return;
         setEmail(emailParam);
+        setEmailLocked(true);
         setPhase("otp");
         return;
       }
@@ -173,6 +180,7 @@ export default function VerifyEmail() {
         }
 
         if (!mounted) return;
+        setEmailLocked(false);
         setPhase("otp");
       } catch (err) {
         if (!mounted) return;
@@ -235,7 +243,9 @@ export default function VerifyEmail() {
       const { error } = await neonAuth.resend({
         type: "signup",
         email: normalizedEmail,
-        options: { emailRedirectTo: `${window.location.origin}/verify-email?email=${encodeURIComponent(normalizedEmail)}` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/verify-email?email=${encodeURIComponent(normalizedEmail)}`,
+        },
       });
       if (error) throw error;
       setStatus({ severity: "success", message: "We sent a new verification code." });
@@ -249,11 +259,21 @@ export default function VerifyEmail() {
     }
   };
 
+  const handleChangeEmail = () => {
+    setEmail("");
+    setEmailLocked(false);
+    setCode("");
+    setStatus({
+      severity: "info",
+      message: "Enter the email you used to register, then request a new code if needed.",
+    });
+  };
+
   return (
     <Container maxWidth="sm">
       <Paper elevation={5} className="glass-form" style={{ textAlign: "center" }}>
         <Typography variant="h4" gutterBottom>
-          Email Verification
+          Verify Your Email
         </Typography>
 
         {phase === "loading" && (
@@ -265,13 +285,21 @@ export default function VerifyEmail() {
         {phase === "otp" && (
           <form onSubmit={handleVerify} noValidate>
             <Stack spacing={2} alignItems="stretch">
-              <Typography>
-                Enter the verification code sent to:
-              </Typography>
+              <Alert severity="info" sx={{ textAlign: "left" }}>
+                Check your email for a 6-digit verification code. Delivery can take a few
+                minutes, and the code may land in spam or promotions.
+              </Alert>
 
-              <Typography fontWeight={700}>{email || "your email address"}</Typography>
+              <Typography>Enter the verification code sent to:</Typography>
 
-              {!initialEmail && (
+              {emailLocked ? (
+                <Stack spacing={0.5} alignItems="center">
+                  <Typography fontWeight={700}>{email || "your email address"}</Typography>
+                  <Button type="button" variant="text" size="small" onClick={handleChangeEmail}>
+                    Change Email
+                  </Button>
+                </Stack>
+              ) : (
                 <GlassTextField
                   label="Email"
                   type="email"
@@ -279,8 +307,14 @@ export default function VerifyEmail() {
                   onChange={(event) => setEmail(normalizeEmail(event.target.value))}
                   fullWidth
                   variant="outlined"
+                  helperText="Use the same email address you entered during registration."
                 />
               )}
+
+              <Typography variant="body2" color="text.secondary">
+                If no code arrives, wait a minute, confirm the email above, then use Resend
+                Code. Contact support if repeated resend attempts still do not arrive.
+              </Typography>
 
               <GlassTextField
                 label="Code"

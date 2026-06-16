@@ -542,7 +542,8 @@
 }
 
 .pricing-root.is-glass .card.disabled {
-  opacity: 0.66;
+  opacity: 0.84;
+  filter: grayscale(0.18);
 }
 
 .pricing-root.is-glass .card.plan-plus,

@@ -77,6 +77,12 @@ const RECRUITER_PLAN_RANK = {
   doctor: 3,
 };
 
+const RECRUITER_POSTING_CTA = {
+  staff: "Continue with Staff Posting",
+  manager: "Continue with Manager Posting",
+  doctor: "Continue with Doctor Posting",
+};
+
 const PricingTable = ({ user, showAudienceToggle = true }) => {
   const defaultAudience = useMemo(() => {
     const role = String(user?.userRole || user?.role || user?.accountRole || "").toLowerCase();
@@ -242,8 +248,8 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           : loadingPlan === p.key
                           ? "Starting..."
                           : isRecommended
-                          ? "Choose recommended plan"
-                          : "Upgrade to this plan"}
+                          ? RECRUITER_POSTING_CTA[p.key]
+                          : RECRUITER_POSTING_CTA[p.key] || "Continue to Checkout"}
                       </button>
                       <p className="fineprint">
                         Recurring 30-day listing cycle. Cancel anytime. Prices shown in USD.

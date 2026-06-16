@@ -23,7 +23,7 @@ const Home = () => {
           Eye care jobs, without the noise.
         </h1>
         <p className="hero-copy">
-          Browse focused optometry and optical openings, or post a role for the right eye care team.
+          Browse focused optometry and optical openings, or post a job for the right eye care team.
         </p>
       </section>
 
