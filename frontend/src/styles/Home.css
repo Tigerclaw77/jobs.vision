@@ -252,6 +252,73 @@ body {
   padding-top: 0.85rem;
 }
 
+.home-action-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 16px;
+  width: min(900px, calc(100vw - 1rem));
+  box-sizing: border-box;
+}
+
+.home-action-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  min-height: 168px;
+  padding: 20px;
+  color: var(--jv-text);
+  text-decoration: none;
+  background:
+    linear-gradient(180deg, rgba(247, 251, 250, 0.78), rgba(221, 243, 239, 0.34)),
+    rgba(247, 251, 250, 0.34);
+  border: 1px solid rgba(95, 183, 178, 0.38);
+  border-radius: 16px;
+  box-shadow: 0 18px 44px rgba(20, 35, 55, 0.14);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.home-action-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(8, 126, 139, 0.52);
+  box-shadow: 0 22px 52px rgba(20, 35, 55, 0.18);
+}
+
+.home-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--jv-primary), var(--jv-secondary));
+}
+
+.home-action-icon svg {
+  font-size: 2.3rem;
+}
+
+.home-action-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.home-action-card p {
+  margin: 0;
+  color: rgba(20, 35, 55, 0.78);
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.home-action-card strong {
+  grid-column: 2;
+  align-self: end;
+  color: var(--jv-primary);
+  font-weight: 950;
+}
+
 .pricing-page-header h1 {
   margin: 0;
   color: var(--jv-text);
@@ -336,6 +403,21 @@ body {
   .banner-text-lower {
     font-size: 1rem;
     margin-bottom: 15px;
+  }
+
+  .home-action-cards {
+    grid-template-columns: 1fr;
+    width: min(680px, calc(100vw - 1.25rem));
+  }
+
+  .home-action-card {
+    grid-template-columns: 1fr;
+    align-items: start;
+    min-height: 0;
+  }
+
+  .home-action-card strong {
+    grid-column: 1;
   }
 
 }

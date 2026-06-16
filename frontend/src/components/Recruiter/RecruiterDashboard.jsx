@@ -4,7 +4,6 @@ import { useSelector } from "react-redux";
 import {
   archiveJob,
   fetchUserProfile,
-  fetchRecruiterApplications,
   fetchRecruiterJobs,
   pauseJob,
   resumeJob,
@@ -81,7 +80,6 @@ const RecruiterDashboard = () => {
     featured: [],
     expired: [],
   });
-  const [applications, setApplications] = useState([]);
   const [profileCompletion, setProfileCompletion] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -108,9 +106,8 @@ const RecruiterDashboard = () => {
     setLoading(true);
     setDashboardError("");
 
-    const [jobsResult, applicationsResult, profileResult] = await Promise.allSettled([
+    const [jobsResult, profileResult] = await Promise.allSettled([
       fetchRecruiterJobs(),
-      fetchRecruiterApplications(),
       fetchUserProfile(),
     ]);
 
@@ -120,19 +117,6 @@ const RecruiterDashboard = () => {
       console.error("Error fetching recruiter jobs:", jobsResult.reason?.message || jobsResult.reason);
       setDashboardError("Could not load recruiter jobs.");
       categorizeJobs([]);
-    }
-
-    if (applicationsResult.status === "fulfilled") {
-      setApplications(applicationsResult.value || []);
-    } else {
-      console.error(
-        "Error fetching recruiter applications:",
-        applicationsResult.reason?.message || applicationsResult.reason
-      );
-      setDashboardError((current) =>
-        current ? `${current} Could not load applicants.` : "Could not load applicants."
-      );
-      setApplications([]);
     }
 
     if (profileResult.status === "fulfilled") {
@@ -170,28 +154,30 @@ const RecruiterDashboard = () => {
       "Inactive";
   const slotLimit = formatSlotLimit(maxActiveJobs);
   const slotSummary =
-    maxActiveJobs === null ? `${slotJobsUsed} used` : `${slotJobsUsed} / ${slotLimit} used`;
+    maxActiveJobs === null
+      ? `${slotJobsUsed} live or pending`
+      : `${slotJobsUsed} of ${slotLimit} live or pending`;
   const nextAction = !subscriptionActive
     ? "Write the job now. Checkout starts when the posting is ready."
     : atSlotCapacity
     ? "Remove a live job or review capacity options before publishing another one."
     : maxActiveJobs === null
-    ? "You can create jobs without a slot limit."
-    : `${remainingSlots} job slot${remainingSlots === 1 ? "" : "s"} available.`;
+    ? "You can publish jobs without a live posting limit."
+    : `You can publish ${remainingSlots} more job${remainingSlots === 1 ? "" : "s"}.`;
 
-  const handleAddJobClick = () => {
+  const handleAddJobClick = useCallback(() => {
     setEditingJob(null);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, []);
 
-  const handleEdit = (job) => {
+  const handleEdit = useCallback((job) => {
     setEditingJob(job);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  }, []);
 
-  const handleArchive = async (jobId) => {
+  const handleArchive = useCallback(async (jobId) => {
     try {
       await archiveJob(jobId);
       await getRecruiterDashboard();
@@ -200,9 +186,9 @@ const RecruiterDashboard = () => {
       console.error("Error archiving job:", error.message);
       alert("Failed to remove posting.");
     }
-  };
+  }, [getRecruiterDashboard]);
 
-  const handlePause = async (jobId) => {
+  const handlePause = useCallback(async (jobId) => {
     try {
       await pauseJob(jobId);
       await getRecruiterDashboard();
@@ -211,9 +197,9 @@ const RecruiterDashboard = () => {
       console.error("Error pausing job:", error.message);
       alert("Failed to hide posting.");
     }
-  };
+  }, [getRecruiterDashboard]);
 
-  const handleResume = async (jobId) => {
+  const handleResume = useCallback(async (jobId) => {
     try {
       await resumeJob(jobId);
       await getRecruiterDashboard();
@@ -222,9 +208,9 @@ const RecruiterDashboard = () => {
       console.error("Error resuming job:", error.message);
       alert(error?.response?.data?.error || "Failed to make posting live.");
     }
-  };
+  }, [getRecruiterDashboard]);
 
-  const handleUnarchive = async (jobId) => {
+  const handleUnarchive = useCallback(async (jobId) => {
     try {
       await unarchiveJob(jobId);
       await getRecruiterDashboard();
@@ -233,7 +219,7 @@ const RecruiterDashboard = () => {
       console.error("Error unarchiving job:", error.message);
       alert("Failed to restore posting.");
     }
-  };
+  }, [getRecruiterDashboard]);
 
   useEffect(() => {
     getRecruiterDashboard();
@@ -257,11 +243,11 @@ const RecruiterDashboard = () => {
               <button
                 type="button"
                 onClick={handleAddJobClick}
-                aria-describedby="recruiter-slot-state"
+                aria-describedby="recruiter-posting-state"
               >
                 Post New Job
               </button>
-              <span id="recruiter-slot-state">{nextAction}</span>
+              <span id="recruiter-posting-state">{nextAction}</span>
             </div>
           ) : (
             <>
@@ -318,13 +304,13 @@ const RecruiterDashboard = () => {
             <span className="summary-label">Posting Access</span>
             <strong>{planName}</strong>
             <p>
-              {statusLabel} - {slotLimit} job slot{slotLimit === "1" ? "" : "s"}.
+              {statusLabel} - up to {slotLimit} live posting{slotLimit === "1" ? "" : "s"}.
             </p>
           </div>
 
           <div className="recruiter-summary-card">
             <span className="summary-label">Applicants</span>
-            <strong>{loading ? "-" : applications.length}</strong>
+            <strong>Review</strong>
             <p>
               <Link to="/recruiter/applications">View applicants</Link>
             </p>
@@ -350,11 +336,11 @@ const RecruiterDashboard = () => {
         {atSlotCapacity && !isAdmin && (
           <div className="upgrade-banner recruiter-capacity-banner">
             <p>
-              <strong>You are using all available job slots.</strong>
+              <strong>You have reached your live posting limit.</strong>
             </p>
             <p>
               Remove a live or pending job to free a posting, or review capacity options.
-              Manager includes 5 active slots and Doctor includes 10.
+              Manager includes 5 live postings and Doctor includes 10.
             </p>
             <Link to="/pricing">Review capacity options</Link>
           </div>

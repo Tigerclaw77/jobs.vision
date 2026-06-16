@@ -842,7 +842,7 @@ export default function JobForm({
         planRequired
           ? "Checkout is required before this job can go live."
           : slotLimitReached
-          ? "Your current posting access has no open job slots. Remove a job or review capacity options before publishing."
+          ? "Your current posting access has reached its live posting limit. Remove a job or review capacity options before publishing."
           : "Publishing is not available for this account yet."
       );
       return;
@@ -887,7 +887,7 @@ export default function JobForm({
   const publishBlockedMessage = planRequired
     ? "Checkout is required before this job can go live."
     : slotLimitReached
-    ? "Your current posting access has no open job slots."
+    ? "Your current posting access has reached its live posting limit."
     : rolePlanBlocked
     ? rolePlanRequirementMessage(recruiterTier, values.role_type)
     : !canPublish

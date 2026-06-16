@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import RecruiterJobCard from "./RecruiterJobCard";
 
 const TAB_ORDER = ["active", "pending", "draft", "paused", "expired", "archived", "featured"];
@@ -16,7 +16,7 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
     featured: "Featured",
   };
 
-  const tabs = TAB_ORDER.filter((key) => key in jobsByStatus);
+  const tabs = useMemo(() => TAB_ORDER.filter((key) => key in jobsByStatus), [jobsByStatus]);
 
   useEffect(() => {
     if (!tabs.length) return;

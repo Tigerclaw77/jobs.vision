@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import {
   EMPLOYMENT_TYPE_LABELS,
   LISTING_OPPORTUNITY_TYPE_LABELS,
@@ -21,6 +22,32 @@ const STATUS_LABELS = {
   expired: "Expired",
   archived: "Removed",
 };
+
+function DetailSection({ title, items }) {
+  if (!items.length) return null;
+  return (
+    <section className="recruiter-card-detail-section">
+      <h4>{title}</h4>
+      <dl className="recruiter-card-detail-grid">
+        {items.map(([label, value]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function StatItem({ label, value }) {
+  return (
+    <span className="recruiter-card-stat">
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
+  );
+}
 
 function formatDate(value) {
   if (!value) return "Not yet";
@@ -79,14 +106,18 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
     role === "optometrist"
       ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
       : [];
-  const details = [
+  const postingDetails = [
     ["Role", ROLE_LABELS[role] || job.role],
-    ["Opportunity Type", opportunityLabels.join(", ")],
-    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
     ["Employment", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
     ["Work Setting", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
-    ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
     ["Compensation", compensationSummary(job)],
+  ].filter(([, value]) => value);
+  const candidateFilterDetails = [
+    ["Opportunity Type", opportunityLabels.join(", ")],
+    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
+  ].filter(([, value]) => value);
+  const extraDetails = [
     ["Sign-on Bonus", job.sign_on_bonus || ""],
     ["CE Allowance", job.ce_allowance || ""],
     ["Benefits", job.benefits || ""],
@@ -118,6 +149,8 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
   const statusLabel = STATUS_LABELS[job.status] || (job.is_archived ? "Removed" : job.status || "Unknown");
   const createdDate = formatDate(job.created_at || job.createdAt || job.posted_at);
   const publishedDate = formatDate(job.first_activated_at || job.firstActivatedAt);
+  const canViewPublicListing = job.status === "active" && !job.is_archived;
+  const publicSearchHref = `/jobs?q=${encodeURIComponent(job.title || "")}`;
 
   return (
     <div className="job-card recruiter-card">
@@ -132,32 +165,33 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
           </div>
         )}
         <h3>{job.title}</h3>
-        <p>{job.description}</p>
+        <p className="recruiter-card-description">{job.description}</p>
       </div>
 
       {/* ✅ Job Metrics */}
-      {details.length > 0 && (
-        <div className="job-details">
-          {details.map(([label, value]) => (
-            <span key={label}>
-              <strong>{label}:</strong> {value}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="recruiter-card-details">
+        <DetailSection title="Posting Details" items={postingDetails} />
+        <DetailSection title="Candidate Search Details" items={candidateFilterDetails} />
+        <DetailSection title="Optional Extras" items={extraDetails} />
+      </div>
 
       <div className="job-metrics">
-        <span>Status: {statusLabel}</span>
-        <span>{job.views || 0} views</span>
-        <span>{job.saves || 0} saves</span>
-        <span>{job.applies || 0} applicants</span>
-        <span>Started: {createdDate}</span>
-        <span>Went live: {publishedDate}</span>
-        <span>{applyDestination}</span>
+        <StatItem label="Status" value={statusLabel} />
+        <StatItem label="Views" value={job.views || 0} />
+        <StatItem label="Saves" value={job.saves || 0} />
+        <StatItem label="Applicants" value={job.applies || 0} />
+        <StatItem label="Started" value={createdDate} />
+        <StatItem label="Went Live" value={publishedDate} />
+        <StatItem label="Apply Method" value={applyDestination} />
       </div>
 
       {/* ✅ Recruiter Actions */}
       <div className="job-actions">
+        {canViewPublicListing && (
+          <Link to={publicSearchHref} className="recruiter-card-action-link">
+            View in Search
+          </Link>
+        )}
         <button onClick={handleEdit}>Edit</button>
         {onPause && (
           <button onClick={handlePause}>Hide</button>
@@ -176,4 +210,4 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
   );
 };
 
-export default RecruiterJobCard;
+export default React.memo(RecruiterJobCard);
