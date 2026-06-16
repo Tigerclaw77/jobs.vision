@@ -61,6 +61,25 @@ async function bootstrapProfile(accessToken, payload) {
   if (!res.ok) throw new Error("Registration succeeded, but profile setup failed.");
 }
 
+function buildVerifyPath(email, nextPath = "") {
+  const params = new URLSearchParams({ email });
+  if (nextPath) params.set("next", nextPath);
+  return `/verify-email?${params.toString()}`;
+}
+
+async function sendSignupVerificationCode(email, emailRedirectTo) {
+  const { error } = await neonAuth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo },
+  });
+  if (!error) return;
+
+  const msg = String(error.message || "").toLowerCase();
+  if (msg.includes("only request this after") || msg.includes("rate")) return;
+  throw error;
+}
+
 const recruiterSchema = Yup.object({
   firstName: Yup.string().trim().required("First name is required."),
   lastName: Yup.string().trim().required("Last name is required."),
@@ -126,6 +145,8 @@ export default function RecruiterRegistration() {
 
   const onSubmit = async (data) => {
     const email = normalize(data.email);
+    const verifyPath = buildVerifyPath(email, nextPath);
+    const emailRedirectTo = `${base}${verifyPath}`;
     const firstName = data.firstName?.trim();
     const lastName = data.lastName?.trim();
     const profilePayload = {
@@ -140,7 +161,7 @@ export default function RecruiterRegistration() {
         email,
         password: data.password,
         options: {
-          emailRedirectTo: `${base}/verify-email`,
+          emailRedirectTo,
           data: {
             displayName: `${firstName} ${lastName}`.trim(),
             accountRole: profilePayload.accountRole,
@@ -159,13 +180,7 @@ export default function RecruiterRegistration() {
           msg.includes("already") ||
           msg.includes("exists")
         ) {
-          await neonAuth
-            .resend({
-              type: "signup",
-              email,
-              options: { emailRedirectTo: `${base}/verify-email` },
-            })
-            .catch(() => {});
+          await sendSignupVerificationCode(email, emailRedirectTo).catch(() => {});
         } else if (error.status === 401 && msg.includes("failed to retrieve user session")) {
           // Some verified-email flows create the auth user but do not return a session yet.
         } else {
@@ -181,10 +196,10 @@ export default function RecruiterRegistration() {
         });
       }
 
-      const flash = "If that email exists, we’ve sent a verification link.";
+      await sendSignupVerificationCode(email, emailRedirectTo);
+      const flash = "We sent a verification code.";
       reset();
-      const loginPath = nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login";
-      navigate(loginPath, { state: { flash, severity: "success" } });
+      navigate(verifyPath, { state: { flash, severity: "success" } });
     } catch (err) {
       showToast(
         err?.message || "Registration failed. Please try again.",

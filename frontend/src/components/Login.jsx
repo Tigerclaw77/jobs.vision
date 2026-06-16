@@ -42,6 +42,11 @@ const parseCooldownSeconds = (msg) => {
   return m ? parseInt(m[1], 10) : null;
 };
 
+const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
+
+const isUnverifiedEmailError = (message = "") =>
+  /confirm|verified|not confirmed|not verified|verification/i.test(String(message));
+
 const pathForRole = (role) => {
   const r = String(role || "").toLowerCase();
   if (!r) return "/profile";
@@ -86,6 +91,7 @@ export default function Login() {
   const [sendingMagic, setSendingMagic] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [canResendVerify, setCanResendVerify] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
   const [magicMode, setMagicMode] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -221,13 +227,15 @@ export default function Login() {
     setFormError("");
     setInfoMsg("");
     setCanResendVerify(false);
+    setPendingVerificationEmail("");
     setSigningIn(true);
     try {
       // set persistence BEFORE sign-in (Remember Me)
       setNeonAuthPersistence(rememberMe ? "local" : "session");
 
+      const loginEmail = normalizeEmail(email);
       const { data, error } = await neonAuth.signInWithPassword({
-        email: String(email).trim().toLowerCase(),
+        email: loginEmail,
         password,
       });
       if (error) throw error;
@@ -235,8 +243,13 @@ export default function Login() {
       await bootstrapReduxAfterSignIn(data?.session || normalizeSessionResult({ data }));
     } catch (err) {
       const msg = err?.message || "Login failed. Please try again.";
-      if (/confirm|verified|not confirmed/i.test(msg)) setCanResendVerify(true);
-      if (/password|credentials/i.test(msg)) {
+      const loginEmail = normalizeEmail(email);
+
+      if (isUnverifiedEmailError(msg) || (/password|credentials/i.test(msg) && isValidEmail(loginEmail))) {
+        setCanResendVerify(true);
+        setPendingVerificationEmail(loginEmail);
+        setFormError("Your email has not been verified yet.");
+      } else if (/password|credentials/i.test(msg)) {
         setError("password", { type: "manual", message: msg });
       } else {
         setFormError(msg);
@@ -304,10 +317,10 @@ export default function Login() {
       setMagicMode(true);
       handleOtpResponse(
         error,
-        "If an account exists for that email, please check your inbox (and spam folder) shortly for a sign-in link."
+        "If an account exists for that email, please check your inbox for a sign-in code."
       );
     } catch (err) {
-      setFormError(err?.message || "Couldn't send the magic link.");
+      setFormError(err?.message || "Could not send the sign-in code.");
     } finally {
       setSendingMagic(false);
     }
@@ -324,27 +337,29 @@ export default function Login() {
           shouldCreateUser: false,
         },
       });
-      handleOtpResponse(error, "We’ve re-sent your sign-in link.");
+      handleOtpResponse(error, "We sent another sign-in code.");
     } catch (err) {
-      setFormError(err?.message || "Couldn't resend the link.");
+      setFormError(err?.message || "Could not resend the code.");
     }
   };
 
   const resendVerification = async () => {
     try {
+      const targetEmail = pendingVerificationEmail || normalizeEmail(email);
       const { error } = await neonAuth.resend({
         type: "signup",
-        email: String(email).trim().toLowerCase(),
-        options: { emailRedirectTo: `${base}/verify-email` },
+        email: targetEmail,
+        options: { emailRedirectTo: `${base}/verify-email?email=${encodeURIComponent(targetEmail)}` },
       });
       if (error) throw error;
-      setInfoMsg("We’ve sent a verification email.");
+      setFormError("");
+      setInfoMsg("We sent a verification code.");
     } catch (err) {
-      setFormError(err?.message || "Could not resend verification email.");
+      setFormError(err?.message || "Could not resend the verification code.");
     }
   };
 
-  const magicButtonLabel = resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Magic Link";
+  const magicButtonLabel = resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code";
 
   // Don’t render the login form while we’re about to redirect
   if (redirecting) return null;
@@ -398,11 +413,20 @@ export default function Login() {
             />
 
             {canResendVerify && (
-              <Typography align="center" sx={{ mt: 1 }}>
-                <Button size="small" onClick={resendVerification}>
-                  Resend verification email
+              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 1 }}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    const targetEmail = pendingVerificationEmail || normalizeEmail(email);
+                    navigate(`/verify-email?email=${encodeURIComponent(targetEmail)}`);
+                  }}
+                >
+                  Continue Verification
                 </Button>
-              </Typography>
+                <Button size="small" onClick={resendVerification}>
+                  Resend Code
+                </Button>
+              </Stack>
             )}
 
             <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
@@ -422,7 +446,7 @@ export default function Login() {
                   "&:hover": { bgcolor: "#f8fafc" },
                 }}
               >
-                {sendingMagic ? "Sending…" : "Send Magic Link"}
+                {sendingMagic ? "Sending..." : "Send Sign-in Code"}
               </Button>
             </Stack>
 

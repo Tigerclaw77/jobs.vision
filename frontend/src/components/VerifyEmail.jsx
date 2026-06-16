@@ -1,7 +1,15 @@
 // frontend/src/pages/VerifyEmail.jsx
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Container, Paper, Typography, Button, CircularProgress } from "@mui/material";
+import {
+  Alert,
+  Button,
+  CircularProgress,
+  Container,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { useDispatch } from "react-redux";
 import {
   getNeonSession,
@@ -11,6 +19,7 @@ import {
 } from "../utils/neonAuthClient";
 import { login as loginRedux } from "../store/authSlice";
 import { useAuth } from "./auth/AuthProvider";
+import GlassTextField from "./ui/GlassTextField";
 
 function apiBaseUrl() {
   const raw = (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/+$/, "");
@@ -37,34 +46,66 @@ function getParam(name) {
   return search.get(name) || hash.get(name);
 }
 
+function normalizeEmail(value = "") {
+  return String(value).trim().toLowerCase();
+}
+
+function normalizeCode(value = "") {
+  return String(value).replace(/\D/g, "").slice(0, 6);
+}
+
+function otpErrorMessage(err) {
+  const msg = String(err?.message || "").toLowerCase();
+  if (msg.includes("expired")) {
+    return "That verification code has expired. Request a new code and try again.";
+  }
+  if (
+    msg.includes("invalid") ||
+    msg.includes("otp") ||
+    msg.includes("token") ||
+    msg.includes("code")
+  ) {
+    return "That verification code is invalid. Check the code and try again.";
+  }
+  return err?.message || "Verification failed. Request a new code and try again.";
+}
+
 export default function VerifyEmail() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { refreshAuth } = useAuth();
-  const [phase, setPhase] = useState("loading"); // loading | success | nocode | error
+  const initialEmail = normalizeEmail(getParam("email") || "");
+  const [phase, setPhase] = useState(initialEmail ? "otp" : "loading");
   const [message, setMessage] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [status, setStatus] = useState(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const hydrateAndRedirect = useCallback(
+    async (session, fallbackMessage) => {
+      let activeSession = session;
+      if (!activeSession?.access_token) {
+        const refreshedSession = await getNeonSession({ forceFetch: true }).catch(() => ({}));
+        activeSession = refreshedSession.session || activeSession;
+      }
 
-    async function hydrateAndRedirect(session, fallbackMessage) {
-      if (!session?.access_token) {
-        if (!mounted) return;
+      if (!activeSession?.access_token) {
         setPhase("success");
         setMessage(fallbackMessage || "Email verified. You can log in now.");
         return;
       }
 
-      const refreshed = await refreshAuth(session);
-      const activeSession = refreshed.session || session;
-      const me = refreshed.account || (await fetchMe(activeSession.access_token));
-      if (!mounted) return;
+      const refreshed = await refreshAuth(activeSession);
+      const currentSession = refreshed.session || activeSession;
+      const me = refreshed.account || (await fetchMe(currentSession.access_token));
       const role =
         me.role ||
         me.profile?.role ||
-        activeSession.user?.user_metadata?.accountRole ||
-        activeSession.user?.user_metadata?.userRole ||
-        activeSession.user?.user_metadata?.role ||
+        currentSession.user?.user_metadata?.accountRole ||
+        currentSession.user?.user_metadata?.userRole ||
+        currentSession.user?.user_metadata?.role ||
         "candidate";
 
       dispatch(
@@ -72,20 +113,33 @@ export default function VerifyEmail() {
           userRole: role,
           user: {
             ...me,
-            ...(activeSession.user?.user_metadata || {}),
+            ...(currentSession.user?.user_metadata || {}),
             userRole: role,
             isVerified: true,
           },
         })
       );
       setPhase("success");
-      setMessage("Email verified! Redirecting...");
+      setMessage("Email verified. Redirecting...");
       setTimeout(() => {
         navigate(redirectForRole(role), { replace: true });
       }, 600);
-    }
+    },
+    [dispatch, navigate, refreshAuth]
+  );
+
+  useEffect(() => {
+    let mounted = true;
 
     (async () => {
+      const emailParam = normalizeEmail(getParam("email") || "");
+      if (emailParam) {
+        if (!mounted) return;
+        setEmail(emailParam);
+        setPhase("otp");
+        return;
+      }
+
       const errorDescription =
         getParam("error_description") || getParam("error") || getParam("message");
       if (errorDescription) {
@@ -97,7 +151,7 @@ export default function VerifyEmail() {
 
       const verificationToken =
         getParam("token") || getParam("token_hash") || getParam("verification_token");
-      const code = getParam("code");
+      const authCode = getParam("code");
 
       try {
         if (verificationToken) {
@@ -110,7 +164,7 @@ export default function VerifyEmail() {
           return;
         }
 
-        if (code) {
+        if (authCode) {
           const result = await neonAuth.exchangeCodeForSession(window.location.href);
           const session = normalizeSessionResult(result);
           if (result?.error) throw result.error;
@@ -118,29 +172,82 @@ export default function VerifyEmail() {
           return;
         }
 
-        const { session } = await getNeonSession({ forceFetch: true });
-        if (session?.user) {
-          await hydrateAndRedirect(session);
-          return;
-        }
-
         if (!mounted) return;
-        setPhase("nocode");
-        setMessage("This page expects a verification link. Please check your email or log in.");
+        setPhase("otp");
       } catch (err) {
         if (!mounted) return;
         setPhase("error");
-        setMessage(
-          err?.message ||
-            "This verification link is invalid or has expired. If you've already confirmed, try logging in."
-        );
+        setMessage(err?.message || "This verification code is invalid or has expired.");
       }
     })();
 
     return () => {
       mounted = false;
     };
-  }, [dispatch, navigate, refreshAuth]);
+  }, [hydrateAndRedirect]);
+
+  const handleVerify = async (event) => {
+    event.preventDefault();
+    const normalizedEmail = normalizeEmail(email);
+    const token = normalizeCode(code);
+
+    if (!normalizedEmail) {
+      setStatus({ severity: "error", message: "Enter the email address you used to register." });
+      return;
+    }
+    if (token.length !== 6) {
+      setStatus({ severity: "error", message: "Enter the 6-digit verification code." });
+      return;
+    }
+
+    setVerifying(true);
+    setStatus(null);
+    try {
+      const result = await neonAuth.verifyOtp({
+        type: "signup",
+        email: normalizedEmail,
+        token,
+      });
+      if (result?.error) throw result.error;
+      let session = normalizeSessionResult(result);
+      if (!session?.access_token) {
+        const refreshed = await getNeonSession({ forceFetch: true });
+        session = refreshed.session || session;
+      }
+      await hydrateAndRedirect(session, "Email verified. You can log in now.");
+    } catch (err) {
+      setStatus({ severity: "error", message: otpErrorMessage(err) });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleResend = async () => {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      setStatus({ severity: "error", message: "Enter your email address before requesting a code." });
+      return;
+    }
+
+    setResending(true);
+    setStatus(null);
+    try {
+      const { error } = await neonAuth.resend({
+        type: "signup",
+        email: normalizedEmail,
+        options: { emailRedirectTo: `${window.location.origin}/verify-email?email=${encodeURIComponent(normalizedEmail)}` },
+      });
+      if (error) throw error;
+      setStatus({ severity: "success", message: "We sent a new verification code." });
+    } catch (err) {
+      setStatus({
+        severity: "error",
+        message: err?.message || "Could not send a new verification code. Try again shortly.",
+      });
+    } finally {
+      setResending(false);
+    }
+  };
 
   return (
     <Container maxWidth="sm">
@@ -155,7 +262,60 @@ export default function VerifyEmail() {
           </Typography>
         )}
 
-        {(phase === "success" || phase === "error" || phase === "nocode") && (
+        {phase === "otp" && (
+          <form onSubmit={handleVerify} noValidate>
+            <Stack spacing={2} alignItems="stretch">
+              <Typography>
+                Enter the verification code sent to:
+              </Typography>
+
+              <Typography fontWeight={700}>{email || "your email address"}</Typography>
+
+              {!initialEmail && (
+                <GlassTextField
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(normalizeEmail(event.target.value))}
+                  fullWidth
+                  variant="outlined"
+                />
+              )}
+
+              <GlassTextField
+                label="Code"
+                value={code}
+                onChange={(event) => setCode(normalizeCode(event.target.value))}
+                inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
+                fullWidth
+                variant="outlined"
+              />
+
+              {status && <Alert severity={status.severity}>{status.message}</Alert>}
+
+              <Button
+                type="submit"
+                variant="contained"
+                className="glass-button"
+                disabled={verifying}
+              >
+                {verifying ? "Verifying..." : "Verify"}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outlined"
+                className="glass-button"
+                disabled={resending}
+                onClick={handleResend}
+              >
+                {resending ? "Sending..." : "Resend Code"}
+              </Button>
+            </Stack>
+          </form>
+        )}
+
+        {(phase === "success" || phase === "error") && (
           <>
             <Typography color={phase === "error" ? "error" : "inherit"} sx={{ my: 2 }}>
               {message}

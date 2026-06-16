@@ -9,7 +9,7 @@ const EmailVerification = () => {
           Verify Your Email
         </Typography>
         <Typography align="center">
-          We've sent you a verification email. Please check your inbox and click the link to activate your account.
+          We've sent you a verification code. Please check your inbox and enter the code to activate your account.
         </Typography>
       </Paper>
     </Container>

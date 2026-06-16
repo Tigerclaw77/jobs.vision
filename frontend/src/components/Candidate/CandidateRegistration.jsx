@@ -33,6 +33,19 @@ async function bootstrapProfile(accessToken, payload) {
   if (!res.ok) throw new Error("Registration succeeded, but profile setup failed.");
 }
 
+async function sendSignupVerificationCode(email, emailRedirectTo) {
+  const { error } = await neonAuth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo },
+  });
+  if (!error) return;
+
+  const msg = String(error.message || "").toLowerCase();
+  if (msg.includes("only request this after") || msg.includes("rate")) return;
+  throw error;
+}
+
 const candidateSchema = Yup.object().shape({
   firstName: Yup.string().required("First name is required."),
   lastName: Yup.string().required("Last name is required."),
@@ -66,6 +79,8 @@ export default function CandidateRegistration() {
 
   const onSubmit = async (data) => {
     const email = data.email.trim().toLowerCase();
+    const verifyPath = `/verify-email?email=${encodeURIComponent(email)}`;
+    const emailRedirectTo = `${base}${verifyPath}`;
     const profilePayload = {
       accountRole: "candidate",
       firstName: data.firstName,
@@ -77,7 +92,7 @@ export default function CandidateRegistration() {
         email,
         password: data.password,
         options: {
-          emailRedirectTo: `${base}/verify-email`,
+          emailRedirectTo,
           data: {
             accountRole: profilePayload.accountRole,
             firstName: profilePayload.firstName,
@@ -90,13 +105,7 @@ export default function CandidateRegistration() {
       if (error) {
         const msg = (error.message || "").toLowerCase();
         if (error.status === 400 || msg.includes("already") || msg.includes("exists")) {
-          await neonAuth
-            .resend({
-              type: "signup",
-              email,
-              options: { emailRedirectTo: `${base}/verify-email` },
-            })
-            .catch(() => {});
+          await sendSignupVerificationCode(email, emailRedirectTo).catch(() => {});
         } else if (error.status === 401 && msg.includes("failed to retrieve user session")) {
           // Some verified-email flows create the auth user but do not return a session yet.
         } else {
@@ -112,9 +121,10 @@ export default function CandidateRegistration() {
         });
       }
 
-      showToast("If that email exists, we’ve sent a verification link.", "success");
+      await sendSignupVerificationCode(email, emailRedirectTo);
+      showToast("We sent a verification code.", "success");
       reset();
-      navigate("/login");
+      navigate(verifyPath);
     } catch (err) {
       showToast(err?.message || "Registration failed. Please try again.", "error");
     }
