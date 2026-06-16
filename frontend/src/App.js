@@ -37,7 +37,6 @@ import CandidateDashboard from "./components/Candidate/CandidateDashboard";
 import SearchJobs from "./components/Candidate/SearchJobs";
 import JobList from "./components/JobSearch/JobList";
 import ClaimListing from "./components/ClaimListing";
-import CheckYourEmail from "./components/CheckYourEmail";
 import VerifyEmail from "./components/VerifyEmail";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPassword from "./components/ResetPassword";
@@ -210,6 +209,11 @@ function RouteLoading({ message = "Loading..." }) {
   );
 }
 
+function EmailVerificationRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/verify-email${search || ""}`} replace />;
+}
+
 /**
  * AppShell
  * - Renders the page shell immediately.
@@ -283,11 +287,7 @@ function AppShell() {
             <Route path="/logout" element={<Logout />} />
             <Route
               path="/email-verification"
-              element={
-                <PublicOnlyRoute>
-                  <CheckYourEmail />
-                </PublicOnlyRoute>
-              }
+              element={<EmailVerificationRedirect />}
             />
             <Route
               path="/verify-email"

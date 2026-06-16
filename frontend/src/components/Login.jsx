@@ -43,9 +43,12 @@ const parseCooldownSeconds = (msg) => {
 };
 
 const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
+const normalizeCode = (value = "") => String(value).replace(/\D/g, "").slice(0, 6);
 
 const isUnverifiedEmailError = (message = "") =>
-  /confirm|verified|not confirmed|not verified|verification/i.test(String(message));
+  /email.*(not confirmed|not verified|unconfirmed)|not confirmed|not verified|confirm your email|verify your email/i.test(
+    String(message)
+  );
 
 const pathForRole = (role) => {
   const r = String(role || "").toLowerCase();
@@ -88,12 +91,15 @@ export default function Login() {
 
   const [formError, setFormError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
-  const [sendingMagic, setSendingMagic] = useState(false);
+  const [sendingSignInCode, setSendingSignInCode] = useState(false);
+  const [verifyingSignInCode, setVerifyingSignInCode] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [canResendVerify, setCanResendVerify] = useState(false);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
 
-  const [magicMode, setMagicMode] = useState(false);
+  const [signInCodeMode, setSignInCodeMode] = useState(false);
+  const [signInCodeEmail, setSignInCodeEmail] = useState("");
+  const [signInCode, setSignInCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // gate rendering while we check if already authed (prevents “login screen while logged in”)
@@ -105,6 +111,7 @@ export default function Login() {
     register,
     handleSubmit,
     setError,
+    clearErrors,
     formState: { errors },
     watch,
   } = useForm({ resolver: yupResolver(passwordSchema) });
@@ -228,6 +235,9 @@ export default function Login() {
     setInfoMsg("");
     setCanResendVerify(false);
     setPendingVerificationEmail("");
+    setSignInCodeMode(false);
+    setSignInCode("");
+    clearErrors();
     setSigningIn(true);
     try {
       // set persistence BEFORE sign-in (Remember Me)
@@ -245,12 +255,12 @@ export default function Login() {
       const msg = err?.message || "Login failed. Please try again.";
       const loginEmail = normalizeEmail(email);
 
-      if (isUnverifiedEmailError(msg) || (/password|credentials/i.test(msg) && isValidEmail(loginEmail))) {
+      if (isUnverifiedEmailError(msg)) {
         setCanResendVerify(true);
         setPendingVerificationEmail(loginEmail);
         setFormError("Your email has not been verified yet.");
       } else if (/password|credentials/i.test(msg)) {
-        setError("password", { type: "manual", message: msg });
+        setError("password", { type: "manual", message: "Invalid email or password." });
       } else {
         setFormError(msg);
       }
@@ -291,56 +301,126 @@ export default function Login() {
     setResendCooldown(DEFAULT_COOLDOWN);
   };
 
-  // ---- Magic link
-  const sendMagicLink = async () => {
+  // ---- Email sign-in code
+  const sendSignInCode = async () => {
     setFormError("");
     setInfoMsg("");
+    setCanResendVerify(false);
+    setPendingVerificationEmail("");
+    setSignInCode("");
+    clearErrors();
 
     if (!isValidEmail(email)) {
       setError("email", { type: "manual", message: "Please enter a valid email" });
       return;
     }
 
-    setSendingMagic(true);
+    const loginEmail = normalizeEmail(email);
+    setSendingSignInCode(true);
     try {
-      // respect Remember Me for OTP return
       setNeonAuthPersistence(rememberMe ? "local" : "session");
 
       const { error } = await neonAuth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: loginEmail,
         options: {
-          emailRedirectTo: `${base}/verify-email`,
+          emailRedirectTo: `${base}/login`,
           shouldCreateUser: false,
         },
       });
 
-      setMagicMode(true);
+      setSignInCodeEmail(loginEmail);
+      setSignInCodeMode(true);
       handleOtpResponse(
         error,
-        "If an account exists for that email, please check your inbox for a sign-in code."
+        "Enter the code sent to your email."
       );
     } catch (err) {
       setFormError(err?.message || "Could not send the sign-in code.");
     } finally {
-      setSendingMagic(false);
+      setSendingSignInCode(false);
     }
   };
 
-  const resendMagicLink = async () => {
-    if (!isValidEmail(email) || resendCooldown > 0) return;
+  const resendSignInCode = async () => {
+    const targetEmail = signInCodeEmail || normalizeEmail(email);
+    if (!isValidEmail(targetEmail) || resendCooldown > 0) return;
+    setFormError("");
+    clearErrors();
     try {
       setNeonAuthPersistence(rememberMe ? "local" : "session");
       const { error } = await neonAuth.signInWithOtp({
-        email: email.trim().toLowerCase(),
+        email: targetEmail,
         options: {
-          emailRedirectTo: `${base}/verify-email`,
+          emailRedirectTo: `${base}/login`,
           shouldCreateUser: false,
         },
       });
-      handleOtpResponse(error, "We sent another sign-in code.");
+      handleOtpResponse(error, "Enter the new code sent to your email.");
     } catch (err) {
       setFormError(err?.message || "Could not resend the code.");
     }
+  };
+
+  const verifySignInCode = async (event) => {
+    event.preventDefault();
+    const targetEmail = signInCodeEmail || normalizeEmail(email);
+    const token = normalizeCode(signInCode);
+
+    setFormError("");
+    setInfoMsg("");
+    clearErrors();
+
+    if (!isValidEmail(targetEmail)) {
+      setFormError("Request a new sign-in code with a valid email address.");
+      return;
+    }
+
+    if (token.length !== 6) {
+      setFormError("Enter the 6-digit sign-in code.");
+      return;
+    }
+
+    setVerifyingSignInCode(true);
+    try {
+      setNeonAuthPersistence(rememberMe ? "local" : "session");
+      const result = await neonAuth.verifyOtp({
+        type: "email",
+        email: targetEmail,
+        token,
+      });
+      if (result?.error) throw result.error;
+
+      let session = normalizeSessionResult(result);
+      if (!session?.access_token) {
+        const refreshed = await getNeonSession({ forceFetch: true });
+        session = refreshed.session || session;
+      }
+
+      await bootstrapReduxAfterSignIn(session);
+    } catch (err) {
+      const msg = err?.message || "Could not verify the sign-in code.";
+      if (isUnverifiedEmailError(msg)) {
+        setCanResendVerify(true);
+        setPendingVerificationEmail(targetEmail);
+        setFormError("Your email has not been verified yet.");
+      } else if (/expired/i.test(msg)) {
+        setFormError("That sign-in code has expired. Request a new code and try again.");
+      } else if (/invalid|otp|token|code/i.test(msg)) {
+        setFormError("That sign-in code is invalid. Check the code and try again.");
+      } else {
+        setFormError(msg);
+      }
+    } finally {
+      setVerifyingSignInCode(false);
+    }
+  };
+
+  const usePasswordMode = () => {
+    setSignInCodeMode(false);
+    setSignInCode("");
+    setFormError("");
+    setInfoMsg("");
+    clearErrors();
   };
 
   const resendVerification = async () => {
@@ -359,7 +439,7 @@ export default function Login() {
     }
   };
 
-  const magicButtonLabel = resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code";
+  const resendButtonLabel = resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code";
 
   // Don’t render the login form while we’re about to redirect
   if (redirecting) return null;
@@ -382,19 +462,19 @@ export default function Login() {
           </Alert>
         )}
 
-        <GlassTextField
-          label="Email"
-          type="email"
-          {...register("email")}
-          error={!!errors.email}
-          helperText={errors.email?.message}
-          className="full-width"
-          variant="outlined"
-          margin="normal"
-        />
-
-        {!magicMode && (
+        {!signInCodeMode && (
           <form onSubmit={handleSubmit(onPasswordLogin)} noValidate>
+            <GlassTextField
+              label="Email"
+              type="email"
+              {...register("email")}
+              error={!!errors.email}
+              helperText={errors.email?.message}
+              className="full-width"
+              variant="outlined"
+              margin="normal"
+            />
+
             <GlassTextField
               label="Password"
               type="password"
@@ -437,8 +517,8 @@ export default function Login() {
               <Button
                 type="button"
                 variant="contained"
-                onClick={sendMagicLink}
-                disabled={sendingMagic}
+                onClick={sendSignInCode}
+                disabled={sendingSignInCode}
                 sx={{
                   bgcolor: "#ffffff",
                   color: "#0f172a",
@@ -446,7 +526,7 @@ export default function Login() {
                   "&:hover": { bgcolor: "#f8fafc" },
                 }}
               >
-                {sendingMagic ? "Sending..." : "Send Sign-in Code"}
+                {sendingSignInCode ? "Sending..." : "Send Sign-in Code"}
               </Button>
             </Stack>
 
@@ -458,23 +538,78 @@ export default function Login() {
           </form>
         )}
 
-        {magicMode && (
-          <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
-            <Button
-              type="button"
-              variant="contained"
-              onClick={resendMagicLink}
-              disabled={!isValidEmail(email) || resendCooldown > 0}
-              sx={{
-                bgcolor: !isValidEmail(email) || resendCooldown > 0 ? "#e5e7eb" : "#ffffff",
-                color: "#0f172a",
-                border: "1px solid #e5e7eb",
-                "&:hover": { bgcolor: "#f8fafc" },
-              }}
-            >
-              {magicButtonLabel}
-            </Button>
-          </Stack>
+        {signInCodeMode && (
+          <form onSubmit={verifySignInCode} noValidate>
+            <Stack spacing={2} alignItems="stretch" sx={{ mt: 2 }}>
+              <Typography align="center">
+                Enter the code sent to your email
+              </Typography>
+
+              <Typography align="center" fontWeight={700}>
+                {signInCodeEmail}
+              </Typography>
+
+              <GlassTextField
+                label="Code"
+                value={signInCode}
+                onChange={(event) => setSignInCode(normalizeCode(event.target.value))}
+                inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 6 }}
+                className="full-width"
+                variant="outlined"
+                margin="normal"
+              />
+
+              {canResendVerify && (
+                <Stack direction="row" spacing={1} justifyContent="center">
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      const targetEmail = pendingVerificationEmail || signInCodeEmail;
+                      navigate(`/verify-email?email=${encodeURIComponent(targetEmail)}`);
+                    }}
+                  >
+                    Continue Verification
+                  </Button>
+                  <Button size="small" onClick={resendVerification}>
+                    Resend Code
+                  </Button>
+                </Stack>
+              )}
+
+              <Stack direction="row" spacing={2} justifyContent="center">
+                <Button
+                  type="submit"
+                  variant="contained"
+                  className="glass-button"
+                  disabled={verifyingSignInCode}
+                >
+                  {verifyingSignInCode ? "Verifying..." : "Verify"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="contained"
+                  onClick={resendSignInCode}
+                  disabled={!isValidEmail(signInCodeEmail) || resendCooldown > 0}
+                  sx={{
+                    bgcolor:
+                      !isValidEmail(signInCodeEmail) || resendCooldown > 0
+                        ? "#e5e7eb"
+                        : "#ffffff",
+                    color: "#0f172a",
+                    border: "1px solid #e5e7eb",
+                    "&:hover": { bgcolor: "#f8fafc" },
+                  }}
+                >
+                  {resendButtonLabel}
+                </Button>
+              </Stack>
+
+              <Button type="button" variant="text" onClick={usePasswordMode}>
+                Use password instead
+              </Button>
+            </Stack>
+          </form>
         )}
       </Paper>
     </Container>
