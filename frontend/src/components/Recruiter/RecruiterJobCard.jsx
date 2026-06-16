@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  COMPENSATION_TYPE_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   LISTING_OPPORTUNITY_TYPE_LABELS,
   LISTING_TIER_LABELS,
@@ -23,32 +24,6 @@ const STATUS_LABELS = {
   archived: "Removed",
 };
 
-function DetailSection({ title, items }) {
-  if (!items.length) return null;
-  return (
-    <section className="recruiter-card-detail-section">
-      <h4>{title}</h4>
-      <dl className="recruiter-card-detail-grid">
-        {items.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
-
-function StatItem({ label, value }) {
-  return (
-    <span className="recruiter-card-stat">
-      <small>{label}</small>
-      <strong>{value}</strong>
-    </span>
-  );
-}
-
 function formatDate(value) {
   if (!value) return "Not yet";
   const date = new Date(value);
@@ -60,153 +35,194 @@ function formatDate(value) {
   });
 }
 
+function labels(values, map) {
+  return labelsForValues(map, values).join(", ");
+}
+
+function locationText(job = {}) {
+  if (job.location) return job.location;
+  const cityState = [job.city, job.state].filter(Boolean).join(", ");
+  return cityState || "Not set";
+}
+
+function applyMethod(job = {}) {
+  if (job.external_apply_url) return "Apply URL";
+  if (job.application_email) return "Apply email";
+  return "Add apply method";
+}
+
+function DetailItem({ label, value }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
 const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchive }) => {
-  const handleEdit = () => {
-    if (onEdit) onEdit(job);
-  };
-
-  const handleArchive = async () => {
-    if (onArchive) {
-      const confirmed = window.confirm(`Remove "${job.title}" from your active postings?`);
-      if (confirmed) {
-        await onArchive(job.id || job._id);
-      }
-    }
-  };
-
-  const handlePause = async () => {
-    if (onPause) {
-      const confirmed = window.confirm(`Hide "${job.title}" from public search and the map?`);
-      if (confirmed) {
-        await onPause(job.id || job._id);
-      }
-    }
-  };
-
-  const handleResume = async () => {
-    if (onResume) {
-      const confirmed = window.confirm(`Make "${job.title}" visible to candidates again?`);
-      if (confirmed) {
-        await onResume(job.id || job._id);
-      }
-    }
-  };
-
-  const handleUnarchive = async () => {
-    if (onUnarchive) {
-      const confirmed = window.confirm(`Restore "${job.title}" to your postings?`);
-      if (confirmed) {
-        await onUnarchive(job.id || job._id);
-      }
-    }
-  };
-
+  const [expanded, setExpanded] = useState(false);
+  const id = job.id || job._id;
   const role = normalizeRole(job.role) || job.role;
-  const opportunityLabels =
-    role === "optometrist"
-      ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
-      : [];
-  const postingDetails = [
-    ["Role", ROLE_LABELS[role] || job.role],
-    ["Employment", labelsForValues(EMPLOYMENT_TYPE_LABELS, job.employment_types || job.employment_type).join(", ")],
-    ["Work Setting", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
-    ["Compensation", compensationSummary(job)],
-  ].filter(([, value]) => value);
-  const candidateFilterDetails = [
-    ["Opportunity Type", opportunityLabels.join(", ")],
-    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
-    ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
-  ].filter(([, value]) => value);
-  const extraDetails = [
-    ["Sign-on Bonus", job.sign_on_bonus || ""],
-    ["CE Allowance", job.ce_allowance || ""],
-    ["Benefits", job.benefits || ""],
-    ["Relocation", job.relocation_assistance ? "Available" : ""],
-    ["Student Loan", job.student_loan_assistance ? "Available" : ""],
-  ].filter(([, value]) => value);
-  const listingTier =
-    job.listing_tier ||
-    (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
-  const listingOpportunityType = job.listing_opportunity_type || "job";
-  const badges = [
-    job.status === "draft" && ["Unfinished", "job-listing-badge draft"],
-    job.status === "active" && ["Live", "job-listing-badge active"],
-    job.status === "paused" && ["Hidden", "job-listing-badge paused"],
-    job.status === "pending_domain" && ["Pending", "job-listing-badge review"],
-    listingTier === "imported" && ["Imported", "job-listing-badge imported"],
-    listingTier === "featured" && [LISTING_TIER_LABELS.featured, "job-listing-badge featured"],
-    listingTier === "sponsor" && [LISTING_TIER_LABELS.sponsor, "job-listing-badge sponsor"],
-    listingOpportunityType !== "job" && [
-      LISTING_OPPORTUNITY_TYPE_LABELS[listingOpportunityType] || listingOpportunityType,
-      `job-listing-badge opportunity ${listingOpportunityType}`,
-    ],
-  ].filter(Boolean);
-  const applyDestination = job.external_apply_url
-    ? "Apply URL set"
-    : job.application_email
-    ? "Apply email set"
-    : "Add an apply method";
+  const roleLabel = ROLE_LABELS[role] || job.role || "Job";
   const statusLabel = STATUS_LABELS[job.status] || (job.is_archived ? "Removed" : job.status || "Unknown");
-  const createdDate = formatDate(job.created_at || job.createdAt || job.posted_at);
-  const publishedDate = formatDate(job.first_activated_at || job.firstActivatedAt);
+  const employment = labels(job.employment_types || job.employment_type, EMPLOYMENT_TYPE_LABELS) || "Not set";
+  const workSetting = labels(job.work_arrangements || job.work_arrangement, WORK_ARRANGEMENT_LABELS);
+  const opportunity =
+    role === "optometrist"
+      ? labels(job.opportunity_types || job.opportunity_type, OPPORTUNITY_TYPE_LABELS)
+      : "";
+  const postedAt = job.first_activated_at || job.firstActivatedAt || job.posted_at || job.created_at || job.createdAt;
+  const startedAt = job.created_at || job.createdAt || job.posted_at;
+  const applicants = job.applies || job.applicants_count || job.application_count || 0;
   const canViewPublicListing = job.status === "active" && !job.is_archived;
   const publicSearchHref = `/jobs?q=${encodeURIComponent(job.title || "")}`;
 
+  const badges = useMemo(() => {
+    const listingTier =
+      job.listing_tier ||
+      (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
+    const listingOpportunityType = job.listing_opportunity_type || "job";
+    return [
+      listingTier === "imported" && ["Imported", "job-listing-badge imported"],
+      listingTier === "featured" && [LISTING_TIER_LABELS.featured, "job-listing-badge featured"],
+      listingTier === "sponsor" && [LISTING_TIER_LABELS.sponsor, "job-listing-badge sponsor"],
+      listingOpportunityType !== "job" && [
+        LISTING_OPPORTUNITY_TYPE_LABELS[listingOpportunityType] || listingOpportunityType,
+        `job-listing-badge opportunity ${listingOpportunityType}`,
+      ],
+    ].filter(Boolean);
+  }, [job.featured, job.listing_opportunity_type, job.listing_tier, job.source]);
+
+  const confirmAndRun = async (message, action, payload = id) => {
+    if (!action) return;
+    const confirmed = window.confirm(message);
+    if (confirmed) await action(payload);
+  };
+
   return (
-    <div className="job-card recruiter-card">
-      <div className="job-header">
-        {badges.length > 0 && (
-          <div className="job-listing-badges">
-            {badges.map(([label, className]) => (
-              <span key={label} className={className}>
-                {label}
-              </span>
-            ))}
+    <article className="recruiter-job-row">
+      <div className="recruiter-job-row-main">
+        <div className="recruiter-job-cell recruiter-job-title-cell">
+          <div className="recruiter-job-title-line">
+            <h3>{job.title || "Untitled job"}</h3>
+            {badges.length > 0 && (
+              <div className="job-listing-badges">
+                {badges.map(([label, className]) => (
+                  <span key={label} className={className}>
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        <h3>{job.title}</h3>
-        <p className="recruiter-card-description">{job.description}</p>
+          <small>{job.company || job.employer_name || job.practice_name || ""}</small>
+        </div>
+
+        <div className="recruiter-job-cell" data-label="Role">
+          {roleLabel}
+        </div>
+        <div className="recruiter-job-cell" data-label="Location">
+          {locationText(job)}
+        </div>
+        <div className="recruiter-job-cell" data-label="Type">
+          {employment}
+        </div>
+        <div className="recruiter-job-cell" data-label="Status">
+          <span className={`recruiter-status-pill ${String(job.status || "").replace(/_/g, "-")}`}>
+            {statusLabel}
+          </span>
+        </div>
+        <div className="recruiter-job-cell" data-label="Posted">
+          {formatDate(postedAt)}
+        </div>
+        <div className="recruiter-job-cell" data-label="Applicants">
+          {applicants}
+        </div>
+
+        <div className="recruiter-job-actions" aria-label={`Actions for ${job.title || "job"}`}>
+          {canViewPublicListing && (
+            <Link to={publicSearchHref} className="recruiter-row-action-link">
+              View
+            </Link>
+          )}
+          <button type="button" onClick={() => onEdit?.(job)}>
+            Edit
+          </button>
+          {onPause && (
+            <button
+              type="button"
+              onClick={() =>
+                confirmAndRun(`Hide "${job.title}" from public search and the map?`, onPause)
+              }
+            >
+              Hide
+            </button>
+          )}
+          {onResume && (
+            <button
+              type="button"
+              onClick={() =>
+                confirmAndRun(`Make "${job.title}" visible to candidates again?`, onResume)
+              }
+            >
+              Make Live
+            </button>
+          )}
+          {onArchive && (
+            <button
+              type="button"
+              className="danger"
+              onClick={() =>
+                confirmAndRun(`Remove "${job.title}" from your postings?`, onArchive)
+              }
+            >
+              Remove
+            </button>
+          )}
+          {onUnarchive && (
+            <button
+              type="button"
+              onClick={() => confirmAndRun(`Restore "${job.title}" to your postings?`, onUnarchive)}
+            >
+              Restore
+            </button>
+          )}
+          <button
+            type="button"
+            className="recruiter-details-toggle"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? "Hide Details" : "Details"}
+          </button>
+        </div>
       </div>
 
-      {/* ✅ Job Metrics */}
-      <div className="recruiter-card-details">
-        <DetailSection title="Posting Details" items={postingDetails} />
-        <DetailSection title="Candidate Search Details" items={candidateFilterDetails} />
-        <DetailSection title="Optional Extras" items={extraDetails} />
-      </div>
-
-      <div className="job-metrics">
-        <StatItem label="Status" value={statusLabel} />
-        <StatItem label="Views" value={job.views || 0} />
-        <StatItem label="Saves" value={job.saves || 0} />
-        <StatItem label="Applicants" value={job.applies || 0} />
-        <StatItem label="Started" value={createdDate} />
-        <StatItem label="Went Live" value={publishedDate} />
-        <StatItem label="Apply Method" value={applyDestination} />
-      </div>
-
-      {/* ✅ Recruiter Actions */}
-      <div className="job-actions">
-        {canViewPublicListing && (
-          <Link to={publicSearchHref} className="recruiter-card-action-link">
-            View in Search
-          </Link>
-        )}
-        <button onClick={handleEdit}>Edit</button>
-        {onPause && (
-          <button onClick={handlePause}>Hide</button>
-        )}
-        {onResume && (
-          <button onClick={handleResume}>Make Live</button>
-        )}
-        {onArchive && (
-          <button onClick={handleArchive} className="danger">Remove</button>
-        )}
-        {onUnarchive && (
-          <button onClick={handleUnarchive}>Restore</button>
-        )}
-      </div>
-    </div>
+      {expanded && (
+        <div className="recruiter-job-expanded">
+          <dl>
+            <DetailItem label="Opportunity Type" value={opportunity} />
+            <DetailItem label="Practice Type" value={PRACTICE_TYPE_LABELS[job.practice_type]} />
+            <DetailItem label="Saturday Schedule" value={SATURDAY_SCHEDULE_LABELS[job.saturday_schedule]} />
+            <DetailItem label="Work Setting" value={workSetting} />
+            <DetailItem label="Compensation Type" value={COMPENSATION_TYPE_LABELS[job.compensation_type]} />
+            <DetailItem label="Compensation" value={compensationSummary(job)} />
+            <DetailItem label="Apply Method" value={applyMethod(job)} />
+            <DetailItem label="Started" value={formatDate(startedAt)} />
+            <DetailItem label="Went Live" value={formatDate(job.first_activated_at || job.firstActivatedAt)} />
+            <DetailItem label="Views" value={job.views || 0} />
+            <DetailItem label="Saves" value={job.saves || 0} />
+            <DetailItem label="Sign-on Bonus" value={job.sign_on_bonus} />
+            <DetailItem label="CE Allowance" value={job.ce_allowance} />
+            <DetailItem label="Benefits" value={job.benefits} />
+            <DetailItem label="Relocation" value={job.relocation_assistance ? "Available" : ""} />
+            <DetailItem label="Student Loan" value={job.student_loan_assistance ? "Available" : ""} />
+          </dl>
+        </div>
+      )}
+    </article>
   );
 };
 

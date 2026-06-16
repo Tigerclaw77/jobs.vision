@@ -18,13 +18,13 @@ import ProfileCompletionModule from "../Profile/ProfileCompletionModule";
 import { recruiterCompletionSummary, shapeProfileForm } from "../Profile/profileUtils";
 import "../../styles/Profile.css";
 
-const PLAN_LABELS = {
-  staff: "Staff",
-  manager: "Manager",
-  doctor: "Doctor",
+const POSTING_LABELS = {
+  staff: "Staff Position",
+  manager: "Manager Position",
+  doctor: "Doctor Position",
 };
 
-const STATUS_LABELS = {
+const PAID_POSTING_STATUS_LABELS = {
   active: "Active",
   trialing: "Trialing",
   past_due: "Past Due",
@@ -32,19 +32,13 @@ const STATUS_LABELS = {
   inactive: "Inactive",
 };
 
-function formatPlanName(entitlement, user) {
+function formatCurrentPosting(entitlement, user) {
   const tier = entitlement?.tier || user?.tier || "";
-  if (tier && PLAN_LABELS[tier]) return `${PLAN_LABELS[tier]} Plan`;
+  if (tier && POSTING_LABELS[tier]) return POSTING_LABELS[tier];
   if (entitlement?.plan) {
     return String(entitlement.plan).replace(/^recruiter_/, "").replace(/_/g, " ");
   }
-  return "No Active Plan";
-}
-
-function formatSlotLimit(maxActiveJobs) {
-  if (maxActiveJobs === null) return "Unlimited";
-  const numeric = Number(maxActiveJobs || 0);
-  return Number.isFinite(numeric) ? String(numeric) : "0";
+  return "No active paid posting";
 }
 
 const RecruiterDashboard = () => {
@@ -83,7 +77,6 @@ const RecruiterDashboard = () => {
   const [profileCompletion, setProfileCompletion] = useState(null);
   const [editingJob, setEditingJob] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
 
   const categorizeJobs = useCallback((jobs = []) => {
@@ -103,7 +96,6 @@ const RecruiterDashboard = () => {
   }, []);
 
   const getRecruiterDashboard = useCallback(async () => {
-    setLoading(true);
     setDashboardError("");
 
     const [jobsResult, profileResult] = await Promise.allSettled([
@@ -132,7 +124,6 @@ const RecruiterDashboard = () => {
       setProfileCompletion(null);
     }
 
-    setLoading(false);
   }, [categorizeJobs, profileFallbackUser]);
 
   const recruiterEntitlement = user?.entitlements?.recruiter || null;
@@ -146,24 +137,15 @@ const RecruiterDashboard = () => {
     subscriptionActive && maxActiveJobs !== null && remainingSlots === 0;
   const canPublishJob =
     isAdmin || (subscriptionActive && (maxActiveJobs === null || remainingSlots > 0));
-  const planName = isAdmin ? "Admin Access" : formatPlanName(recruiterEntitlement, user);
-  const statusLabel = isAdmin
+  const currentPosting = isAdmin ? "Admin Posting View" : formatCurrentPosting(recruiterEntitlement, user);
+  const paidPostingStatus = isAdmin
     ? "Active"
-    : STATUS_LABELS[String(recruiterEntitlement?.status || "inactive").toLowerCase()] ||
+    : PAID_POSTING_STATUS_LABELS[String(recruiterEntitlement?.status || "inactive").toLowerCase()] ||
       recruiterEntitlement?.status ||
       "Inactive";
-  const slotLimit = formatSlotLimit(maxActiveJobs);
-  const slotSummary =
-    maxActiveJobs === null
-      ? `${slotJobsUsed} live or pending`
-      : `${slotJobsUsed} of ${slotLimit} live or pending`;
   const nextAction = !subscriptionActive
-    ? "Write the job now. Checkout starts when the posting is ready."
-    : atSlotCapacity
-    ? "Remove a live job or review capacity options before publishing another one."
-    : maxActiveJobs === null
-    ? "You can publish jobs without a live posting limit."
-    : `You can publish ${remainingSlots} more job${remainingSlots === 1 ? "" : "s"}.`;
+    ? "Create the posting first. Checkout appears when it is ready."
+    : "Manage your listings.";
 
   const handleAddJobClick = useCallback(() => {
     setEditingJob(null);
@@ -243,11 +225,9 @@ const RecruiterDashboard = () => {
               <button
                 type="button"
                 onClick={handleAddJobClick}
-                aria-describedby="recruiter-posting-state"
               >
                 Post New Job
               </button>
-              <span id="recruiter-posting-state">{nextAction}</span>
             </div>
           ) : (
             <>
@@ -287,82 +267,38 @@ const RecruiterDashboard = () => {
           />
         </section>
 
-        <section className="recruiter-summary-grid" aria-label="Recruiter account summary">
-          <div className="recruiter-summary-card">
-            <span className="summary-label">Live Jobs</span>
-            <strong>{loading ? "-" : categorizedJobs.active.length}</strong>
-            <p>Published jobs visible to candidates.</p>
-          </div>
+        <details className="recruiter-secondary-panel" aria-label="Recruiter account tools">
+          <summary>Account tools</summary>
+          <div className="recruiter-secondary-content">
+            <div className="recruiter-current-posting">
+              <span>Current Posting</span>
+              <strong>{currentPosting}</strong>
+              <p>{subscriptionActive ? `${paidPostingStatus} Paid Posting` : "No active paid posting yet."}</p>
+            </div>
 
-          <div className="recruiter-summary-card">
-            <span className="summary-label">Live Posting Limit</span>
-            <strong>{loading ? "-" : slotSummary}</strong>
-            <p>Live and pending jobs count toward your posting limit. Unfinished jobs do not.</p>
-          </div>
+            {profileCompletion && (
+              <div className="recruiter-profile-completion-banner">
+                <ProfileCompletionModule
+                  completion={profileCompletion}
+                  compact
+                  includeOptional={false}
+                  titleLabel="Business Details"
+                  completeLabel="Business Details Ready"
+                  readyText="Business details are ready"
+                />
+                <Link to="/recruiter/profile" className="profile-completion-banner-link">
+                  Edit business details
+                </Link>
+              </div>
+            )}
 
-          <div className="recruiter-summary-card">
-            <span className="summary-label">Posting Access</span>
-            <strong>{planName}</strong>
-            <p>
-              {statusLabel} - up to {slotLimit} live posting{slotLimit === "1" ? "" : "s"}.
-            </p>
+            <div className="recruiter-dashboard-links">
+              <Link to="/recruiter/applications">Applicants</Link>
+              <Link to="/recruiter/profile">Business Details</Link>
+              <Link to="/recruiter/domains">Employer Verification</Link>
+            </div>
           </div>
-
-          <div className="recruiter-summary-card">
-            <span className="summary-label">Applicants</span>
-            <strong>Review</strong>
-            <p>
-              <Link to="/recruiter/applications">View applicants</Link>
-            </p>
-          </div>
-        </section>
-
-        {profileCompletion && (
-          <div className="recruiter-profile-completion-banner">
-            <ProfileCompletionModule
-              completion={profileCompletion}
-              compact
-              includeOptional={false}
-              titleLabel="Business Details"
-              completeLabel="Business Details Ready"
-              readyText="Business details are ready"
-            />
-            <Link to="/recruiter/profile" className="profile-completion-banner-link">
-              Edit business details
-            </Link>
-          </div>
-        )}
-
-        {atSlotCapacity && !isAdmin && (
-          <div className="upgrade-banner recruiter-capacity-banner">
-            <p>
-              <strong>You have reached your live posting limit.</strong>
-            </p>
-            <p>
-              Remove a live or pending job to free a posting, or review capacity options.
-              Manager includes 5 live postings and Doctor includes 10.
-            </p>
-            <Link to="/pricing">Review capacity options</Link>
-          </div>
-        )}
-
-        {!subscriptionActive && !isAdmin && (
-          <div className="upgrade-banner recruiter-capacity-banner">
-            <p>
-              <strong>No paid posting is active yet.</strong>
-            </p>
-            <p>You can write the job first. Checkout appears when the posting is ready.</p>
-          </div>
-        )}
-
-        <section className="recruiter-secondary-panel" aria-label="Recruiter account tools">
-          <h2>Settings</h2>
-          <div className="recruiter-dashboard-links">
-            <Link to="/recruiter/domains">Employer Verification</Link>
-            <Link to="/recruiter/applications">Applicants</Link>
-            <Link to="/recruiter/profile">Business Details</Link>
-          </div>
-        </section>
+        </details>
       </div>
     </AccessGate>
   );

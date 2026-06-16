@@ -7,7 +7,7 @@ const RecruiterTour = () => {
     <div style={styles.container}>
       <h2>Welcome to Job Posting</h2>
       {step === 1 && <p>Step 1: Register & Verify Your Email</p>}
-      {step === 2 && <p>Step 2: Choose Your Job Posting Plan</p>}
+      {step === 2 && <p>Step 2: Create a Job Posting</p>}
       {step === 3 && <p>Step 3: Fill Out Your Job Posting Details</p>}
       {step === 4 && <p>Step 4: Pay & Publish</p>}
 

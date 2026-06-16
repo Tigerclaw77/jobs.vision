@@ -3,20 +3,20 @@ import RecruiterJobCard from "./RecruiterJobCard";
 
 const TAB_ORDER = ["active", "pending", "draft", "paused", "expired", "archived", "featured"];
 
+const TAB_LABELS = {
+  draft: "Unfinished",
+  active: "Live Jobs",
+  paused: "Hidden",
+  expired: "Expired",
+  archived: "Removed",
+  pending: "Pending Jobs",
+  featured: "Featured",
+};
+
 const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchive }) => {
   const [activeTab, setActiveTab] = useState("active");
-
-  const tabLabels = {
-    draft: "Unfinished",
-    active: "Live Jobs",
-    paused: "Hidden",
-    expired: "Expired",
-    archived: "Removed",
-    pending: "Pending Jobs",
-    featured: "Featured",
-  };
-
   const tabs = useMemo(() => TAB_ORDER.filter((key) => key in jobsByStatus), [jobsByStatus]);
+  const jobs = jobsByStatus[activeTab] || [];
 
   useEffect(() => {
     if (!tabs.length) return;
@@ -25,33 +25,44 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
 
   return (
     <div className="job-tabs">
-      {/* ✅ Tab Navigation */}
       <div className="tab-buttons">
         {tabs.map((key) => (
           <button
             key={key}
+            type="button"
             onClick={() => setActiveTab(key)}
             className={activeTab === key ? "active" : ""}
           >
-            {tabLabels[key]} ({jobsByStatus[key].length})
+            {TAB_LABELS[key]} ({jobsByStatus[key].length})
           </button>
         ))}
       </div>
 
-      {/* ✅ Tab Content */}
       <div className="tab-content">
-        {jobsByStatus[activeTab] && jobsByStatus[activeTab].length > 0 ? (
-          jobsByStatus[activeTab].map((job) => (
-            <RecruiterJobCard
-              key={job.id || job._id}
-              job={job}
-              onEdit={onEdit}
-              onPause={activeTab === "active" || activeTab === "pending" ? onPause : null}
-              onResume={activeTab === "paused" ? onResume : null}
-              onArchive={activeTab !== "archived" ? onArchive : null}
-              onUnarchive={activeTab === "archived" ? onUnarchive : null}
-            />
-          ))
+        {jobs.length > 0 ? (
+          <div className="recruiter-job-list">
+            <div className="recruiter-job-list-header" aria-hidden="true">
+              <span>Job</span>
+              <span>Role</span>
+              <span>Location</span>
+              <span>Type</span>
+              <span>Status</span>
+              <span>Posted</span>
+              <span>Applicants</span>
+              <span>Actions</span>
+            </div>
+            {jobs.map((job) => (
+              <RecruiterJobCard
+                key={job.id || job._id}
+                job={job}
+                onEdit={onEdit}
+                onPause={activeTab === "active" || activeTab === "pending" ? onPause : null}
+                onResume={activeTab === "paused" ? onResume : null}
+                onArchive={activeTab !== "archived" ? onArchive : null}
+                onUnarchive={activeTab === "archived" ? onUnarchive : null}
+              />
+            ))}
+          </div>
         ) : (
           <p>No jobs here yet.</p>
         )}

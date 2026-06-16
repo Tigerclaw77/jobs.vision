@@ -273,7 +273,7 @@ function rolePlanRequirementMessage(tier, role) {
   const roleLabel = ROLE_LABELS[role] || "this role";
   const requiredPlan = ROLE_REQUIRED_RECRUITER_PLAN[role] || "staff";
   const requiredLabel = RECRUITER_PLAN_LABELS[requiredPlan] || "matching plan";
-  return `${roleLabel} postings require ${requiredLabel} checkout. Your current posting access is ${planLabel}.`;
+  return `${roleLabel} postings require ${requiredLabel} checkout. Current paid posting: ${planLabel}.`;
 }
 
 function profileDefaultDestination(profile = {}) {
@@ -842,7 +842,7 @@ export default function JobForm({
         planRequired
           ? "Checkout is required before this job can go live."
           : slotLimitReached
-          ? "Your current posting access has reached its live posting limit. Remove a job or review capacity options before publishing."
+          ? "Another paid posting is already active for this account. Remove a live job or review options before publishing."
           : "Publishing is not available for this account yet."
       );
       return;
@@ -887,7 +887,7 @@ export default function JobForm({
   const publishBlockedMessage = planRequired
     ? "Checkout is required before this job can go live."
     : slotLimitReached
-    ? "Your current posting access has reached its live posting limit."
+    ? "Another paid posting is already active for this account."
     : rolePlanBlocked
     ? rolePlanRequirementMessage(recruiterTier, values.role_type)
     : !canPublish
@@ -1015,7 +1015,7 @@ export default function JobForm({
                     {checkoutLoading ? "Starting Checkout..." : checkoutButtonLabel}
                   </button>
                 ) : slotLimitReached ? (
-                  <a href={capacityPricingHref}>Review Capacity Options</a>
+                  <a href={capacityPricingHref}>Review Options</a>
                 ) : null}
               </div>
             ) : null}
@@ -1514,7 +1514,7 @@ export default function JobForm({
               </Button>
             ) : publishActionBlocked && slotLimitReached ? (
               <Button component="a" href={capacityPricingHref} variant="contained">
-                Review Capacity Options
+                Review Options
               </Button>
             ) : publishActionBlocked ? (
               <Button type="button" variant="contained" disabled>
