@@ -729,6 +729,24 @@ function normalizePracticeTypes(value) {
   );
 }
 
+function normalizePracticeTypeFilterValues(value) {
+  const canonicalValues = normalizePracticeTypes(value);
+  const input = toInputArray(value) || [];
+  const seen = new Set(canonicalValues);
+
+  for (const item of input) {
+    const raw = String(item || "").trim();
+    if (!raw) continue;
+    const choiceKey = normalizeChoiceKey(raw);
+    const legacyValue = choiceKey.replace(/\s+/g, "_");
+    if (PRACTICE_TYPE_ALIASES.has(choiceKey) && legacyValue && !seen.has(legacyValue)) {
+      seen.add(legacyValue);
+    }
+  }
+
+  return Array.from(seen);
+}
+
 function normalizeBenefitFlags(value) {
   return (
     normalizeChoiceList(
@@ -1114,9 +1132,9 @@ router.get("/", maybeAuth, async (req, res) => {
     const clinicalFocuses = normalizeClinicalFocuses(
       req.query.clinicalFocuses ?? req.query.clinical_focuses ?? req.query.clinicalFocus ?? req.query.clinical_focus
     );
-    const practiceTypes = normalizePracticeTypes(
-      req.query.practiceTypes ?? req.query.practice_types ?? req.query.practiceType ?? req.query.practice_type
-    );
+    const practiceTypeQuery =
+      req.query.practiceTypes ?? req.query.practice_types ?? req.query.practiceType ?? req.query.practice_type;
+    const practiceTypeFilterValues = normalizePracticeTypeFilterValues(practiceTypeQuery);
     const benefitFlags = normalizeBenefitFlags(
       req.query.benefitFlags ?? req.query.benefit_flags ?? req.query.benefit
     );
@@ -1189,9 +1207,11 @@ router.get("/", maybeAuth, async (req, res) => {
       params.push(clinicalFocuses);
       where.push(`clinical_focuses @> $${params.length}::text[]`);
     }
-    if (practiceTypes.length) {
-      params.push(practiceTypes);
-      where.push(`practice_types @> $${params.length}::text[]`);
+    if (practiceTypeFilterValues.length) {
+      params.push(practiceTypeFilterValues);
+      where.push(
+        `(coalesce(practice_types, array[]::text[]) && $${params.length}::text[] or practice_type = any($${params.length}::text[]))`
+      );
     }
     if (benefitFlags.length) {
       params.push(benefitFlags);
