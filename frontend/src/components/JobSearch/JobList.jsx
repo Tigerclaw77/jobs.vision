@@ -1,5 +1,5 @@
 // src/components/JobSearch/JobList.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { archiveJob, createStripeCheckout } from "../../utils/api";
 import { useEffectiveAuth } from "../auth/useEffectiveAuth";
@@ -12,6 +12,8 @@ import {
   hideJob as hideJobPreference,
   unhideJob as unhideJobPreference,
   getUserJobInteractions,
+  recordApplyClick,
+  recordListingView,
 } from "../../utils/api.supabase";
 
 import JobFilter from "./JobFilter";
@@ -360,6 +362,7 @@ function filtersFromSearchParams(searchParams) {
   const initial = Object.fromEntries([...searchParams.entries()]);
   delete initial.page;
   delete initial.sort;
+  delete initial.jobId;
 
   const next = { ...DEFAULT_FILTERS };
   Object.entries(initial).forEach(([key, value]) => {
@@ -405,6 +408,7 @@ export default function JobList() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [sort, setSort] = useState(JOB_SORT_MODES.BEST_MATCH);
   const [searchParams, setSearchParams] = useSearchParams();
+  const selectedJobId = searchParams.get("jobId");
   const debounceRef = useRef(null);
   const includeBrandFilter = useMemo(
     () => normalizeFilterArray(filters.includeBrand),
@@ -440,6 +444,14 @@ export default function JobList() {
     setFilters(filtersFromSearchParams(searchParams));
     setSort(normalizeSortMode(searchParams.get("sort")));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!selectedJobId || jobs.length === 0) return;
+    const match = jobs.find((job) => String(job._id || job.id) === String(selectedJobId));
+    if (!match) return;
+    setSelectedJob(match);
+    setIsModalOpen(true);
+  }, [jobs, selectedJobId]);
 
   // load jobs
   useEffect(() => {
@@ -1112,6 +1124,14 @@ const removeQuickTag = (tag) => {
     navigate(`/claim-listing/${encodeURIComponent(jobId)}`);
   };
 
+  const handleListingView = useCallback((jobId) => {
+    recordListingView(jobId);
+  }, []);
+
+  const handleOutboundApply = useCallback((jobId, options = {}) => {
+    recordApplyClick(jobId, options);
+  }, []);
+
   const handleAdminRemoveJob = async (jobId) => {
     if (!isAdminUser) return;
     const confirmed = window.confirm("Remove this job from public results?");
@@ -1145,6 +1165,15 @@ const removeQuickTag = (tag) => {
       setCheckoutError(error?.response?.data?.error || error?.message || "Unable to open checkout.");
       setCheckoutLoading("");
     }
+  };
+
+  const closeJobModal = () => {
+    setSelectedJob(null);
+    setIsModalOpen(false);
+    if (!searchParams.get("jobId")) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("jobId");
+    setSearchParams(nextParams, { replace: true });
   };
 
   return (
@@ -1331,11 +1360,10 @@ const removeQuickTag = (tag) => {
         onHide={handleHideJob}
         onRestore={handleRestoreJob}
         onClaim={handleClaimListing}
-        onClose={() => {
-          setSelectedJob(null);
-          setIsModalOpen(false);
-        }}
+        onClose={closeJobModal}
         isAuthed={isAuthed}
+        onListingView={handleListingView}
+        onOutboundApply={handleOutboundApply}
       />
     </div>
   );

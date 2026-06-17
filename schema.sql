@@ -1,6 +1,6 @@
 -- jobs.vision consolidated schema inventory
 -- Tables referenced by live frontend/backend Supabase code:
--- profiles, jobs, job_applications, job_favorites, recruiter_domains,
+-- profiles, jobs, job_apply_events, job_applications, job_favorites, recruiter_domains,
 -- manual_overrides, recruiter_entitlements, candidate_entitlements.
 -- Supabase storage buckets referenced: override_docs.
 --
@@ -305,6 +305,26 @@ create table if not exists public.job_listing_claims (
   )
 );
 
+create table if not exists public.job_apply_events (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete set null,
+  event_type text not null,
+  destination_type text,
+  destination_domain text,
+  event_source text,
+  session_id text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  constraint job_apply_events_event_type_check check (
+    event_type in ('listing_view', 'apply_click')
+  ),
+  constraint job_apply_events_destination_type_check check (
+    destination_type is null
+    or destination_type in ('external_url', 'recruiter_email', 'recruiter_website')
+  )
+);
+
 create table if not exists public.job_applications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -576,6 +596,10 @@ create index if not exists job_listing_claims_requester_idx on public.job_listin
 create unique index if not exists job_listing_claims_one_pending_per_user_job_idx
   on public.job_listing_claims (job_id, requested_by_user_id)
   where status = 'pending';
+
+create index if not exists job_apply_events_job_event_created_idx on public.job_apply_events (job_id, event_type, created_at desc);
+create index if not exists job_apply_events_apply_click_created_idx on public.job_apply_events (job_id, created_at desc) where event_type = 'apply_click';
+create index if not exists job_apply_events_user_created_idx on public.job_apply_events (user_id, created_at desc) where user_id is not null;
 
 create unique index if not exists job_applications_user_job_unique on public.job_applications (user_id, job_id);
 create index if not exists job_applications_user_created_idx on public.job_applications (user_id, created_at desc);

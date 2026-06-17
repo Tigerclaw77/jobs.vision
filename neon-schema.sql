@@ -299,6 +299,26 @@ create table if not exists public.job_listing_claims (
   )
 );
 
+create table if not exists public.job_apply_events (
+  id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references public.jobs(id) on delete cascade,
+  user_id text references public.profiles(id) on delete set null,
+  event_type text not null,
+  destination_type text,
+  destination_domain text,
+  event_source text,
+  session_id text,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  constraint job_apply_events_event_type_check check (
+    event_type in ('listing_view', 'apply_click')
+  ),
+  constraint job_apply_events_destination_type_check check (
+    destination_type is null
+    or destination_type in ('external_url', 'recruiter_email', 'recruiter_website')
+  )
+);
+
 create table if not exists public.job_applications (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references public.profiles(id) on delete cascade,
@@ -701,6 +721,17 @@ create unique index if not exists job_listing_claims_one_pending_per_user_job_id
   on public.job_listing_claims (job_id, requested_by_user_id)
   where status = 'pending';
 
+create index if not exists job_apply_events_job_event_created_idx
+  on public.job_apply_events (job_id, event_type, created_at desc);
+
+create index if not exists job_apply_events_apply_click_created_idx
+  on public.job_apply_events (job_id, created_at desc)
+  where event_type = 'apply_click';
+
+create index if not exists job_apply_events_user_created_idx
+  on public.job_apply_events (user_id, created_at desc)
+  where user_id is not null;
+
 create unique index if not exists job_applications_user_job_unique
   on public.job_applications (user_id, job_id);
 
@@ -834,6 +865,7 @@ $$;
 
 alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
+alter table public.job_apply_events enable row level security;
 alter table public.job_applications enable row level security;
 alter table public.job_favorites enable row level security;
 alter table public.hidden_jobs enable row level security;
@@ -914,6 +946,38 @@ create policy jobs_manager_delete_own_or_admin
     public.is_admin()
     or recruiter_id = public.current_auth_user_id()
     or posted_by = public.current_auth_user_id()
+  );
+
+drop policy if exists job_apply_events_insert_public_active_job on public.job_apply_events;
+create policy job_apply_events_insert_public_active_job
+  on public.job_apply_events
+  for insert
+  with check (
+    exists (
+      select 1
+      from public.jobs j
+      where j.id = job_id
+        and j.status = 'active'
+        and j.is_archived = false
+    )
+  );
+
+drop policy if exists job_apply_events_select_owner_or_admin on public.job_apply_events;
+create policy job_apply_events_select_owner_or_admin
+  on public.job_apply_events
+  for select
+  using (
+    public.is_admin()
+    or exists (
+      select 1
+      from public.jobs j
+      where j.id = job_id
+        and (
+          j.recruiter_id = public.current_auth_user_id()
+          or j.posted_by = public.current_auth_user_id()
+          or j.claimed_by_user_id = public.current_auth_user_id()
+        )
+    )
   );
 
 drop policy if exists job_applications_insert_own_active_job on public.job_applications;

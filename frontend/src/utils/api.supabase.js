@@ -302,6 +302,59 @@ export async function addJobToFavorites(jobId) {
   return { added: true };
 }
 
+function analyticsSessionId() {
+  const key = "jobsVisionApplyAnalyticsSession";
+  try {
+    const existing = window.localStorage.getItem(key);
+    if (existing) return existing;
+    const next =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(key, next);
+    return next;
+  } catch {
+    return "";
+  }
+}
+
+async function recordJobEvent(jobId, payload = {}) {
+  if (!jobId) return null;
+  const body = JSON.stringify({
+    ...payload,
+    session_id: analyticsSessionId() || undefined,
+  });
+
+  try {
+    const res = await fetch(`${apiBaseUrl()}/jobs/${encodeURIComponent(jobId)}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    });
+    return res.ok ? res.json().catch(() => ({ ok: true })) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function recordListingView(jobId, metadata = {}) {
+  return recordJobEvent(jobId, {
+    event_type: "listing_view",
+    source: "job_modal",
+    metadata,
+  });
+}
+
+export async function recordApplyClick(jobId, { destinationType, destination, source = "job_modal" } = {}) {
+  return recordJobEvent(jobId, {
+    event_type: "apply_click",
+    destination_type: destinationType,
+    destination,
+    source,
+  });
+}
+
 export async function applyToJob(jobId) {
   const headers = await authHeaders();
   try {

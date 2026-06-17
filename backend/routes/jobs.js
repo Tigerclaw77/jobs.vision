@@ -138,6 +138,12 @@ const LISTING_REPORT_REASONS = new Set([
   "duplicate_listing",
   "other",
 ]);
+const JOB_APPLY_EVENT_TYPES = new Set(["listing_view", "apply_click"]);
+const JOB_APPLY_DESTINATION_TYPES = new Set([
+  "external_url",
+  "recruiter_email",
+  "recruiter_website",
+]);
 
 const PUBLIC_JOB_COLUMN_NAMES = [
   "id",
@@ -458,6 +464,57 @@ function isImportedListing(job = {}) {
     job.source === "imported" ||
     Boolean(job.external_apply_url)
   );
+}
+
+function normalizeApplyEventType(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (normalized === "view") return "listing_view";
+  if (normalized === "apply" || normalized === "outbound_apply") return "apply_click";
+  return JOB_APPLY_EVENT_TYPES.has(normalized) ? normalized : null;
+}
+
+function normalizeApplyDestinationType(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (normalized === "email" || normalized === "apply_email") return "recruiter_email";
+  if (normalized === "url" || normalized === "apply_url") return "external_url";
+  return JOB_APPLY_DESTINATION_TYPES.has(normalized) ? normalized : null;
+}
+
+function inferApplyDestinationType(job = {}) {
+  if (job.external_apply_url) {
+    return job.listing_source === "employer_submitted" ? "recruiter_website" : "external_url";
+  }
+  if (job.application_email) return "recruiter_email";
+  return null;
+}
+
+function destinationDomainFor({ destinationType, destination, job = {} }) {
+  if (destinationType === "recruiter_email") {
+    const email = String(destination || job.application_email || "").trim();
+    const domain = email.includes("@") ? email.split("@").pop() : "";
+    return domain ? domain.toLowerCase().slice(0, 255) : null;
+  }
+
+  const url = destination || job.external_apply_url || "";
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) return null;
+    return parsed.hostname.replace(/^www\./i, "").toLowerCase().slice(0, 255);
+  } catch {
+    return null;
+  }
+}
+
+function shortNullableText(value, maxLength = 255) {
+  const text = toNullableText(value);
+  return text ? text.slice(0, maxLength) : null;
 }
 
 function normalizeOptionalChoice(value, aliases, message, code) {
@@ -1063,6 +1120,15 @@ router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
     const selectWithPayment = `
       select
         j.*,
+        coalesce(event_stats.view_count, 0)::int as analytics_views,
+        coalesce(event_stats.apply_click_count, 0)::int as apply_clicks,
+        coalesce(favorite_stats.save_count, 0)::int as saves_count,
+        coalesce(favorite_stats.save_count, 0)::int as analytics_saves,
+        case
+          when coalesce(event_stats.view_count, 0) = 0 then 0::numeric
+          else round((coalesce(event_stats.apply_click_count, 0)::numeric / event_stats.view_count::numeric) * 100, 1)
+        end as apply_rate,
+        event_stats.last_apply_click_at,
         case
           when rpp.id is null then null
           else json_build_object(
@@ -1088,6 +1154,19 @@ router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
         order by updated_at desc nulls last, created_at desc
         limit 1
       ) rpp on true
+      left join lateral (
+        select
+          count(*) filter (where event_type = 'listing_view')::int as view_count,
+          count(*) filter (where event_type = 'apply_click')::int as apply_click_count,
+          max(created_at) filter (where event_type = 'apply_click') as last_apply_click_at
+        from public.job_apply_events jae
+        where jae.job_id = j.id
+      ) event_stats on true
+      left join lateral (
+        select count(*)::int as save_count
+        from public.job_favorites jf
+        where jf.job_id = j.id
+      ) favorite_stats on true
     `;
     const result = isAdmin(req.user)
       ? await query(`${selectWithPayment} order by j.posted_at desc`)
@@ -1183,6 +1262,87 @@ router.post("/:id/report", maybeAuth, async (req, res) => {
   } catch (e) {
     console.error("Report listing issue error:", e);
     return res.status(500).json({ error: "Failed to submit listing report" });
+  }
+});
+
+router.post("/:id/events", maybeAuth, async (req, res) => {
+  try {
+    const eventType = normalizeApplyEventType(req.body?.event_type || req.body?.eventType);
+    if (!eventType) {
+      return res.status(400).json({ error: "Choose a valid apply event type." });
+    }
+
+    const job = await one(
+      `
+        select
+          jobs.id,
+          jobs.external_apply_url,
+          jobs.application_email,
+          jobs.listing_source
+        from public.jobs jobs
+        where jobs.id = $1
+          and jobs.status = 'active'
+          and jobs.is_archived = false
+          and ${rejectedImportVisibilityFilterSql("jobs")}
+      `,
+      [req.params.id]
+    );
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const bodyDestinationType = normalizeApplyDestinationType(
+      req.body?.destination_type || req.body?.destinationType
+    );
+    const destinationType =
+      eventType === "apply_click"
+        ? bodyDestinationType || inferApplyDestinationType(job)
+        : bodyDestinationType;
+
+    if (eventType === "apply_click" && !destinationType) {
+      return res.status(400).json({ error: "Apply destination is required." });
+    }
+
+    const destinationDomain = destinationDomainFor({
+      destinationType,
+      destination: req.body?.destination,
+      job,
+    });
+    const metadata =
+      req.body?.metadata && typeof req.body.metadata === "object" && !Array.isArray(req.body.metadata)
+        ? req.body.metadata
+        : {};
+
+    const event = await one(
+      `
+        insert into public.job_apply_events (
+          job_id,
+          user_id,
+          event_type,
+          destination_type,
+          destination_domain,
+          event_source,
+          session_id,
+          metadata
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        returning id, created_at
+      `,
+      [
+        job.id,
+        req.user?.id || null,
+        eventType,
+        destinationType || null,
+        destinationDomain,
+        shortNullableText(req.body?.source || req.body?.eventSource, 80),
+        shortNullableText(req.body?.session_id || req.body?.sessionId, 128),
+        JSON.stringify(metadata),
+      ]
+    );
+
+    return res.status(201).json({ ok: true, event });
+  } catch (e) {
+    console.error("Track job apply event error:", e);
+    return res.status(500).json({ error: "Failed to track job event" });
   }
 });
 

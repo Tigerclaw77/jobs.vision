@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import RecruiterJobCard from "./RecruiterJobCard";
 
 const TAB_ORDER = ["active", "pending", "draft", "paused", "expired", "archived", "featured"];
+const SECONDARY_TABS = new Set(["featured"]);
 
 const TAB_LABELS = {
   draft: "Unfinished",
@@ -16,6 +17,8 @@ const TAB_LABELS = {
 const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchive }) => {
   const [activeTab, setActiveTab] = useState("active");
   const tabs = useMemo(() => TAB_ORDER.filter((key) => key in jobsByStatus), [jobsByStatus]);
+  const primaryTabs = tabs.filter((key) => !SECONDARY_TABS.has(key));
+  const secondaryTabs = tabs.filter((key) => SECONDARY_TABS.has(key));
   const jobs = jobsByStatus[activeTab] || [];
 
   useEffect(() => {
@@ -26,7 +29,7 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
   return (
     <div className="job-tabs">
       <div className="tab-buttons">
-        {tabs.map((key) => (
+        {primaryTabs.map((key) => (
           <button
             key={key}
             type="button"
@@ -38,6 +41,21 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
         ))}
       </div>
 
+      {secondaryTabs.length > 0 && (
+        <div className="tab-secondary-filters" aria-label="Secondary listing filters">
+          {secondaryTabs.map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setActiveTab(key)}
+              className={activeTab === key ? "active" : ""}
+            >
+              {TAB_LABELS[key]} ({jobsByStatus[key].length})
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="tab-content">
         {jobs.length > 0 ? (
           <div className="recruiter-job-list">
@@ -48,7 +66,7 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
               <span>Type</span>
               <span>Status</span>
               <span>Posted</span>
-              <span>Applicants</span>
+              <span>Performance</span>
               <span>Actions</span>
             </div>
             {jobs.map((job) => (

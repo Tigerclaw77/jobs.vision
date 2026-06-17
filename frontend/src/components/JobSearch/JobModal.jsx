@@ -52,6 +52,8 @@ export default function JobModal({
   isHidden = false,
   onClose,
   isAuthed,
+  onListingView,
+  onOutboundApply,
 }) {
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("expired");
@@ -64,6 +66,11 @@ export default function JobModal({
     else document.body.classList.remove("modal-open");
     return () => document.body.classList.remove("modal-open");
   }, [isOpen]);
+
+  useEffect(() => {
+    const jobId = job?._id || job?.id;
+    if (isOpen && jobId) onListingView?.(jobId);
+  }, [isOpen, job?._id, job?.id, onListingView]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -109,6 +116,13 @@ export default function JobModal({
   const listingOpportunityType = job.listing_opportunity_type || "job";
   const claimStatus = job.claim_status || "unclaimed";
   const isImportedListing = job.listing_source === "imported" || listingTier === "imported";
+  const outboundDestinationType = externalApplyUrl
+    ? job.listing_source === "employer_submitted"
+      ? "recruiter_website"
+      : "external_url"
+    : emailApplyUrl
+    ? "recruiter_email"
+    : null;
   const isClaimedListing = claimStatus === "claimed" || Boolean(job.claimed_by_user_id);
   const showClaimAction = Boolean(onClaim && isImportedListing && !isClaimedListing);
   const badges = [
@@ -158,6 +172,15 @@ export default function JobModal({
     } finally {
       setIsReporting(false);
     }
+  }
+
+  function handleOutboundApply() {
+    const jobId = job?._id || job?.id;
+    if (!jobId || !outboundDestinationType) return;
+    onOutboundApply?.(jobId, {
+      destinationType: outboundDestinationType,
+      destination: externalApplyUrl || applyEmail,
+    });
   }
 
   return (
@@ -311,23 +334,25 @@ export default function JobModal({
                 : "Claim this Listing"}
             </button>
           )}
-          {externalApplyUrl || emailApplyUrl ? (
+          {(externalApplyUrl || emailApplyUrl) && (
             <a
               className="btn-primary"
               href={externalApplyUrl || emailApplyUrl}
               target={externalApplyUrl ? "_blank" : undefined}
               rel={externalApplyUrl ? "noreferrer" : undefined}
               title={externalApplyUrl ? "Apply on employer site" : "Apply by email"}
+              onClick={handleOutboundApply}
             >
               {externalApplyUrl ? "Apply on Employer Site" : "Apply by Email"}
             </a>
-          ) : !isApplied && (
+          )}
+          {!externalApplyUrl && !emailApplyUrl && !isApplied && (
             <button
               className="btn-primary"
               onClick={() => onApply(job._id)}
               title="Apply to this job"
             >
-              {isAuthed ? "Apply Now" : "Sign in to Apply"}
+              {isAuthed ? "Mark as Applied" : "Sign in to Mark Applied"}
             </button>
           )}
           <button className="btn-secondary" onClick={onClose}>

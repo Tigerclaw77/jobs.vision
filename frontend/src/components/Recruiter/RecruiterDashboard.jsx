@@ -194,9 +194,15 @@ const RecruiterDashboard = () => {
 
         <section className="recruiter-listings-section" aria-label="My jobs">
           {!showForm ? (
-            <div className="recruiter-action-row">
+            <div className="recruiter-primary-cta-panel">
+              <div>
+                <span className="recruiter-primary-cta-kicker">Ready to hire?</span>
+                <h2>Post a job</h2>
+                <p>Create a listing, choose the role, and continue to checkout.</p>
+              </div>
               <button
                 type="button"
+                className="recruiter-primary-cta"
                 onClick={handleAddJobClick}
               >
                 Post New Job
@@ -226,6 +232,13 @@ const RecruiterDashboard = () => {
             </>
           )}
 
+          <div className="recruiter-listings-heading">
+            <div>
+              <span>Existing Listings</span>
+              <h2>Manage jobs</h2>
+            </div>
+          </div>
+
           <JobTabs
             jobsByStatus={categorizedJobs}
             onEdit={handleEdit}
@@ -237,7 +250,10 @@ const RecruiterDashboard = () => {
         </section>
 
         <details className="recruiter-secondary-panel" aria-label="Recruiter account tools">
-          <summary>Account tools</summary>
+          <summary>
+            <span>Account Tools</span>
+            <small>Business details, applicants, and verification</small>
+          </summary>
           <div className="recruiter-secondary-content">
             <div className="recruiter-current-posting">
               <span>Posting checkout</span>
