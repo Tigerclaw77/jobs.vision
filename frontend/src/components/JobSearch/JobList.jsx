@@ -25,7 +25,9 @@ import Pagination from "./Pagination";
 import { buildLookupFromJobs, smartParseQuery } from "../../utils/smartParseQuery";
 import { JOB_SORT_MODES, normalizeSortMode, rankJobs } from "../../utils/jobRanking";
 import {
+  BENEFIT_FLAG_LABELS,
   BRAND_FILTER_LABELS,
+  CLINICAL_FOCUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   OPPORTUNITY_TYPE_LABELS,
   PRACTICE_TYPE_LABELS,
@@ -264,6 +266,8 @@ async function geocodeAddress(address, apiKey) {
 const TYPE_LABEL = EMPLOYMENT_TYPE_LABELS;
 const OPPORTUNITY_TYPE_LABEL = OPPORTUNITY_TYPE_LABELS;
 const PRACTICE_TYPE_LABEL = PRACTICE_TYPE_LABELS;
+const CLINICAL_FOCUS_LABEL = CLINICAL_FOCUS_LABELS;
+const BENEFIT_FLAG_LABEL = BENEFIT_FLAG_LABELS;
 const SATURDAY_SCHEDULE_LABEL = SATURDAY_SCHEDULE_LABELS;
 const WORK_ARRANGEMENT_LABEL = WORK_ARRANGEMENT_LABELS;
 const titleCase = (s = "") =>
@@ -293,6 +297,27 @@ function jobValues(job, pluralField, singularField, fallbackField = null) {
   );
 }
 
+function mergedUnique(values = []) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function includesSelectedValues(values = [], selectedSet = new Set()) {
+  if (selectedSet.size === 0) return true;
+  const valueSet = new Set(values.map(normalizeType));
+  return [...selectedSet].every((value) => valueSet.has(value));
+}
+
+function benefitValuesForJob(job = {}) {
+  const structured = normalizeMultiValue(job?.benefit_flags, normalizeType);
+  const fallback = [
+    job?.sign_on_bonus && "sign_on_bonus",
+    job?.ce_allowance && "ce_allowance",
+    job?.relocation_assistance && "relocation_assistance",
+    job?.student_loan_assistance && "student_loan_assistance",
+  ].filter(Boolean);
+  return mergedUnique([...structured, ...fallback]);
+}
+
 function hasUnlimitedCandidateSaves(user, userRole) {
   if (String(userRole || "").toLowerCase() === "admin") return true;
   const candidate = user?.entitlements?.candidate;
@@ -317,7 +342,9 @@ const DEFAULT_FILTERS = {
   employmentTypes: [],
   workArrangements: [],
   opportunityTypes: [],
+  clinicalFocuses: [],
   practiceTypes: [],
+  benefitFlags: [],
   saturdaySchedules: [],
   includeBrand: [],
   excludeBrand: [],
@@ -330,7 +357,9 @@ const ARRAY_FILTER_KEYS = new Set([
   "employmentTypes",
   "workArrangements",
   "opportunityTypes",
+  "clinicalFocuses",
   "practiceTypes",
+  "benefitFlags",
   "saturdaySchedules",
   "includeBrand",
   "excludeBrand",
@@ -422,6 +451,27 @@ export default function JobList() {
     () => `${includeBrandFilter.join("|")}::${excludeBrandFilter.join("|")}`,
     [includeBrandFilter, excludeBrandFilter]
   );
+  const clinicalFocusFilter = useMemo(
+    () => normalizeFilterArray(filters.clinicalFocuses),
+    [filters.clinicalFocuses]
+  );
+  const practiceTypeFilter = useMemo(
+    () => normalizeFilterArray(filters.practiceTypes),
+    [filters.practiceTypes]
+  );
+  const benefitFlagFilter = useMemo(
+    () => normalizeFilterArray(filters.benefitFlags),
+    [filters.benefitFlags]
+  );
+  const structuredFilterKey = useMemo(
+    () =>
+      [
+        clinicalFocusFilter.join("|"),
+        practiceTypeFilter.join("|"),
+        benefitFlagFilter.join("|"),
+      ].join("::"),
+    [clinicalFocusFilter, practiceTypeFilter, benefitFlagFilter]
+  );
 
   // interactions
   const [favorites, setFavorites] = useState(new Set());
@@ -461,6 +511,9 @@ export default function JobList() {
         const list = await fetchJobs({
           includeBrand: includeBrandFilter,
           excludeBrand: excludeBrandFilter,
+          clinicalFocuses: clinicalFocusFilter,
+          practiceTypes: practiceTypeFilter,
+          benefitFlags: benefitFlagFilter,
         });
         setJobs(list || []);
         setFilteredJobs(list || []);
@@ -472,7 +525,15 @@ export default function JobList() {
       }
     };
     load();
-  }, [brandFilterKey, includeBrandFilter, excludeBrandFilter]);
+  }, [
+    brandFilterKey,
+    structuredFilterKey,
+    includeBrandFilter,
+    excludeBrandFilter,
+    clinicalFocusFilter,
+    practiceTypeFilter,
+    benefitFlagFilter,
+  ]);
 
   useEffect(() => {
   document.body.classList.add('dim-bg');
@@ -696,19 +757,37 @@ export default function JobList() {
         value,
         label:
           WORK_ARRANGEMENT_LABEL[normalizeType(value)] ||
+            titleCase(value.replace(/_/g, " ")),
+      });
+    });
+    normalizeFilterArray(filters.clinicalFocuses).forEach((value) => {
+      tags.push({
+        type: "clinicalFocuses",
+        value,
+        label:
+          CLINICAL_FOCUS_LABEL[normalizeType(value)] ||
+          titleCase(value.replace(/_/g, " ")),
+      });
+    });
+    normalizeFilterArray(filters.practiceTypes).forEach((value) => {
+      tags.push({
+        type: "practiceTypes",
+        value,
+        label:
+          PRACTICE_TYPE_LABEL[normalizeType(value)] ||
+          titleCase(value.replace(/_/g, " ")),
+      });
+    });
+    normalizeFilterArray(filters.benefitFlags).forEach((value) => {
+      tags.push({
+        type: "benefitFlags",
+        value,
+        label:
+          BENEFIT_FLAG_LABEL[normalizeType(value)] ||
           titleCase(value.replace(/_/g, " ")),
       });
     });
     if (canUseAdvancedOdFilters && includesOptometristRole(filters.roles)) {
-      normalizeFilterArray(filters.practiceTypes).forEach((value) => {
-        tags.push({
-          type: "practiceTypes",
-          value,
-          label:
-            PRACTICE_TYPE_LABEL[normalizeType(value)] ||
-            titleCase(value.replace(/_/g, " ")),
-        });
-      });
       normalizeFilterArray(filters.saturdaySchedules).forEach((value) => {
         tags.push({
           type: "saturdaySchedules",
@@ -754,7 +833,9 @@ export default function JobList() {
         employmentTypes = [],
         workArrangements = [],
         opportunityTypes = [],
+        clinicalFocuses = [],
         practiceTypes = [],
+        benefitFlags = [],
         saturdaySchedules = [],
         includeBrand = [],
         excludeBrand = [],
@@ -777,7 +858,9 @@ export default function JobList() {
       const qLower = q.trim().toLowerCase();
       const employmentSet = new Set(normalizeFilterArray(employmentTypes).map(normalizeType));
       const workArrangementSet = new Set(normalizeFilterArray(workArrangements).map(normalizeType));
+      const clinicalFocusSet = new Set(normalizeFilterArray(clinicalFocuses).map(normalizeType));
       const practiceSet = new Set(normalizeFilterArray(practiceTypes).map(normalizeType));
+      const benefitFlagSet = new Set(normalizeFilterArray(benefitFlags).map(normalizeType));
       const saturdaySet = new Set(normalizeFilterArray(saturdaySchedules).map(normalizeType));
       const roleSet = new Set(
         normalizeRoleFilters(roles)
@@ -786,7 +869,6 @@ export default function JobList() {
       const opportunitySet = odFiltersEnabled
         ? new Set(normalizeFilterArray(opportunityTypes).map(normalizeType))
         : new Set();
-      const activePracticeSet = odFiltersEnabled ? practiceSet : new Set();
       const activeSaturdaySet = odFiltersEnabled ? saturdaySet : new Set();
       const includeBrandSet = new Set(expandBrandFilterValues(includeBrand).map((value) => value.toLowerCase()));
       const excludeBrandSet = new Set(expandBrandFilterValues(excludeBrand).map((value) => value.toLowerCase()));
@@ -798,6 +880,9 @@ export default function JobList() {
         const employmentValues = jobValues(job, "employment_types", "employment_type", "type");
         const workArrangementValues = jobValues(job, "work_arrangements", "work_arrangement");
         const opportunityValues = jobValues(job, "opportunity_types", "opportunity_type");
+        const clinicalFocusValues = jobValues(job, "clinical_focuses", "clinical_focus");
+        const practiceValues = jobValues(job, "practice_types", "practice_type");
+        const benefitValues = benefitValuesForJob(job);
         const saturdaySchedule = normalizeType(job.saturday_schedule);
 
         const hay = [
@@ -819,8 +904,12 @@ export default function JobList() {
           ...workArrangementValues.map((value) => WORK_ARRANGEMENT_LABEL[value]),
           ...opportunityValues,
           ...opportunityValues.map((value) => OPPORTUNITY_TYPE_LABEL[value]),
-          job.practice_type,
-          PRACTICE_TYPE_LABEL[normalizeType(job.practice_type)],
+          ...clinicalFocusValues,
+          ...clinicalFocusValues.map((value) => CLINICAL_FOCUS_LABEL[value]),
+          ...practiceValues,
+          ...practiceValues.map((value) => PRACTICE_TYPE_LABEL[value]),
+          ...benefitValues,
+          ...benefitValues.map((value) => BENEFIT_FLAG_LABEL[value]),
           saturdaySchedule,
           SATURDAY_SCHEDULE_LABEL[saturdaySchedule],
           job.location,
@@ -838,8 +927,10 @@ export default function JobList() {
           workArrangementValues.some((value) => workArrangementSet.has(value));
         const matchOpportunity =
           opportunitySet.size === 0 || opportunityValues.some((value) => opportunitySet.has(value));
+        const matchClinicalFocus = includesSelectedValues(clinicalFocusValues, clinicalFocusSet);
         const matchPractice =
-          activePracticeSet.size === 0 || activePracticeSet.has(normalizeType(job.practice_type));
+          includesSelectedValues(practiceValues, practiceSet);
+        const matchBenefits = includesSelectedValues(benefitValues, benefitFlagSet);
         const matchSaturday =
           activeSaturdaySet.size === 0 || activeSaturdaySet.has(saturdaySchedule);
         const matchCompany =
@@ -870,7 +961,9 @@ export default function JobList() {
           matchEmployment &&
           matchWorkArrangement &&
           matchOpportunity &&
+          matchClinicalFocus &&
           matchPractice &&
+          matchBenefits &&
           matchSaturday &&
           matchCompany &&
           matchIncludeBrand &&
@@ -940,7 +1033,9 @@ export default function JobList() {
       filters.includeBrand,
       filters.excludeBrand,
       odFiltersEnabled ? filters.opportunityTypes : [],
-      odFiltersEnabled ? filters.practiceTypes : [],
+      filters.clinicalFocuses,
+      filters.practiceTypes,
+      filters.benefitFlags,
       odFiltersEnabled ? filters.saturdaySchedules : [],
     ].some((value) => normalizeFilterArray(value).length > 0);
     const hasNonLocationNarrowing = Boolean(

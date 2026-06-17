@@ -1,11 +1,11 @@
 export const ROLE_OPTIONS = [
   { value: "optometrist", label: "Optometrist" },
   { value: "optician", label: "Optician" },
-  { value: "ophthalmic_technician", label: "Ophthalmic Technician" },
+  { value: "ophthalmic_technician", label: "Tech" },
   { value: "optical_lab", label: "Optical Lab" },
   { value: "front_desk", label: "Front Desk" },
-  { value: "practice_manager", label: "Practice Manager" },
-  { value: "optical_manager", label: "Optical Manager" },
+  { value: "practice_manager", label: "Manager" },
+  { value: "optical_manager", label: "Manager" },
   { value: "other", label: "Other" },
 ];
 
@@ -32,8 +32,35 @@ export const WORK_ARRANGEMENT_OPTIONS = [
 
 export const PRACTICE_TYPE_OPTIONS = [
   { value: "private_practice", label: "Private Practice" },
-  { value: "corporate", label: "Corporate" },
+  { value: "family_practice", label: "Family Practice" },
+  { value: "retail_optical", label: "Retail Optical" },
   { value: "od_md", label: "OD/MD" },
+  { value: "multi_location_group", label: "Multi-Location Group" },
+  { value: "academic", label: "Academic" },
+  { value: "nonprofit", label: "Nonprofit" },
+  { value: "government", label: "Government" },
+];
+
+export const CLINICAL_FOCUS_OPTIONS = [
+  { value: "dry_eye", label: "Dry Eye" },
+  { value: "myopia_management", label: "Myopia Management" },
+  { value: "specialty_contact_lenses", label: "Specialty Contact Lenses" },
+  { value: "vision_therapy", label: "Vision Therapy" },
+  { value: "medical_optometry", label: "Medical Optometry" },
+  { value: "pediatrics", label: "Pediatrics" },
+  { value: "glaucoma", label: "Glaucoma" },
+  { value: "low_vision", label: "Low Vision" },
+  { value: "primary_care", label: "Primary Care" },
+  { value: "refractive_surgical_comanagement", label: "Refractive / Surgical Co-Management" },
+  { value: "scleral_lenses", label: "Scleral Lenses" },
+  { value: "ocular_disease", label: "Ocular Disease" },
+];
+
+export const BENEFIT_FLAG_OPTIONS = [
+  { value: "sign_on_bonus", label: "Sign-on Bonus" },
+  { value: "ce_allowance", label: "CE Allowance" },
+  { value: "relocation_assistance", label: "Relocation Assistance" },
+  { value: "student_loan_assistance", label: "Student Loan Assistance" },
 ];
 
 export const SATURDAY_SCHEDULE_OPTIONS = [
@@ -99,6 +126,8 @@ export const OPPORTUNITY_TYPE_LABELS = optionMap(OPPORTUNITY_TYPE_OPTIONS);
 export const EMPLOYMENT_TYPE_LABELS = optionMap(EMPLOYMENT_TYPE_OPTIONS);
 export const WORK_ARRANGEMENT_LABELS = optionMap(WORK_ARRANGEMENT_OPTIONS);
 export const PRACTICE_TYPE_LABELS = optionMap(PRACTICE_TYPE_OPTIONS);
+export const CLINICAL_FOCUS_LABELS = optionMap(CLINICAL_FOCUS_OPTIONS);
+export const BENEFIT_FLAG_LABELS = optionMap(BENEFIT_FLAG_OPTIONS);
 export const SATURDAY_SCHEDULE_LABELS = optionMap(SATURDAY_SCHEDULE_OPTIONS);
 export const BRAND_FILTER_LABELS = optionMap(BRAND_FILTER_OPTIONS);
 export const COMPENSATION_TYPE_LABELS = optionMap(COMPENSATION_TYPE_OPTIONS);

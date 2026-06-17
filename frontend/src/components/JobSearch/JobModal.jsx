@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import { reportListingIssue } from "../../utils/api";
 import {
+  BENEFIT_FLAG_LABELS,
+  CLINICAL_FOCUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   LISTING_OPPORTUNITY_TYPE_LABELS,
   LISTING_TIER_LABELS,
@@ -93,10 +95,18 @@ export default function JobModal({
     EMPLOYMENT_TYPE_LABELS,
     job.employment_types || job.employment_type || job.type
   ).join(", ");
+  const clinicalFocusLabels = labelsForValues(CLINICAL_FOCUS_LABELS, job.clinical_focuses);
+  const practiceTypeLabels = labelsForValues(PRACTICE_TYPE_LABELS, job.practice_types);
+  const benefitFlagLabels = labelsForValues(BENEFIT_FLAG_LABELS, job.benefit_flags);
+  const structuredSections = [
+    ["Clinical Focus", clinicalFocusLabels],
+    ["Practice Type", practiceTypeLabels],
+    ["Benefits & Incentives", benefitFlagLabels],
+  ].filter(([, values]) => values.length > 0);
   const jobDetails = [
     ["Role", ROLE_LABELS[role] || job.role || ""],
     ["Opportunity Type", opportunityLabels.join(", ")],
-    ["Practice Type", PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Practice Type", practiceTypeLabels.length ? "" : PRACTICE_TYPE_LABELS[job.practice_type] || ""],
     ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
     ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
     ["Sign-on Bonus", job.sign_on_bonus || ""],
@@ -266,6 +276,23 @@ export default function JobModal({
               <p key={label}>
                 <strong>{label}:</strong> {value}
               </p>
+            ))}
+          </div>
+        )}
+
+        {structuredSections.length > 0 && (
+          <div className="modal-structured-details" aria-label="Structured job attributes">
+            {structuredSections.map(([label, values]) => (
+              <section key={label} className="modal-structured-section">
+                <h4>{label}</h4>
+                <div className="modal-attribute-list">
+                  {values.map((value) => (
+                    <span key={value} className="modal-attribute-pill">
+                      {value}
+                    </span>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

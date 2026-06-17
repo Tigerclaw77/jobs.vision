@@ -1145,6 +1145,39 @@
   color:rgba(219,230,255,.86);
   font-size:.9rem;
 }
+.modal-structured-details{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+  gap:10px;
+  margin:12px 0 0;
+}
+.modal-structured-section{
+  min-width:0;
+}
+.modal-structured-section h4{
+  margin:0 0 6px;
+  color:#fff;
+  font-size:.92rem;
+  font-weight:850;
+}
+.modal-attribute-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.modal-attribute-pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:3px 8px;
+  border:1px solid rgba(147,197,253,.34);
+  border-radius:999px;
+  background:rgba(147,197,253,.12);
+  color:#e8f2ff;
+  font-size:.8rem;
+  font-weight:750;
+  line-height:1.15;
+}
 .modal-description-block{
   flex:1 1 auto;
   display:flex;

@@ -7,18 +7,18 @@ const PricingTiers = () => {
       <div style={styles.tiers}>
         <div style={styles.tier}>
           <h3>Staff Position</h3>
-          <p>$79 first 30 days</p>
-          <p>$49 every 30 days thereafter</p>
+          <p>$79 first month</p>
+          <p>$49/mo after</p>
         </div>
         <div style={styles.tier}>
           <h3>Manager Position</h3>
-          <p>$149 first 30 days</p>
-          <p>$99 every 30 days thereafter</p>
+          <p>$149 first month</p>
+          <p>$99/mo after</p>
         </div>
         <div style={styles.tier}>
           <h3>Doctor Position</h3>
-          <p>$299 first 30 days</p>
-          <p>$149 every 30 days thereafter</p>
+          <p>$299 first month</p>
+          <p>$149/mo after</p>
         </div>
       </div>
     </div>

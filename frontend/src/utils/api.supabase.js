@@ -117,6 +117,9 @@ function mapJobRow(row = {}) {
     hourly_max: row.hourly_max,
     daily_rate: row.daily_rate,
     compensation_notes: row.compensation_notes || "",
+    clinical_focuses: normalizeMultiValue(row.clinical_focuses),
+    practice_types: normalizeMultiValue(row.practice_types || row.practice_type),
+    benefit_flags: normalizeMultiValue(row.benefit_flags),
     featured: row.featured === true,
     source: row.source || "",
     seed_batch: row.seed_batch || "",
@@ -168,6 +171,9 @@ export async function fetchJobsPage({
   sort = "best_match",
   includeBrand = [],
   excludeBrand = [],
+  clinicalFocuses = [],
+  practiceTypes = [],
+  benefitFlags = [],
 } = {}) {
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
   const safeOffset = Math.max(0, Number(offset) || 0);
@@ -178,6 +184,9 @@ export async function fetchJobsPage({
   });
   appendArrayParam(params, "includeBrand", expandBrandFilterValues(includeBrand));
   appendArrayParam(params, "excludeBrand", expandBrandFilterValues(excludeBrand));
+  appendArrayParam(params, "clinicalFocuses", clinicalFocuses);
+  appendArrayParam(params, "practiceTypes", practiceTypes);
+  appendArrayParam(params, "benefitFlags", benefitFlags);
   const data = await apiJson(`/jobs?${params.toString()}`);
   const legacyArrayResponse = Array.isArray(data);
   const rows = legacyArrayResponse ? data : data?.items || [];
@@ -195,6 +204,9 @@ export async function fetchJobs({
   sort = "best_match",
   includeBrand = [],
   excludeBrand = [],
+  clinicalFocuses = [],
+  practiceTypes = [],
+  benefitFlags = [],
 } = {}) {
   const safeLimit = Math.min(100, Math.max(1, Number(limit) || 100));
   const jobs = [];
@@ -208,6 +220,9 @@ export async function fetchJobs({
       sort,
       includeBrand,
       excludeBrand,
+      clinicalFocuses,
+      practiceTypes,
+      benefitFlags,
     });
     jobs.push(...result.jobs);
     total = Number.isFinite(result.total) ? result.total : jobs.length;

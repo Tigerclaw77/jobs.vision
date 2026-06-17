@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Lock, Navigation, SlidersHorizontal } from "lucide-react";
 import {
+  BENEFIT_FLAG_OPTIONS,
+  CLINICAL_FOCUS_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
   BRAND_FILTER_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
@@ -113,6 +115,7 @@ export default function JobFilter({
 }) {
   const [locLoading, setLocLoading] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [structuredOpen, setStructuredOpen] = useState(false);
   const set = (patch) => onFilterChange({ ...filters, ...patch });
   const hasLocation =
     Boolean(String(filters.location || "").trim()) ||
@@ -123,6 +126,16 @@ export default function JobFilter({
     : [];
   const odFiltersEnabled =
     canUseAdvancedOdFilters && selectedRoles.includes("optometrist");
+  const hasStructuredFilters =
+    (filters.clinicalFocuses || []).length > 0 ||
+    (filters.practiceTypes || []).length > 0 ||
+    (filters.benefitFlags || []).length > 0;
+
+  useEffect(() => {
+    if (hasStructuredFilters) {
+      setStructuredOpen(true);
+    }
+  }, [hasStructuredFilters]);
 
   const toggleMulti = (key, value) => {
     const current = Array.isArray(filters[key]) ? filters[key] : [];
@@ -327,6 +340,44 @@ export default function JobFilter({
           onToggle={(value) => toggleMulti("workArrangements", value)}
         />
 
+        <div className="advanced-filter-shell structured-filter-shell">
+          <button
+            className="advanced-toggle structured-toggle"
+            type="button"
+            aria-expanded={structuredOpen}
+            onClick={() => setStructuredOpen((open) => !open)}
+          >
+            <span className="advanced-toggle-title">
+              <SlidersHorizontal size={15} aria-hidden="true" />
+              <span>More Filters</span>
+            </span>
+            <span aria-hidden="true">{structuredOpen ? "-" : "+"}</span>
+          </button>
+
+          {structuredOpen && (
+            <div className="advanced-filter-content structured-filter-content">
+              <FilterChecks
+                legend="Clinical Focus"
+                options={CLINICAL_FOCUS_OPTIONS}
+                selected={filters.clinicalFocuses}
+                onToggle={(value) => toggleMulti("clinicalFocuses", value)}
+              />
+              <FilterChecks
+                legend="Practice Type"
+                options={PRACTICE_TYPE_OPTIONS}
+                selected={filters.practiceTypes}
+                onToggle={(value) => toggleMulti("practiceTypes", value)}
+              />
+              <FilterChecks
+                legend="Benefits & Incentives"
+                options={BENEFIT_FLAG_OPTIONS}
+                selected={filters.benefitFlags}
+                onToggle={(value) => toggleMulti("benefitFlags", value)}
+              />
+            </div>
+          )}
+        </div>
+
         <div
           className={`advanced-filter-shell ${
             canUseAdvancedOdFilters ? "advanced-filter-unlocked" : "advanced-filter-locked"
@@ -359,13 +410,6 @@ export default function JobFilter({
                 options={OPPORTUNITY_TYPE_OPTIONS}
                 selected={filters.opportunityTypes}
                 onToggle={(value) => toggleMulti("opportunityTypes", value)}
-                disabled={!odFiltersEnabled}
-              />
-              <FilterChecks
-                legend="Practice Type"
-                options={PRACTICE_TYPE_OPTIONS}
-                selected={filters.practiceTypes}
-                onToggle={(value) => toggleMulti("practiceTypes", value)}
                 disabled={!odFiltersEnabled}
               />
               <FilterChecks

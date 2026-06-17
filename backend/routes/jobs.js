@@ -109,6 +109,69 @@ const COMPENSATION_TYPE_ALIASES = new Map([
   ["production", "production_based"],
   ["other", "other"],
 ]);
+const CLINICAL_FOCUS_ALIASES = new Map([
+  ["dry eye", "dry_eye"],
+  ["dry_eye", "dry_eye"],
+  ["myopia management", "myopia_management"],
+  ["myopia_management", "myopia_management"],
+  ["myopia control", "myopia_management"],
+  ["specialty contact lenses", "specialty_contact_lenses"],
+  ["specialty_contact_lenses", "specialty_contact_lenses"],
+  ["specialty contacts", "specialty_contact_lenses"],
+  ["vision therapy", "vision_therapy"],
+  ["vision_therapy", "vision_therapy"],
+  ["medical optometry", "medical_optometry"],
+  ["medical_optometry", "medical_optometry"],
+  ["pediatrics", "pediatrics"],
+  ["pediatric", "pediatrics"],
+  ["glaucoma", "glaucoma"],
+  ["low vision", "low_vision"],
+  ["low_vision", "low_vision"],
+  ["primary care", "primary_care"],
+  ["primary_care", "primary_care"],
+  ["refractive surgical co management", "refractive_surgical_comanagement"],
+  ["refractive surgical comanagement", "refractive_surgical_comanagement"],
+  ["refractive_surgical_comanagement", "refractive_surgical_comanagement"],
+  ["scleral lenses", "scleral_lenses"],
+  ["scleral_lenses", "scleral_lenses"],
+  ["scleral lens", "scleral_lenses"],
+  ["ocular disease", "ocular_disease"],
+  ["ocular_disease", "ocular_disease"],
+]);
+const PRACTICE_TYPE_ALIASES = new Map([
+  ["private practice", "private_practice"],
+  ["private_practice", "private_practice"],
+  ["family practice", "family_practice"],
+  ["family_practice", "family_practice"],
+  ["retail optical", "retail_optical"],
+  ["retail_optical", "retail_optical"],
+  ["retail", "retail_optical"],
+  ["corporate", "retail_optical"],
+  ["od md", "od_md"],
+  ["od/md", "od_md"],
+  ["od_md", "od_md"],
+  ["multi location group", "multi_location_group"],
+  ["multi_location_group", "multi_location_group"],
+  ["multi location", "multi_location_group"],
+  ["academic", "academic"],
+  ["nonprofit", "nonprofit"],
+  ["non profit", "nonprofit"],
+  ["government", "government"],
+]);
+const BENEFIT_FLAG_ALIASES = new Map([
+  ["sign on bonus", "sign_on_bonus"],
+  ["sign_on_bonus", "sign_on_bonus"],
+  ["sign-on bonus", "sign_on_bonus"],
+  ["ce allowance", "ce_allowance"],
+  ["ce_allowance", "ce_allowance"],
+  ["continuing education", "ce_allowance"],
+  ["relocation assistance", "relocation_assistance"],
+  ["relocation_assistance", "relocation_assistance"],
+  ["relocation", "relocation_assistance"],
+  ["student loan assistance", "student_loan_assistance"],
+  ["student_loan_assistance", "student_loan_assistance"],
+  ["student loan", "student_loan_assistance"],
+]);
 const LISTING_OPPORTUNITY_TYPES = new Set(["job", "practice_sale", "partnership", "lease"]);
 const LISTING_SOURCES = new Set(["imported", "employer_submitted"]);
 const LISTING_TIERS = new Set(["imported", "standard_paid", "featured", "sponsor"]);
@@ -179,6 +242,9 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "daily_rate",
   "compensation_notes",
   "salary",
+  "clinical_focuses",
+  "practice_types",
+  "benefit_flags",
   "tag_ids",
   "featured",
   "posted_at",
@@ -228,6 +294,9 @@ const PUBLIC_JOB_COLUMN_FALLBACKS = {
   hourly_max: "null::numeric as hourly_max",
   daily_rate: "null::numeric as daily_rate",
   compensation_notes: "null::text as compensation_notes",
+  clinical_focuses: "array[]::text[] as clinical_focuses",
+  practice_types: "array[]::text[] as practice_types",
+  benefit_flags: "array[]::text[] as benefit_flags",
   created_at: "null::timestamptz as created_at",
   updated_at: "null::timestamptz as updated_at",
   source: "null::text as source",
@@ -632,6 +701,45 @@ function normalizeCompensationType(value) {
   );
 }
 
+function normalizeClinicalFocuses(value) {
+  const focuses = normalizeChoiceList(
+    value,
+    CLINICAL_FOCUS_ALIASES,
+    "Please choose valid clinical focus areas.",
+    "invalid_clinical_focus"
+  ) || [];
+  if (focuses.length > 5) {
+    throw requestError(
+      400,
+      "Select up to 5 clinical focus areas.",
+      "clinical_focus_limit_exceeded"
+    );
+  }
+  return focuses;
+}
+
+function normalizePracticeTypes(value) {
+  return (
+    normalizeChoiceList(
+      value,
+      PRACTICE_TYPE_ALIASES,
+      "Please choose valid practice types.",
+      "invalid_practice_type"
+    ) || []
+  );
+}
+
+function normalizeBenefitFlags(value) {
+  return (
+    normalizeChoiceList(
+      value,
+      BENEFIT_FLAG_ALIASES,
+      "Please choose valid benefits and incentives.",
+      "invalid_benefit_flag"
+    ) || []
+  );
+}
+
 function isLegacyRemoteEmployment(value) {
   return normalizeChoiceKey(value) === "remote";
 }
@@ -721,6 +829,19 @@ function toNullableText(value) {
   if (value === null) return null;
   const text = String(value).trim();
   return text || null;
+}
+
+function benefitFlagsFromJobFields(fields = {}) {
+  const flags = new Set();
+  if (toNullableText(fields.sign_on_bonus ?? fields.signOnBonus)) flags.add("sign_on_bonus");
+  if (toNullableText(fields.ce_allowance ?? fields.ceAllowance)) flags.add("ce_allowance");
+  if (normalizeBoolean(fields.relocation_assistance ?? fields.relocationAssistance, false)) {
+    flags.add("relocation_assistance");
+  }
+  if (normalizeBoolean(fields.student_loan_assistance ?? fields.studentLoanAssistance, false)) {
+    flags.add("student_loan_assistance");
+  }
+  return Array.from(flags);
 }
 
 function hasOwn(object, key) {
@@ -990,6 +1111,15 @@ router.get("/", maybeAuth, async (req, res) => {
   try {
     const { q, city, state, tags, sort = "best_match", limit = "20", offset = "0" } = req.query;
     const tagIds = typeof tags === "string" && tags.length ? tags.split(",") : [];
+    const clinicalFocuses = normalizeClinicalFocuses(
+      req.query.clinicalFocuses ?? req.query.clinical_focuses ?? req.query.clinicalFocus ?? req.query.clinical_focus
+    );
+    const practiceTypes = normalizePracticeTypes(
+      req.query.practiceTypes ?? req.query.practice_types ?? req.query.practiceType ?? req.query.practice_type
+    );
+    const benefitFlags = normalizeBenefitFlags(
+      req.query.benefitFlags ?? req.query.benefit_flags ?? req.query.benefit
+    );
     const sortMode = normalizePublicSortMode(sort);
     const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
     const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
@@ -1055,6 +1185,18 @@ router.get("/", maybeAuth, async (req, res) => {
       params.push(tagIds);
       where.push(`tag_ids @> $${params.length}::text[]`);
     }
+    if (clinicalFocuses.length) {
+      params.push(clinicalFocuses);
+      where.push(`clinical_focuses @> $${params.length}::text[]`);
+    }
+    if (practiceTypes.length) {
+      params.push(practiceTypes);
+      where.push(`practice_types @> $${params.length}::text[]`);
+    }
+    if (benefitFlags.length) {
+      params.push(benefitFlags);
+      where.push(`benefit_flags @> $${params.length}::text[]`);
+    }
 
     const countParams = [...params];
     const totalResult = await query(
@@ -1110,6 +1252,9 @@ router.get("/", maybeAuth, async (req, res) => {
       offset: safeOffset,
     });
   } catch (e) {
+    if (e?.statusCode) {
+      return res.status(e.statusCode).json({ error: e.message, code: e.code });
+    }
     console.error("List jobs error:", e);
     res.status(500).json({ error: "Failed to list jobs" });
   }
@@ -1486,6 +1631,14 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     );
     const location_precision = normalizeLocationPrecision(req.body.location_precision, "city");
     const saturday_schedule = normalizeSaturdaySchedule(req.body.saturday_schedule);
+    const clinical_focuses = normalizeClinicalFocuses(
+      req.body.clinical_focuses ?? req.body.clinical_focus
+    );
+    const practice_types = normalizePracticeTypes(req.body.practice_types ?? req.body.practice_type);
+    const benefit_flags = normalizeBenefitFlags([
+      ...(toInputArray(req.body.benefit_flags) || []),
+      ...benefitFlagsFromJobFields(req.body),
+    ]);
 
     let employer_name = req.body.employer_name ?? req.body.company ?? null;
     let employer_brand = normalizeBrand(req.body.employer_brand ?? req.body.brand ?? null);
@@ -1555,12 +1708,14 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       type: employment_type ?? null,
       opportunity_type,
       opportunity_types,
-      practice_type: toNullableText(req.body.practice_type),
+      practice_type: firstOrNull(practice_types),
+      practice_types,
       employment_type,
       employment_types,
       work_arrangement,
       work_arrangements,
       saturday_schedule,
+      clinical_focuses,
       sign_on_bonus: toNullableText(req.body.sign_on_bonus ?? req.body.signOnBonus),
       relocation_assistance: normalizeBoolean(
         req.body.relocation_assistance ?? req.body.relocationAssistance,
@@ -1572,6 +1727,7 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
         req.body.student_loan_assistance ?? req.body.studentLoanAssistance,
         false
       ),
+      benefit_flags,
       compensation_type: compensation.compensation_type,
       salary_min: compensation.salary_min,
       salary_max: compensation.salary_max,
@@ -1684,16 +1840,19 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "opportunity_type",
       "opportunity_types",
       "practice_type",
+      "practice_types",
       "employment_type",
       "employment_types",
       "work_arrangement",
       "work_arrangements",
       "saturday_schedule",
+      "clinical_focuses",
       "sign_on_bonus",
       "relocation_assistance",
       "benefits",
       "ce_allowance",
       "student_loan_assistance",
+      "benefit_flags",
       "compensation_type",
       "salary_min",
       "salary_max",
@@ -1736,6 +1895,9 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       }
     }
     if ("tag_ids" in updates) updates.tag_ids = toTagIds(updates.tag_ids);
+    if ("clinical_focuses" in updates) {
+      updates.clinical_focuses = normalizeClinicalFocuses(updates.clinical_focuses);
+    }
     if ("external_apply_url" in updates) {
       updates.external_apply_url = normalizeApplyUrl(updates.external_apply_url);
     }
@@ -1781,6 +1943,23 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     if ("student_loan_assistance" in updates) {
       updates.student_loan_assistance = normalizeBoolean(updates.student_loan_assistance, false);
     }
+    const hasBenefitInput = [
+      "benefit_flags",
+      "sign_on_bonus",
+      "signOnBonus",
+      "relocation_assistance",
+      "relocationAssistance",
+      "ce_allowance",
+      "ceAllowance",
+      "student_loan_assistance",
+      "studentLoanAssistance",
+    ].some((field) => field in req.body);
+    if (hasBenefitInput) {
+      updates.benefit_flags = normalizeBenefitFlags([
+        ...(toInputArray(req.body.benefit_flags) || []),
+        ...benefitFlagsFromJobFields({ ...job, ...updates }),
+      ]);
+    }
     const nextRole = updates.role || job.role;
 
     const locationChanged = didLocationChange(req.body, job);
@@ -1809,7 +1988,11 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     } else if ("opportunity_type" in updates) {
       updates.opportunity_type = normalizeOpportunityType(updates.opportunity_type);
     }
-    if ("practice_type" in updates) updates.practice_type = toNullableText(updates.practice_type);
+    if ("practice_types" in req.body || "practice_type" in req.body) {
+      const practiceTypes = normalizePracticeTypes(req.body.practice_types ?? req.body.practice_type);
+      updates.practice_types = practiceTypes;
+      updates.practice_type = firstOrNull(practiceTypes);
+    }
     if ("practice_name" in updates) updates.practice_name = toNullableText(updates.practice_name);
     const hasEmploymentInput = "employment_types" in req.body || "employment_type" in req.body || "type" in req.body;
     const rawEmploymentType = req.body.employment_type ?? req.body.type;

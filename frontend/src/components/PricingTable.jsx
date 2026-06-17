@@ -77,10 +77,10 @@ const RECRUITER_PLAN_RANK = {
   doctor: 3,
 };
 
-const RECRUITER_POSTING_CTA = {
-  staff: "Continue with Staff Posting",
-  manager: "Continue with Manager Posting",
-  doctor: "Continue with Doctor Posting",
+const RECRUITER_PLAN_PRESELECT_ROLE = {
+  staff: "optician",
+  manager: "practice_manager",
+  doctor: "optometrist",
 };
 
 const PricingTable = ({ user, showAudienceToggle = true }) => {
@@ -124,7 +124,12 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
     }
 
     if (audience === "recruiter") {
-      nav("/recruiter/addjob");
+      const role = RECRUITER_PLAN_PRESELECT_ROLE[plan.key] || "";
+      const params = new URLSearchParams({
+        postingPlan: plan.key,
+        ...(role ? { role } : {}),
+      });
+      nav(`/recruiter/addjob?${params.toString()}`);
       return;
     }
 
@@ -223,14 +228,14 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           <span className="currency">$</span>
                           <span className="amount">{p.firstMonth}</span>
                         </span>
-                        <span className="period">first 30 days</span>
+                        <span className="period">first month</span>
                       </div>
                       <div className="price-line">
                         <span className="price small">
                           <span className="currency">$</span>
                           <span className="amount">{p.renewal}</span>
                         </span>
-                        <span className="period">every 30 days thereafter</span>
+                        <span className="period">/mo after</span>
                       </div>
                     </div>
 
@@ -244,7 +249,7 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
 
                     <div className="actions">
                       <button
-                        className="btn primary"
+                        className={`btn ${p.key === "staff" ? "ghost" : "primary"}`}
                         onClick={() => startCheckout(p, "recruiter")}
                         disabled={loadingPlan === p.key || belowRecommended}
                       >
@@ -252,9 +257,7 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           ? "Not valid for this posting"
                           : loadingPlan === p.key
                           ? "Starting..."
-                          : isRecommended
-                          ? RECRUITER_POSTING_CTA[p.key]
-                          : RECRUITER_POSTING_CTA[p.key] || "Continue to Checkout"}
+                          : "Post Job"}
                       </button>
                       <p className="fineprint">
                         Recurring 30-day listing cycle. Cancel anytime. Prices shown in USD.

@@ -64,12 +64,12 @@
 }
 
 .recruiter-job-form-card .MuiOutlinedInput-input::placeholder {
-  color: rgba(248, 250, 252, 0.62) !important;
+  color: rgba(248, 250, 252, 0.78) !important;
   opacity: 1;
 }
 
 .recruiter-job-form-card .MuiOutlinedInput-notchedOutline {
-  border-color: rgba(255, 255, 255, 0.36) !important;
+  border-color: rgba(255, 255, 255, 0.52) !important;
 }
 
 .recruiter-job-form-card .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
@@ -162,11 +162,19 @@
   font-weight: 700;
 }
 
-.recruiter-position-options {
+.recruiter-position-step > .MuiTypography-subtitle2 {
+  margin-bottom: 14px !important;
+}
+
+.recruiter-position-selector-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
   gap: 10px;
-  margin: 12px 0 8px;
+  align-items: stretch;
+}
+
+.recruiter-position-options {
+  display: contents;
 }
 
 .recruiter-position-options button {
@@ -203,6 +211,26 @@
 .recruiter-position-empty {
   color: #dbeafe !important;
   font-weight: 700;
+}
+
+.recruiter-position-pricing {
+  align-self: center;
+  margin: 0;
+  color: #dbeafe;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.recruiter-position-pricing span {
+  display: block;
+  color: #dbeafe;
+  font-weight: 600;
+}
+
+.recruiter-position-note {
+  align-self: center;
+  margin: 0;
 }
 
 .recruiter-preview-grid {
@@ -384,9 +412,9 @@
 }
 
 .recruiter-additional-details {
-  border: 1px solid rgba(147, 197, 253, 0.52);
+  border: 1px solid rgba(147, 197, 253, 0.72);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.78);
+  background: rgba(15, 23, 42, 0.9);
 }
 
 .recruiter-additional-details summary {
@@ -398,7 +426,11 @@
   color: #ffffff;
   cursor: pointer;
   font-weight: 800;
-  background: rgba(2, 6, 23, 0.26);
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.recruiter-additional-details summary span {
+  color: #f8fafc !important;
 }
 
 .recruiter-additional-details summary::marker {
@@ -406,8 +438,8 @@
 }
 
 .recruiter-additional-details summary small {
-  color: #ffffff;
-  font-weight: 800;
+  color: #e0f2fe !important;
+  font-weight: 700;
 }
 
 .recruiter-additional-details[open] summary {
@@ -421,9 +453,101 @@
 .recruiter-job-checkbox {
   min-height: 56px;
   padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(186, 230, 253, 0.64);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(30, 41, 59, 0.94);
+}
+
+.recruiter-job-checkbox span {
+  color: #f8fafc !important;
+  font-weight: 800;
+}
+
+.recruiter-structured-group {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+}
+
+.recruiter-structured-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recruiter-structured-heading p,
+.recruiter-structured-helper {
+  margin: 3px 0 0;
+  color: #e0f2fe !important;
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.recruiter-structured-heading > span {
+  color: #bae6fd !important;
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.recruiter-pill-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.recruiter-option-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.98);
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.recruiter-option-pill span {
+  color: inherit !important;
+}
+
+.recruiter-option-pill:hover:not(:disabled) {
+  border-color: #bae6fd;
+  background: rgba(51, 65, 85, 0.98);
+}
+
+.recruiter-option-pill.selected {
+  border-color: #7dd3fc;
+  background: #e0f2fe;
+  color: #082f49;
+}
+
+.recruiter-option-pill:disabled {
+  border-color: rgba(100, 116, 139, 0.68);
+  background: rgba(15, 23, 42, 0.58);
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.recruiter-pill-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.22);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .recruiter-job-form-error {
@@ -482,6 +606,16 @@
 
   .recruiter-preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .recruiter-position-selector-row {
+    grid-template-columns: 1fr;
+  }
+
+  .recruiter-position-pricing,
+  .recruiter-position-note {
+    grid-column: auto;
+    padding-left: 0;
   }
 
   .recruiter-apply-options {

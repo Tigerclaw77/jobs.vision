@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Box,
   Button,
@@ -18,16 +19,9 @@ import {
 
 import { createJob, createStripeCheckout, fetchUserProfile, publishJob, updateJob } from "../utils/api";
 import {
-  JOB_TAG_OPTIONS,
-  canonicalizeJobTagInput,
-  displayJobTagLabel,
-} from "../constants/jobTagTaxonomy";
-import {
   COMPENSATION_TYPE_OPTIONS,
   EMPLOYMENT_TYPE_OPTIONS,
   OPPORTUNITY_TYPE_OPTIONS,
-  PRACTICE_TYPE_OPTIONS,
-  ROLE_OPTIONS,
   ROLE_LABELS,
   SATURDAY_SCHEDULE_LABELS,
   SATURDAY_SCHEDULE_OPTIONS,
@@ -69,6 +63,81 @@ const RECRUITER_POSTING_LABELS = {
   doctor: "Doctor Posting",
 };
 
+const RECRUITER_PLAN_PRICING = {
+  staff: {
+    firstMonth: "$79 first month",
+    renewal: "$49/mo after",
+  },
+  manager: {
+    firstMonth: "$149 first month",
+    renewal: "$99/mo after",
+  },
+  doctor: {
+    firstMonth: "$299 first month",
+    renewal: "$149/mo after",
+  },
+};
+
+const POSTING_ROLE_OPTIONS = [
+  { value: "optometrist", label: "Optometrist" },
+  { value: "practice_manager", label: "Manager" },
+  { value: "optician", label: "Optician" },
+  { value: "ophthalmic_technician", label: "Tech" },
+  { value: "optical_lab", label: "Optical Lab" },
+  { value: "front_desk", label: "Front Desk" },
+  { value: "other", label: "Other" },
+];
+
+const PRESELECT_ROLE_BY_PLAN = {
+  staff: "optician",
+  manager: "practice_manager",
+  doctor: "optometrist",
+};
+
+const CLINICAL_FOCUS_LIMIT = 5;
+
+const CLINICAL_FOCUS_OPTIONS = [
+  { value: "dry_eye", label: "Dry Eye" },
+  { value: "myopia_management", label: "Myopia Management" },
+  { value: "specialty_contact_lenses", label: "Specialty Contact Lenses" },
+  { value: "vision_therapy", label: "Vision Therapy" },
+  { value: "medical_optometry", label: "Medical Optometry" },
+  { value: "pediatrics", label: "Pediatrics" },
+  { value: "glaucoma", label: "Glaucoma" },
+  { value: "low_vision", label: "Low Vision" },
+  { value: "primary_care", label: "Primary Care" },
+  { value: "refractive_surgical_comanagement", label: "Refractive / Surgical Co-Management" },
+  { value: "scleral_lenses", label: "Scleral Lenses" },
+  { value: "ocular_disease", label: "Ocular Disease" },
+];
+
+const PRACTICE_ENVIRONMENT_OPTIONS = [
+  { value: "private_practice", label: "Private Practice" },
+  { value: "family_practice", label: "Family Practice" },
+  { value: "retail_optical", label: "Retail Optical" },
+  { value: "od_md", label: "OD/MD" },
+  { value: "multi_location_group", label: "Multi-Location Group" },
+  { value: "academic", label: "Academic" },
+  { value: "nonprofit", label: "Nonprofit" },
+  { value: "government", label: "Government" },
+];
+
+const BENEFIT_FLAG_VALUES = {
+  signOnBonus: "sign_on_bonus",
+  ceAllowance: "ce_allowance",
+  relocation: "relocation_assistance",
+  studentLoan: "student_loan_assistance",
+};
+
+const CLINICAL_FOCUS_LABELS = CLINICAL_FOCUS_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {}
+);
+const PRACTICE_ENVIRONMENT_LABELS = PRACTICE_ENVIRONMENT_OPTIONS.reduce(
+  (acc, option) => ({ ...acc, [option.value]: option.label }),
+  {}
+);
+
 const defaultValues = {
   title: "",
   company: "",
@@ -76,6 +145,8 @@ const defaultValues = {
   role_type: "",
   opportunity_types: [],
   practice_type: "",
+  practice_types: [],
+  clinical_focuses: [],
   employment_types: [],
   work_arrangements: [],
   saturday_schedule: "",
@@ -96,8 +167,29 @@ const defaultValues = {
   external_apply_url: "",
   application_email: "",
   description: "",
-  tags: [],
+  benefit_flags: [],
 };
+
+function roleFromSearch(search = "") {
+  try {
+    const params = new URLSearchParams(search);
+    const explicitRole = normalizeRole(params.get("role") || "");
+    if (explicitRole) return explicitRole;
+    const postingPlan = String(params.get("postingPlan") || "").toLowerCase();
+    return PRESELECT_ROLE_BY_PLAN[postingPlan] || "";
+  } catch {
+    return "";
+  }
+}
+
+function valuesWithPreselectedRole(values, role) {
+  if (!role) return values;
+  return {
+    ...values,
+    role_type: role,
+    opportunity_types: role === "optometrist" ? values.opportunity_types || [] : [],
+  };
+}
 
 function splitLocation(location = "") {
   const parts = String(location).split(",").map((part) => part.trim()).filter(Boolean);
@@ -151,6 +243,45 @@ function normalizeWorkArrangementValue(value = "") {
     onsite: "on_site",
     hybrid: "hybrid",
     remote: "remote",
+  });
+}
+
+function normalizeClinicalFocusValue(value = "") {
+  return normalizeOptionValue(value, {
+    "dry eye": "dry_eye",
+    "myopia management": "myopia_management",
+    "myopia control": "myopia_management",
+    "specialty contact lenses": "specialty_contact_lenses",
+    "specialty contacts": "specialty_contact_lenses",
+    "vision therapy": "vision_therapy",
+    "medical optometry": "medical_optometry",
+    pediatrics: "pediatrics",
+    pediatric: "pediatrics",
+    glaucoma: "glaucoma",
+    "low vision": "low_vision",
+    "primary care": "primary_care",
+    "refractive surgical co management": "refractive_surgical_comanagement",
+    "refractive surgical comanagement": "refractive_surgical_comanagement",
+    "scleral lenses": "scleral_lenses",
+    "scleral lens": "scleral_lenses",
+    "ocular disease": "ocular_disease",
+  });
+}
+
+function normalizePracticeEnvironmentValue(value = "") {
+  return normalizeOptionValue(value, {
+    "private practice": "private_practice",
+    "family practice": "family_practice",
+    "retail optical": "retail_optical",
+    retail: "retail_optical",
+    corporate: "retail_optical",
+    "od md": "od_md",
+    "multi location group": "multi_location_group",
+    "multi location": "multi_location_group",
+    academic: "academic",
+    nonprofit: "nonprofit",
+    "non profit": "nonprofit",
+    government: "government",
   });
 }
 
@@ -349,6 +480,15 @@ function compensationPayload(values) {
   };
 }
 
+function benefitFlagsFromValues(values) {
+  return [
+    values.sign_on_bonus?.trim() && BENEFIT_FLAG_VALUES.signOnBonus,
+    values.ce_allowance?.trim() && BENEFIT_FLAG_VALUES.ceAllowance,
+    values.relocation_assistance && BENEFIT_FLAG_VALUES.relocation,
+    values.student_loan_assistance && BENEFIT_FLAG_VALUES.studentLoan,
+  ].filter(Boolean);
+}
+
 function normalizeDraftValues(raw = {}) {
   const draftValues = { ...raw };
   delete draftValues.hours;
@@ -367,6 +507,17 @@ function normalizeDraftValues(raw = {}) {
       role === "optometrist"
         ? normalizeMultiValue(raw.opportunity_types || raw.opportunity_type, normalizeOpportunityValue)
         : [],
+    clinical_focuses: normalizeMultiValue(
+      raw.clinical_focuses || raw.clinical_focus || raw.tag_ids || raw.tags,
+      normalizeClinicalFocusValue
+    ).slice(0, CLINICAL_FOCUS_LIMIT),
+    practice_types: normalizeMultiValue(
+      raw.practice_types || raw.practice_type || raw.tag_ids || raw.tags,
+      normalizePracticeEnvironmentValue
+    ),
+    practice_type:
+      normalizeMultiValue(raw.practice_types || raw.practice_type, normalizePracticeEnvironmentValue)[0] ||
+      "",
     employment_types: normalizeMultiValue(
       raw.employment_types || raw.employment_type || raw.type,
       normalizeEmploymentValue
@@ -390,7 +541,17 @@ function valuesFromJob(job = {}) {
       normalizeRole(job.role) === "optometrist"
         ? normalizeMultiValue(job.opportunity_types || job.opportunity_type, normalizeOpportunityValue)
         : [],
-    practice_type: job.practice_type || "",
+    clinical_focuses: normalizeMultiValue(
+      job.clinical_focuses || job.clinical_focus || job.tag_ids || job.tags,
+      normalizeClinicalFocusValue
+    ).slice(0, CLINICAL_FOCUS_LIMIT),
+    practice_types: normalizeMultiValue(
+      job.practice_types || job.practice_type || job.tag_ids || job.tags,
+      normalizePracticeEnvironmentValue
+    ),
+    practice_type:
+      normalizeMultiValue(job.practice_types || job.practice_type, normalizePracticeEnvironmentValue)[0] ||
+      "",
     employment_types: normalizeMultiValue(
       job.employment_types || job.employment_type || job.type,
       normalizeEmploymentValue
@@ -425,7 +586,7 @@ function valuesFromJob(job = {}) {
     external_apply_url: job.external_apply_url || job.apply_url || "",
     application_email: job.application_email || job.applicationEmail || "",
     description: job.description || "",
-    tags: Array.isArray(job.tag_ids) ? job.tag_ids : Array.isArray(job.tags) ? job.tags : [],
+    benefit_flags: normalizeMultiValue(job.benefit_flags),
   };
 }
 
@@ -436,6 +597,9 @@ function validate(values, { requireApplyDestination = false, profile = {} } = {}
   if (!values.role_type) errors.role_type = "Role is required.";
   if (!values.employment_types?.length) {
     errors.employment_types = "Employment type is required.";
+  }
+  if ((values.clinical_focuses || []).length > CLINICAL_FOCUS_LIMIT) {
+    errors.clinical_focuses = `Select up to ${CLINICAL_FOCUS_LIMIT} clinical focus areas.`;
   }
   if (!values.description.trim()) errors.description = "Description is required.";
   if (values.apply_destination_mode === "url" && !values.external_apply_url?.trim()) {
@@ -530,6 +694,8 @@ export default function JobForm({
   onSuccess,
   isAdmin = false,
 }) {
+  const location = useLocation();
+  const preselectedRole = roleFromSearch(location.search);
   const editingJobId = jobToEdit?.id || jobToEdit?._id || null;
   const isEditing = Boolean(editingJobId);
   const roleLocked =
@@ -539,9 +705,10 @@ export default function JobForm({
   const [values, setValues] = useState(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
-      return raw ? normalizeDraftValues(JSON.parse(raw)) : defaultValues;
+      const initial = raw ? normalizeDraftValues(JSON.parse(raw)) : defaultValues;
+      return valuesWithPreselectedRole(initial, preselectedRole);
     } catch {
-      return defaultValues;
+      return valuesWithPreselectedRole(defaultValues, preselectedRole);
     }
   });
   const [errors, setErrors] = useState({});
@@ -577,6 +744,11 @@ export default function JobForm({
     setTouched({});
     setAttemptedSubmit(false);
   }, [jobToEdit]);
+
+  useEffect(() => {
+    if (isEditing || !preselectedRole) return;
+    setValues((prev) => valuesWithPreselectedRole(prev, preselectedRole));
+  }, [isEditing, preselectedRole]);
 
   // Autosave (debounced)
   useEffect(() => {
@@ -680,33 +852,37 @@ export default function JobForm({
     });
   };
 
-  const addTag = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const raw = e.target.value.trim();
-      if (!raw) return;
-      const tagId = canonicalizeJobTagInput(raw);
-      if (tagId && !values.tags.includes(tagId)) {
-        setValues((p) => ({ ...p, tags: [...p.tags, tagId] }));
+  const toggleClinicalFocus = (value) => {
+    setValues((prev) => ({
+      ...prev,
+      clinical_focuses: prev.clinical_focuses.includes(value)
+        ? prev.clinical_focuses.filter((item) => item !== value)
+        : prev.clinical_focuses.length < CLINICAL_FOCUS_LIMIT
+        ? [...prev.clinical_focuses, value]
+        : prev.clinical_focuses,
+    }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (values.clinical_focuses.includes(value) || values.clinical_focuses.length < CLINICAL_FOCUS_LIMIT) {
+        delete next.clinical_focuses;
+      } else {
+        next.clinical_focuses = `Select up to ${CLINICAL_FOCUS_LIMIT} clinical focus areas.`;
       }
-      e.target.value = "";
-    }
+      return next;
+    });
   };
 
-  const removeTag = (tag) => {
-    setValues((p) => ({ ...p, tags: p.tags.filter((t) => t !== tag) }));
-  };
-
-  const clearDraft = () => {
-    setValues(jobToEdit ? valuesFromJob(jobToEdit) : defaultValues);
-    setErrors({});
-    setTouched({});
-    setAttemptedSubmit(false);
-    try {
-      localStorage.removeItem(DRAFT_KEY);
-    } catch {}
-    setMessage(isEditing ? "Reset." : "Cleared.");
-    setTimeout(() => setMessage(""), 1000);
+  const togglePracticeType = (value) => {
+    setValues((prev) => {
+      const practiceTypes = prev.practice_types.includes(value)
+        ? prev.practice_types.filter((item) => item !== value)
+        : [...prev.practice_types, value];
+      return {
+        ...prev,
+        practice_types: practiceTypes,
+        practice_type: practiceTypes[0] || "",
+      };
+    });
   };
 
   const buildPayload = () => {
@@ -729,7 +905,9 @@ export default function JobForm({
       type: employmentTypes[0] || null,
       opportunity_type: opportunityTypes[0] || null,
       opportunity_types: opportunityTypes,
-      practice_type: values.practice_type || null,
+      practice_type: values.practice_types[0] || null,
+      practice_types: values.practice_types,
+      clinical_focuses: values.clinical_focuses,
       employment_type: employmentTypes[0] || null,
       employment_types: employmentTypes,
       work_arrangement: workArrangements[0] || null,
@@ -740,12 +918,12 @@ export default function JobForm({
       benefits: values.benefits.trim() || null,
       ce_allowance: values.ce_allowance.trim() || null,
       student_loan_assistance: Boolean(values.student_loan_assistance),
+      benefit_flags: benefitFlagsFromValues(values),
       ...compensation,
       use_default_apply_destination: Boolean(values.use_default_apply_destination),
       external_apply_url: values.external_apply_url.trim() || null,
       application_email: values.application_email.trim() || null,
       description: values.description.trim(),
-      tag_ids: values.tags,
     };
   };
 
@@ -895,6 +1073,8 @@ export default function JobForm({
   ).join(", ");
   const previewWorkSetting = labelsForValues(WORK_ARRANGEMENT_LABELS, values.work_arrangements).join(", ");
   const previewSchedule = SATURDAY_SCHEDULE_LABELS[values.saturday_schedule] || "";
+  const previewClinicalFocus = labelsForValues(CLINICAL_FOCUS_LABELS, values.clinical_focuses).join(", ");
+  const previewPracticeTypes = labelsForValues(PRACTICE_ENVIRONMENT_LABELS, values.practice_types).join(", ");
   const previewHighlights = [
     values.sign_on_bonus && `Sign-on bonus: ${values.sign_on_bonus}`,
     values.relocation_assistance && "Relocation assistance",
@@ -903,9 +1083,12 @@ export default function JobForm({
   ].filter(Boolean);
   const canShowPostingFields = Boolean(values.role_type);
   const requiredPlanKey = ROLE_REQUIRED_RECRUITER_PLAN[values.role_type] || "staff";
+  const selectedRolePricing = values.role_type
+    ? RECRUITER_PLAN_PRICING[requiredPlanKey] || RECRUITER_PLAN_PRICING.staff
+    : null;
   const checkoutRequired = paymentRequired;
   const checkoutPostingLabel = RECRUITER_POSTING_LABELS[requiredPlanKey] || "Posting";
-  const checkoutButtonLabel = `Continue with ${checkoutPostingLabel}`;
+  const checkoutButtonLabel = "Continue";
 
   const handleCheckout = async (e) => {
     if (e) e.preventDefault();
@@ -972,11 +1155,10 @@ export default function JobForm({
                 </section>
                 <div className="modal-job-details">
                   <p><strong>Role:</strong> {roleLabel}</p>
+                  {previewClinicalFocus ? <p><strong>Clinical Focus:</strong> {previewClinicalFocus}</p> : null}
+                  {previewPracticeTypes ? <p><strong>Practice Type:</strong> {previewPracticeTypes}</p> : null}
                   {previewWorkSetting ? <p><strong>Work Setting:</strong> {previewWorkSetting}</p> : null}
                   {previewSchedule ? <p><strong>Saturday Schedule:</strong> {previewSchedule}</p> : null}
-                  {values.practice_type ? (
-                    <p><strong>Practice Type:</strong> {values.practice_type.replace(/_/g, " ")}</p>
-                  ) : null}
                   {previewHighlights.map((item) => (
                     <p key={item}>{item}</p>
                   ))}
@@ -1007,24 +1189,33 @@ export default function JobForm({
 
         <Box className="recruiter-position-step">
           <Typography variant="subtitle2">Step 1: Select Position Type</Typography>
-          <div className="recruiter-position-options">
-            {ROLE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={values.role_type === option.value ? "selected" : ""}
-                onClick={() => handleRoleChange({ target: { value: option.value } })}
-                disabled={roleLocked}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="recruiter-position-selector-row">
+            <div className="recruiter-position-options">
+              {POSTING_ROLE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={values.role_type === option.value ? "selected" : ""}
+                  onClick={() => handleRoleChange({ target: { value: option.value } })}
+                  disabled={roleLocked}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {roleLocked ? (
+              <p className="recruiter-position-note">
+                Role category is locked after publication. Create a new posting for a different role.
+              </p>
+            ) : selectedRolePricing ? (
+              <div className="recruiter-position-pricing" aria-live="polite">
+                <span>{selectedRolePricing.firstMonth}</span>
+                <span>{selectedRolePricing.renewal}</span>
+              </div>
+            ) : (
+              <p className="recruiter-position-note">Select a position type to see pricing.</p>
+            )}
           </div>
-          {roleLocked ? (
-            <p>Role category is locked after publication. Create a new posting for a different role.</p>
-          ) : (
-            <p>Checkout is based on this position type.</p>
-          )}
           {!!errors.role_type && <p className="recruiter-job-form-error">{errors.role_type}</p>}
         </Box>
 
@@ -1044,15 +1235,10 @@ export default function JobForm({
 
         <Grid item xs={12} md={4}>
           <TextField
-            label="Practice / Company Name"
+            label="Business name"
             fullWidth
             value={values.company}
             onChange={handleChange("company")}
-            helperText={
-              profileEmployerName(profile || {})
-                ? `Optional. Blank uses ${profileEmployerName(profile || {})}.`
-                : "Optional. Add a default in your recruiter profile."
-            }
           />
         </Grid>
 
@@ -1102,28 +1288,6 @@ export default function JobForm({
                 </Grid>
               )}
 
-              {values.role_type === "optometrist" && (
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel id="practice-type-label">Practice Type</InputLabel>
-                    <Select
-                      labelId="practice-type-label"
-                      label="Practice Type"
-                      value={values.practice_type}
-                      onChange={handleChange("practice_type")}
-                    >
-                      <MenuItem value="">Optional</MenuItem>
-                      {PRACTICE_TYPE_OPTIONS.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <FormHelperText>Recommended for optometrist postings.</FormHelperText>
-                  </FormControl>
-                </Grid>
-              )}
-
               <Grid item xs={12} md={6}>
                 <MultiSelectField
                   label="Work Setting"
@@ -1131,7 +1295,6 @@ export default function JobForm({
                   value={values.work_arrangements}
                   onChange={handleMultiChange("work_arrangements")}
                   options={WORK_ARRANGEMENT_OPTIONS}
-                  helperText="Optional. Candidates can filter for on-site, hybrid, or remote work."
                 />
               </Grid>
 
@@ -1173,7 +1336,6 @@ export default function JobForm({
                       </MenuItem>
                     ))}
                   </Select>
-                  <FormHelperText>Optional. Pay transparency can improve candidate response.</FormHelperText>
                 </FormControl>
               </Grid>
 
@@ -1257,7 +1419,7 @@ export default function JobForm({
                     fullWidth
                     value={values.compensation_notes}
                     onChange={handleChange("compensation_notes")}
-                    helperText="Optional. Example: Base plus production bonus."
+                    placeholder="Base plus production bonus"
                   />
                 </Grid>
               )}
@@ -1379,11 +1541,56 @@ export default function JobForm({
         <Grid item xs={12}>
           <details className="recruiter-additional-details">
             <summary>
-              <span>Optional Extras</span>
-              <small>Optional benefits, bonuses, relocation, and search tags.</small>
+              <span>Additional details</span>
+              <small>Clinical focus, practice type, benefits</small>
             </summary>
 
             <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <section className="recruiter-structured-group">
+                  <div className="recruiter-structured-heading">
+                    <div>
+                      <Typography variant="subtitle2">Clinical Focus</Typography>
+                      <p>Select up to 5 areas that best describe this position.</p>
+                    </div>
+                    <span>{values.clinical_focuses.length}/{CLINICAL_FOCUS_LIMIT}</span>
+                  </div>
+                  <div className="recruiter-pill-picker" aria-label="Clinical Focus">
+                    {CLINICAL_FOCUS_OPTIONS.map((option) => {
+                      const selected = values.clinical_focuses.includes(option.value);
+                      const disabled = !selected && values.clinical_focuses.length >= CLINICAL_FOCUS_LIMIT;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={`recruiter-option-pill${selected ? " selected" : ""}`}
+                          aria-pressed={selected}
+                          disabled={disabled}
+                          onClick={() => toggleClinicalFocus(option.value)}
+                        >
+                          <span>{option.label}</span>
+                          {selected ? <span className="recruiter-pill-remove" aria-hidden="true">x</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!!errors.clinical_focuses && (
+                    <p className="recruiter-job-form-error">{errors.clinical_focuses}</p>
+                  )}
+                </section>
+              </Grid>
+
+              <Grid item xs={12}>
+                <section className="recruiter-structured-group">
+                  <div className="recruiter-structured-heading">
+                    <div>
+                      <Typography variant="subtitle2">Benefits & Incentives</Typography>
+                      <p>Highlight perks and compensation extras.</p>
+                    </div>
+                  </div>
+                </section>
+              </Grid>
+
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Sign-on Bonus"
@@ -1450,25 +1657,28 @@ export default function JobForm({
 
               <Grid item xs={12}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Tags (press Enter to add)
+                  Practice Type
                 </Typography>
-                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1, mb: 1 }}>
-                  {values.tags.map((t) => (
-                    <Chip
-                      key={t}
-                      className="recruiter-job-tag-chip"
-                      label={displayJobTagLabel(t)}
-                      title={t}
-                      onDelete={() => removeTag(t)}
-                    />
-                  ))}
-                </Stack>
-                <TextField
-                  placeholder="e.g., pediatrics, scleral lenses, bilingual Spanish"
-                  fullWidth
-                  onKeyDown={addTag}
-                  helperText={`Optional. Uses ${JOB_TAG_OPTIONS.length} approved taxonomy tags and can improve matching.`}
-                />
+                <p className="recruiter-structured-helper">Describe the practice environment.</p>
+                <div className="recruiter-pill-picker" aria-label="Practice Type">
+                  {PRACTICE_ENVIRONMENT_OPTIONS.map((tag) => {
+                    const selected = values.practice_types.includes(tag.value);
+                    return (
+                      <button
+                        key={tag.value}
+                        type="button"
+                        className={`recruiter-option-pill${selected ? " selected" : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => togglePracticeType(tag.value)}
+                      >
+                        <span>{tag.label}</span>
+                        {selected ? (
+                          <span className="recruiter-pill-remove" aria-hidden="true">x</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
               </Grid>
             </Grid>
           </details>
@@ -1478,9 +1688,6 @@ export default function JobForm({
           <Stack className="recruiter-job-form-actions" direction="row" spacing={1}>
             <Button type="button" variant="outlined" onClick={handleSaveDraft} disabled={submitting}>
               Save for Later
-            </Button>
-            <Button type="button" variant="text" color="warning" onClick={clearDraft}>
-              {isEditing ? "Reset" : "Clear"}
             </Button>
             <Box sx={{ flexGrow: 1 }} />
             <Button type="submit" variant="outlined" disabled={submitting}>

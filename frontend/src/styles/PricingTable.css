@@ -696,3 +696,88 @@
   -webkit-backdrop-filter: blur(5px) saturate(112%);
   backdrop-filter: blur(5px) saturate(112%);
 }
+
+/* Card hierarchy: related surfaces, distinct tier emphasis. */
+.pricing-root.is-glass .card,
+.home-pricing-cards .pricing-root.is-glass .card,
+.pricing-root.is-glass .card.recommended,
+.pricing-root.is-glass .card.disabled {
+  opacity: 1;
+  border-radius: var(--radius) !important;
+  background: rgba(247, 251, 250, 0.68) !important;
+  -webkit-backdrop-filter: blur(7px) saturate(112%) !important;
+  backdrop-filter: blur(7px) saturate(112%) !important;
+}
+
+.pricing-root.is-glass .card::before {
+  content: "";
+  display: block;
+  height: 8px;
+}
+
+.pricing-root.is-glass .card.plan-free,
+.pricing-root.is-glass .card.plan-staff,
+.pricing-root.is-glass .card.plan-free:hover,
+.pricing-root.is-glass .card.plan-staff:hover {
+  border: 1px solid rgba(203, 213, 225, 0.95) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+.pricing-root.is-glass .card.plan-free::before,
+.pricing-root.is-glass .card.plan-staff::before {
+  background: rgba(226, 232, 240, 0.82) !important;
+}
+
+.pricing-root.is-glass .card.plan-plus,
+.pricing-root.is-glass .card.plan-manager,
+.pricing-root.is-glass .card.plan-plus:hover,
+.pricing-root.is-glass .card.plan-manager:hover {
+  border: 1px solid rgba(8, 126, 139, 0.96) !important;
+  box-shadow:
+    0 14px 34px rgba(8, 126, 139, 0.2),
+    0 0 0 1px rgba(8, 126, 139, 0.18) !important;
+}
+
+.pricing-root.is-glass .card.plan-plus::before,
+.pricing-root.is-glass .card.plan-manager::before {
+  background: linear-gradient(90deg, #087e8b, #5fb7b2) !important;
+}
+
+.pricing-root.is-glass .card.plan-premium,
+.pricing-root.is-glass .card.plan-doctor,
+.pricing-root.is-glass .card.plan-premium:hover,
+.pricing-root.is-glass .card.plan-doctor:hover {
+  border: 1px solid rgba(123, 77, 216, 0.88) !important;
+  box-shadow:
+    0 13px 32px rgba(123, 77, 216, 0.18),
+    0 0 0 1px rgba(123, 77, 216, 0.14) !important;
+}
+
+.pricing-root.is-glass .card.plan-premium::before,
+.pricing-root.is-glass .card.plan-doctor::before {
+  background: linear-gradient(90deg, #7b4dd8, rgba(123, 77, 216, 0.58)) !important;
+}
+
+.pricing-root.is-glass .card:hover,
+.home-pricing-cards .pricing-root.is-glass .card:hover {
+  transform: translateY(-2px);
+}
+
+.pricing-root.is-glass .card.recruiter.plan-staff .btn.ghost {
+  background: #ffffff !important;
+  border: 1.6px solid rgba(8, 126, 139, 0.58) !important;
+  color: var(--jv-text, #142337) !important;
+  box-shadow: none !important;
+}
+
+.pricing-root.is-glass .card.recruiter.plan-manager .btn.primary {
+  background: linear-gradient(135deg, var(--jv-secondary, #5fb7b2), var(--jv-primary, #087e8b)) !important;
+  color: #042f2e !important;
+  box-shadow: 0 12px 26px rgba(95, 183, 178, 0.24) !important;
+}
+
+.pricing-root.is-glass .card.recruiter.plan-doctor .btn.primary {
+  background: linear-gradient(135deg, #7b4dd8, #5b35b1) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 26px rgba(123, 77, 216, 0.24) !important;
+}

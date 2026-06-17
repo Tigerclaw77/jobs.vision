@@ -91,6 +91,9 @@ create table if not exists public.jobs (
   daily_rate numeric(10,2),
   compensation_notes text,
   salary text,
+  clinical_focuses text[] not null default '{}',
+  practice_types text[] not null default '{}',
+  benefit_flags text[] not null default '{}',
   tag_ids text[] not null default '{}',
   status text not null default 'active',
   featured boolean not null default false,
@@ -609,6 +612,15 @@ create index if not exists jobs_employment_types_gin_idx
 
 create index if not exists jobs_work_arrangements_gin_idx
   on public.jobs using gin (work_arrangements);
+
+create index if not exists jobs_clinical_focuses_gin_idx
+  on public.jobs using gin (clinical_focuses);
+
+create index if not exists jobs_practice_types_gin_idx
+  on public.jobs using gin (practice_types);
+
+create index if not exists jobs_benefit_flags_gin_idx
+  on public.jobs using gin (benefit_flags);
 
 create index if not exists jobs_compensation_type_idx
   on public.jobs (compensation_type);
