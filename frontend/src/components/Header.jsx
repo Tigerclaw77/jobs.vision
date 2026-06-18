@@ -1,7 +1,7 @@
 // src/components/Header.jsx
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { logout as logoutRedux } from "../store/authSlice";
 import { fetchNotifications, clearNotifications } from "../store/notificationsSlice";
 import { FiBell, FiUser, FiLogOut, FiSettings, FiHome } from "react-icons/fi";
@@ -54,11 +54,6 @@ const AdminViewModeControl = () => {
 const Header = () => {
   // 🔐 Single source of truth for auth
   const { session, user, account, profile, role: authRole, signOut } = useAuth();
-
-  // Keep using Redux for notifications (unchanged)
-  const hasUnreadNotifications = useSelector(
-    (state) => state.notifications.hasUnreadNotifications
-  );
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -241,7 +236,6 @@ const Header = () => {
             <nav className="nav">{/* right-aligned via CSS */}
               <Link to="/notifications" className="icon notification-wrapper">
                 <FiBell />
-                {hasUnreadNotifications && <span className="notification-dot" />}
               </Link>
 
               {isAuthed ? (
@@ -285,9 +279,6 @@ const Header = () => {
                       >
                         <span className="icon-wrapper">
                           <FiBell />
-                          {hasUnreadNotifications && (
-                            <span className="dropdown-notification-dot" />
-                          )}
                         </span>
                       Notifications
                     </button>
@@ -327,7 +318,6 @@ const Header = () => {
                 aria-label="Open account menu"
               >
                 <span className="initials">{getInitials()}</span>
-                {hasUnreadNotifications && <span className="notification-dot" />}
               </button>
 
               <div className={`slide-drawer ${drawerOpen ? "open" : ""}`}>
@@ -344,9 +334,6 @@ const Header = () => {
                   >
                     <span className="icon-wrapper">
                       <FiBell />
-                      {hasUnreadNotifications && (
-                        <span className="drawer-notification-dot" />
-                      )}
                     </span>
                     Notifications
                   </button>

@@ -3,6 +3,7 @@ import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import {
   LISTING_OPPORTUNITY_TYPE_LABELS,
   LISTING_TIER_LABELS,
+  EMPLOYMENT_TYPE_LABELS,
   ROLE_LABELS,
   compensationSummary,
   normalizeRole,
@@ -19,42 +20,31 @@ function displayRole(role, fallbackTitle = "") {
   return String(label).trim();
 }
 
-function opportunityDescriptor(values = []) {
-  if (values.some((value) => value === "corporate_lease")) return "Lease";
-  if (values.some((value) => value === "partnership_opportunity")) return "Partnership";
-  if (values.some((value) => value === "practice_acquisition")) return "Acquisition";
-  if (
-    values.some((value) =>
-      ["associate_w2", "associate_1099", "corporate_employment"].includes(value)
-    )
-  ) {
-    return "Associate";
-  }
-  return "";
+function uniquePostingIdentity(job = {}, role = "") {
+  const title = String(job.title || "").trim();
+  const company = String(job.company || job.employer_name || "").trim();
+  const roleTitle = displayRole(role);
+  if (title && title.toLowerCase() !== roleTitle.toLowerCase()) return title;
+  return company || title || roleTitle;
 }
 
-function conciseTitle(job = {}, role = "") {
+function roleEmploymentLine(job = {}, role = "") {
   const roleTitle = displayRole(role, job.title);
   const employmentValues = valuesFrom(job, "employment_types", "employment_type", "type");
-  const opportunityValues = role === "optometrist"
-    ? valuesFrom(job, "opportunity_types", "opportunity_type")
-    : [];
 
   if (employmentValues.includes("per_diem_fill_in")) {
-    return role === "optometrist" ? `${roleTitle} - Locum Tenens` : `${roleTitle} - Per Diem`;
+    const label = role === "optometrist" ? "Locum Tenens" : "Per Diem";
+    return `${roleTitle} · ${label}`;
   }
 
-  const parts = [];
+  const employmentLabels = [];
   const isFullTime = employmentValues.includes("full_time");
   const isPartTime = employmentValues.includes("part_time");
-  if (isFullTime && isPartTime) parts.push("F/T or P/T");
-  else if (isFullTime) parts.push("F/T");
-  else if (isPartTime) parts.push("P/T");
+  if (isFullTime && isPartTime) employmentLabels.push("Full-Time / Part-Time");
+  else if (isFullTime) employmentLabels.push(EMPLOYMENT_TYPE_LABELS.full_time);
+  else if (isPartTime) employmentLabels.push(EMPLOYMENT_TYPE_LABELS.part_time);
 
-  const opportunity = opportunityDescriptor(opportunityValues);
-  if (opportunity) parts.push(opportunity);
-
-  return parts.length ? `${roleTitle} - ${parts.join(" ")}` : roleTitle;
+  return [roleTitle, ...employmentLabels].filter(Boolean).join(" · ");
 }
 
 function compactCompensation(job = {}) {
@@ -128,7 +118,8 @@ export default function JobCard({
   onAdminRemoveClick,
 }) {
   const role = normalizeRole(job.role) || job.role;
-  const cardTitle = conciseTitle(job, role);
+  const cardTitle = uniquePostingIdentity(job, role);
+  const cardRoleLine = roleEmploymentLine(job, role);
   const cardCompensation = compactCompensation(job);
   const cardLocation = displayLocation(job);
   const listingTier =
@@ -224,7 +215,7 @@ export default function JobCard({
           </div>
         )}
         <h3 className="job-title">{cardTitle}</h3>
-        {job.company && <p className="job-company">{job.company}</p>}
+        {cardRoleLine && <p className="job-role-line">{cardRoleLine}</p>}
         {cardLocation && <p className="job-location">{cardLocation}</p>}
         {cardCompensation.primary && (
           <p className="job-compensation">

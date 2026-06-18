@@ -25,6 +25,7 @@ frontend/build/
 /*.jpg
 /*.jpeg
 /*.gif
+screenshots/
 
 # Local/editor/system files
 .git/

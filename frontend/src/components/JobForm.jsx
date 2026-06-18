@@ -1228,12 +1228,10 @@ export default function JobForm({
       : locationMode === "multiple"
       ? "Primary Location* (City, ST)"
       : "Location* (City, ST)";
-  const locationPlaceholder =
-    locationMode === "remote" ? "TX" : "Spring, TX";
   const locationHelper =
     locationMode === "remote"
-      ? "State license required. No street address needed."
-      : "City and state are required.";
+      ? "Example: TX. State license required. No street address needed."
+      : "Example: Spring, TX";
 
   const handleCheckout = async (e) => {
     if (e) e.preventDefault();
@@ -1311,7 +1309,7 @@ export default function JobForm({
                 </div>
                 <div className="modal-actions recruiter-preview-actions">
                   <button type="button" className="btn-primary">
-                    {previewUsesApplyUrl ? "Apply on Employer Site" : "Apply by Email"}
+                    {previewUsesApplyUrl ? "Apply on Employer Site" : "Email Employer"}
                   </button>
                   <button type="button" className="btn-secondary">Close</button>
                 </div>
@@ -1419,7 +1417,6 @@ export default function JobForm({
               onBlur={handleBlur("location")}
               error={showError("location")}
               helperText={helperTextFor("location", locationHelper)}
-              placeholder={locationPlaceholder}
               disabled={locationLocked}
             />
           </div>
@@ -1459,12 +1456,12 @@ export default function JobForm({
               tabIndex={locationLocked ? 0 : undefined}
             >
               <TextField
-                label="Map address"
+                label="Map Address or ZIP"
                 fullWidth
                 value={values.map_address}
                 onChange={handleChange("map_address")}
-                placeholder="123 Main St, Spring, TX 77380"
-                helperText="Improves map accuracy. Not shown on the job ad."
+                placeholder="77380 or 1201 Lake Woodlands Dr, Spring, TX 77380"
+                helperText="Used only for maps and radius matching. Not shown on the job posting."
                 disabled={locationLocked}
               />
             </div>
@@ -1729,6 +1726,7 @@ export default function JobForm({
                 error={showError("application_email")}
                 helperText={helperTextFor("application_email", "Applicants will be instructed to email this address.")}
                 placeholder="hiring@example.com"
+                InputLabelProps={{ shrink: true }}
               />
             ) : null}
 

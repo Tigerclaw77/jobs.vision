@@ -103,13 +103,18 @@
 
 .recruiter-job-form-card .recruiter-custom-apply-email-field .MuiInputLabel-root {
   color: rgba(248, 250, 252, 0.92) !important;
-  background: transparent;
-  padding: 0;
+  background: #0a1221;
+  padding: 0 6px;
 }
 
 .recruiter-job-form-card .recruiter-custom-apply-email-field .MuiInputLabel-root.Mui-focused,
 .recruiter-job-form-card .recruiter-custom-apply-email-field .MuiInputLabel-root.MuiFormLabel-filled {
   color: #ffffff !important;
+}
+
+.recruiter-job-form-card .recruiter-custom-apply-email-field .MuiInputLabel-root.MuiInputLabel-shrink {
+  background: #0a1221;
+  padding: 0 6px;
 }
 
 .recruiter-job-form-card .recruiter-custom-apply-email-field .MuiOutlinedInput-root {

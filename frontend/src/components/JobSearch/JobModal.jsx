@@ -74,6 +74,8 @@ export default function JobModal({
   const [reportComment, setReportComment] = useState("");
   const [reportMessage, setReportMessage] = useState("");
   const [isReporting, setIsReporting] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) document.body.classList.add("modal-open");
@@ -93,6 +95,8 @@ export default function JobModal({
     setReportComment("");
     setReportMessage("");
     setIsReporting(false);
+    setShowEmailDialog(false);
+    setEmailCopied(false);
   }, [isOpen, job?._id, job?.id]);
 
   if (!isOpen || !job) return null;
@@ -170,11 +174,6 @@ export default function JobModal({
       className: "job-listing-badge claimed",
       label: "Claimed",
     },
-    (isClaimedListing || job.listing_source === "employer_submitted") && {
-      key: "employer-managed",
-      className: "job-listing-badge employer-managed",
-      label: "Employer Managed",
-    },
   ].filter(Boolean);
 
   async function handleReportSubmit(event) {
@@ -205,6 +204,32 @@ export default function JobModal({
       destinationType: outboundDestinationType,
       destination: externalApplyUrl || applyEmail,
     });
+  }
+
+  function handleEmailApplyClick() {
+    handleOutboundApply();
+    setEmailCopied(false);
+    setShowEmailDialog(true);
+  }
+
+  async function handleCopyEmailAddress() {
+    if (!applyEmail) return;
+    try {
+      await navigator.clipboard.writeText(applyEmail);
+      setEmailCopied(true);
+      return;
+    } catch (error) {
+      const textarea = document.createElement("textarea");
+      textarea.value = applyEmail;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setEmailCopied(true);
+    }
   }
 
   return (
@@ -375,17 +400,27 @@ export default function JobModal({
                 : "Claim this Listing"}
             </button>
           )}
-          {(externalApplyUrl || emailApplyUrl) && (
+          {externalApplyUrl && (
             <a
               className="btn-primary"
-              href={externalApplyUrl || emailApplyUrl}
-              target={externalApplyUrl ? "_blank" : undefined}
-              rel={externalApplyUrl ? "noreferrer" : undefined}
-              title={externalApplyUrl ? "Apply on employer site" : "Apply by email"}
+              href={externalApplyUrl}
+              target="_blank"
+              rel="noreferrer"
+              title="Apply on employer site"
               onClick={handleOutboundApply}
             >
-              {externalApplyUrl ? "Apply on Employer Site" : "Apply by Email"}
+              Apply on Employer Site
             </a>
+          )}
+          {!externalApplyUrl && emailApplyUrl && (
+            <button
+              type="button"
+              className="btn-primary"
+              title="Email employer"
+              onClick={handleEmailApplyClick}
+            >
+              Email Employer
+            </button>
           )}
           {!externalApplyUrl && !emailApplyUrl && !isApplied && (
             <button
@@ -400,6 +435,32 @@ export default function JobModal({
             Close
           </button>
         </div>
+        {showEmailDialog && applyEmail ? (
+          <div
+            className="email-apply-dialog-backdrop"
+            role="presentation"
+            onClick={() => setShowEmailDialog(false)}
+          >
+            <div
+              className="email-apply-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="email-employer-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h4 id="email-employer-title">Email Employer</h4>
+              <p className="email-apply-address">{applyEmail}</p>
+              <div className="email-apply-actions">
+                <button type="button" className="btn-primary" onClick={handleCopyEmailAddress}>
+                  {emailCopied ? "Copied" : "Copy Email Address"}
+                </button>
+                <a className="btn-secondary" href={emailApplyUrl}>
+                  Open Email App
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -28,7 +28,6 @@ const MobileUserMenu = () => {
     <>
       <button className="user-circle" onClick={() => setDrawerOpen(!drawerOpen)}>
         <span className="initials">{getInitials()}</span>
-        <span className="notification-dot"></span>
       </button>
 
       <div className={`slide-drawer ${drawerOpen ? "open" : ""}`}>
