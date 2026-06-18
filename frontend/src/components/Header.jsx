@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { logout as logoutRedux } from "../store/authSlice";
 import { fetchNotifications, clearNotifications } from "../store/notificationsSlice";
-import { FiBell, FiUser, FiLogOut, FiSettings } from "react-icons/fi";
+import { FiBell, FiUser, FiLogOut, FiSettings, FiHome } from "react-icons/fi";
 import LoadingSpinner from "./ui/LoadingSpinner";
 import { useAuth } from "../components/auth/AuthProvider";
 import {
@@ -168,6 +168,20 @@ const Header = () => {
     }
   };
 
+  const getDashboardLink = () => {
+    const r = String(authRole || "").toLowerCase();
+    switch (r) {
+      case "candidate":
+        return "/candidate/dashboard";
+      case "recruiter":
+        return "/recruiter/dashboard";
+      case "admin":
+        return "/admin";
+      default:
+        return null;
+    }
+  };
+
   const displayName =
     profile?.firstName ||
     profile?.first_name ||
@@ -232,6 +246,12 @@ const Header = () => {
 
               {isAuthed ? (
                 <div className="account-container" ref={dropdownRef}>
+                  {getDashboardLink() && (
+                    <Link to={getDashboardLink()} className="header-dashboard-link">
+                      <FiHome />
+                      <span>Dashboard</span>
+                    </Link>
+                  )}
                   <button
                     className="account-link welcome-pill"
                     onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -269,8 +289,14 @@ const Header = () => {
                             <span className="dropdown-notification-dot" />
                           )}
                         </span>
-                        Notifications
-                      </button>
+                      Notifications
+                    </button>
+
+                      {getDashboardLink() && (
+                        <Link to={getDashboardLink()} className="dropdown-item">
+                          <FiHome /> Dashboard
+                        </Link>
+                      )}
 
                       {getProfileLink() && (
                         <Link to={getProfileLink()} className="dropdown-item">
@@ -334,6 +360,18 @@ const Header = () => {
                       }}
                     >
                       <FiSettings /> Profile
+                    </button>
+                  )}
+
+                  {getDashboardLink() && (
+                    <button
+                      className="drawer-item"
+                      onClick={() => {
+                        navigate(getDashboardLink());
+                        setDrawerOpen(false);
+                      }}
+                    >
+                      <FiHome /> Dashboard
                     </button>
                   )}
 

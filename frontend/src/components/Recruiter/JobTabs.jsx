@@ -66,7 +66,6 @@ const JobTabs = ({ jobsByStatus, onEdit, onPause, onResume, onArchive, onUnarchi
               <span>Type</span>
               <span>Status</span>
               <span>Posted</span>
-              <span>Performance</span>
               <span>Actions</span>
             </div>
             {jobs.map((job) => (

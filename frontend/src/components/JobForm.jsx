@@ -96,6 +96,12 @@ const PRESELECT_ROLE_BY_PLAN = {
 
 const CLINICAL_FOCUS_LIMIT = 5;
 
+const LOCATION_MODE_OPTIONS = [
+  { value: "single", label: "One location" },
+  { value: "multiple", label: "Multiple nearby locations" },
+  { value: "remote", label: "Remote" },
+];
+
 const CLINICAL_FOCUS_OPTIONS = [
   { value: "dry_eye", label: "Dry Eye" },
   { value: "myopia_management", label: "Myopia Management" },
@@ -141,7 +147,11 @@ const PRACTICE_ENVIRONMENT_LABELS = PRACTICE_ENVIRONMENT_OPTIONS.reduce(
 const defaultValues = {
   title: "",
   company: "",
+  location_mode: "single",
   location: "",
+  map_address: "",
+  additional_locations: [],
+  additional_locations_text: "",
   role_type: "",
   opportunity_types: [],
   practice_type: "",
@@ -196,6 +206,55 @@ function splitLocation(location = "") {
   return {
     city: parts[0] || "",
     state: parts[1] || "",
+  };
+}
+
+function splitListInput(value = "") {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeLocationMode(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  return LOCATION_MODE_OPTIONS.some((option) => option.value === normalized) ? normalized : "single";
+}
+
+function stateFromLocationInput(value = "") {
+  const text = cleanGeocodeText(value);
+  if (!text) return "";
+  const parts = text.split(",").map((part) => part.trim()).filter(Boolean);
+  const state = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+  return state.replace(/\./g, "").toUpperCase();
+}
+
+function locationFieldsFromValues(values = {}) {
+  const locationMode = normalizeLocationMode(values.location_mode);
+  if (locationMode === "remote") {
+    const state = stateFromLocationInput(values.location);
+    return {
+      location: state ? `Remote, ${state}` : cleanGeocodeText(values.location),
+      city: null,
+      state,
+      location_mode: "remote",
+      additional_locations: [],
+      geocodeAddress: null,
+    };
+  }
+
+  const { city, state } = splitLocation(values.location);
+  return {
+    location: cleanGeocodeText(values.location),
+    city,
+    state,
+    location_mode: locationMode,
+    additional_locations:
+      locationMode === "multiple"
+        ? splitListInput(values.additional_locations_text || values.additional_locations || "")
+        : [],
+    geocodeAddress: cleanGeocodeText(values.map_address),
   };
 }
 
@@ -298,7 +357,9 @@ function hasLocationChanged(job, payload) {
   return (
     !sameText(job.location, payload.location) ||
     !sameText(job.city, payload.city) ||
-    !sameText(job.state, payload.state)
+    !sameText(job.state, payload.state) ||
+    !sameText(job.location_mode, payload.location_mode) ||
+    (payload.geocodeAddress && cleanGeocodeText(payload.geocodeAddress).length > 0)
   );
 }
 
@@ -333,7 +394,7 @@ function loadGoogleMaps(apiKey) {
 
 async function geocodeJobPayload(payload) {
   const address = cleanGeocodeText(
-    payload.location || [payload.city, payload.state].filter(Boolean).join(", ")
+    payload.geocodeAddress || payload.location || [payload.city, payload.state].filter(Boolean).join(", ")
   );
   if (!address) throw new Error(LOCATION_MAP_ERROR);
 
@@ -437,10 +498,12 @@ function applyDestinationSummary(values, profile = {}) {
   const jobUrl = values.external_apply_url?.trim();
   const jobEmail = values.application_email?.trim();
   if (values.apply_destination_mode === "url") {
-    return jobUrl ? `Custom apply URL: ${jobUrl}` : "Custom apply URL required before publishing.";
+    return jobUrl ? `Application page URL: ${jobUrl}` : "Application page URL required before publishing.";
   }
   if (values.apply_destination_mode === "email") {
-    return jobEmail ? `Custom apply email: ${jobEmail}` : "Custom apply email required before publishing.";
+    return jobEmail
+      ? `Alternate application email: ${jobEmail}`
+      : "Alternate application email required before publishing.";
   }
   if (defaultDestination.applyUrl) {
     return `Recruiter default apply URL: ${defaultDestination.applyUrl}`;
@@ -500,6 +563,12 @@ function normalizeDraftValues(raw = {}) {
   return {
     ...defaultValues,
     ...draftValues,
+    location_mode: normalizeLocationMode(raw.location_mode || raw.locationMode),
+    additional_locations: splitListInput(raw.additional_locations || raw.additionalLocations || ""),
+    additional_locations_text:
+      raw.additional_locations_text ||
+      raw.additionalLocationsText ||
+      splitListInput(raw.additional_locations || raw.additionalLocations || "").join(", "),
     role_type: role,
     apply_destination_mode: applyDestinationMode,
     use_default_apply_destination: applyDestinationMode === "default",
@@ -535,7 +604,13 @@ function valuesFromJob(job = {}) {
     ...defaultValues,
     title: job.title || "",
     company: job.employer_name || job.company || "",
+    location_mode: normalizeLocationMode(job.location_mode || job.locationMode || job.location_precision),
     location: job.location || [job.city, job.state].filter(Boolean).join(", "),
+    additional_locations: splitListInput(job.additional_locations || job.additionalLocations || ""),
+    additional_locations_text: splitListInput(
+      job.additional_locations || job.additionalLocations || ""
+    ).join(", "),
+    map_address: "",
     role_type: normalizeRole(job.role) || "",
     opportunity_types:
       normalizeRole(job.role) === "optometrist"
@@ -593,7 +668,13 @@ function valuesFromJob(job = {}) {
 function validate(values, { requireApplyDestination = false, profile = {} } = {}) {
   const errors = {};
   if (!values.title.trim()) errors.title = "Job title is required.";
-  if (!values.location.trim()) errors.location = "City/State (or Remote) is required.";
+  const locationMode = normalizeLocationMode(values.location_mode);
+  const locationFields = locationFieldsFromValues(values);
+  if (locationMode === "remote") {
+    if (!locationFields.state) errors.location = "Licensing state is required.";
+  } else if (!locationFields.city || !locationFields.state) {
+    errors.location = "Enter location as City, ST.";
+  }
   if (!values.role_type) errors.role_type = "Role is required.";
   if (!values.employment_types?.length) {
     errors.employment_types = "Employment type is required.";
@@ -696,12 +777,15 @@ export default function JobForm({
 }) {
   const location = useLocation();
   const preselectedRole = roleFromSearch(location.search);
+  const checkoutSucceeded =
+    new URLSearchParams(location.search).get("checkout") === "success";
   const editingJobId = jobToEdit?.id || jobToEdit?._id || null;
   const isEditing = Boolean(editingJobId);
   const roleLocked =
     isEditing &&
     (Boolean(jobToEdit?.first_activated_at || jobToEdit?.firstActivatedAt) ||
       !["draft", ""].includes(String(jobToEdit?.status || "").toLowerCase()));
+  const locationLocked = roleLocked;
   const [values, setValues] = useState(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
@@ -809,6 +893,33 @@ export default function JobForm({
     }
   };
 
+  const handleLocationModeChange = (mode) => {
+    if (locationLocked) return;
+    setValues((prev) => ({
+      ...prev,
+      location_mode: normalizeLocationMode(mode),
+      map_address: mode === "remote" ? "" : prev.map_address,
+      additional_locations: mode === "multiple" ? prev.additional_locations : [],
+      additional_locations_text: mode === "multiple" ? prev.additional_locations_text : "",
+    }));
+    if (errors.location) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.location;
+        return next;
+      });
+    }
+  };
+
+  const handleAdditionalLocationsChange = (e) => {
+    const value = e?.target?.value ?? "";
+    setValues((prev) => ({
+      ...prev,
+      additional_locations_text: value,
+      additional_locations: splitListInput(value),
+    }));
+  };
+
   const handleMultiChange = (field) => (e) => {
     const v = e?.target?.value ?? [];
     setValues((prev) => ({ ...prev, [field]: Array.isArray(v) ? v : String(v).split(",") }));
@@ -886,7 +997,7 @@ export default function JobForm({
   };
 
   const buildPayload = () => {
-    const { city, state } = splitLocation(values.location);
+    const locationFields = locationFieldsFromValues(values);
     const opportunityTypes =
       values.role_type === "optometrist" ? values.opportunity_types || [] : [];
     const employmentTypes = values.employment_types || [];
@@ -898,9 +1009,12 @@ export default function JobForm({
       title: values.title.trim(),
       company: employerName || null,
       employer_name: employerName || null,
-      location: values.location.trim(),
-      city,
-      state,
+      location: locationFields.location,
+      city: locationFields.city,
+      state: locationFields.state,
+      location_mode: locationFields.location_mode,
+      additional_locations: locationFields.additional_locations,
+      geocodeAddress: locationFields.geocodeAddress || undefined,
       role: values.role_type,
       type: employmentTypes[0] || null,
       opportunity_type: opportunityTypes[0] || null,
@@ -928,6 +1042,11 @@ export default function JobForm({
   };
 
   const hydrateCoordinates = async (payload, { required = false } = {}) => {
+    if (payload.location_mode === "remote") {
+      payload.latitude = null;
+      payload.longitude = null;
+      return payload;
+    }
     if (!required && !GOOGLE_MAPS_API_KEY) return payload;
     if (!isEditing || hasLocationChanged(jobToEdit, payload)) {
       if (GOOGLE_MAPS_API_KEY) {
@@ -1045,6 +1164,17 @@ export default function JobForm({
     values.role_type,
     isAdmin
   );
+
+  useEffect(() => {
+    if (!checkoutSucceeded || !isEditing) return;
+    setShowPreview(false);
+    setMessage(
+      postingPaymentActive
+        ? "Payment received. Publish when ready."
+        : "Payment received. We are confirming it with Stripe; publish will unlock shortly."
+    );
+  }, [checkoutSucceeded, isEditing, postingPaymentActive]);
+
   const previewUsesApplyUrl = Boolean(
     values.external_apply_url?.trim() ||
       (!values.application_email?.trim() &&
@@ -1089,6 +1219,21 @@ export default function JobForm({
   const checkoutRequired = paymentRequired;
   const checkoutPostingLabel = RECRUITER_POSTING_LABELS[requiredPlanKey] || "Posting";
   const checkoutButtonLabel = "Continue";
+  const roleLockMessage = "Create a new posting to select a different role.";
+  const locationLockMessage = "Create a new posting to use a different location.";
+  const locationMode = normalizeLocationMode(values.location_mode);
+  const locationLabel =
+    locationMode === "remote"
+      ? "Licensing State*"
+      : locationMode === "multiple"
+      ? "Primary Location* (City, ST)"
+      : "Location* (City, ST)";
+  const locationPlaceholder =
+    locationMode === "remote" ? "TX" : "Spring, TX";
+  const locationHelper =
+    locationMode === "remote"
+      ? "State license required. No street address needed."
+      : "City and state are required.";
 
   const handleCheckout = async (e) => {
     if (e) e.preventDefault();
@@ -1190,31 +1335,28 @@ export default function JobForm({
         <Box className="recruiter-position-step">
           <Typography variant="subtitle2">Step 1: Select Position Type</Typography>
           <div className="recruiter-position-selector-row">
-            <div className="recruiter-position-options">
+            <div className={`recruiter-position-options${roleLocked ? " is-locked" : ""}`}>
               {POSTING_ROLE_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   className={values.role_type === option.value ? "selected" : ""}
                   onClick={() => handleRoleChange({ target: { value: option.value } })}
-                  disabled={roleLocked}
+                  aria-disabled={roleLocked}
+                  data-lock-message={roleLocked ? roleLockMessage : undefined}
                 >
                   {option.label}
                 </button>
               ))}
             </div>
-            {roleLocked ? (
-              <p className="recruiter-position-note">
-                Role category is locked after publication. Create a new posting for a different role.
-              </p>
-            ) : selectedRolePricing ? (
+            {!roleLocked && selectedRolePricing ? (
               <div className="recruiter-position-pricing" aria-live="polite">
                 <span>{selectedRolePricing.firstMonth}</span>
                 <span>{selectedRolePricing.renewal}</span>
               </div>
-            ) : (
+            ) : !roleLocked ? (
               <p className="recruiter-position-note">Select a position type to see pricing.</p>
-            )}
+            ) : null}
           </div>
           {!!errors.role_type && <p className="recruiter-job-form-error">{errors.role_type}</p>}
         </Box>
@@ -1242,16 +1384,45 @@ export default function JobForm({
           />
         </Grid>
 
+        <Grid item xs={12}>
+          <Box className="recruiter-location-mode-group">
+            <Typography variant="subtitle2">Location Type</Typography>
+            <div className="recruiter-location-mode-options">
+              {LOCATION_MODE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={locationMode === option.value ? "selected" : ""}
+                  onClick={() => handleLocationModeChange(option.value)}
+                  aria-pressed={locationMode === option.value}
+                  aria-disabled={locationLocked}
+                  disabled={locationLocked}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </Box>
+        </Grid>
+
         <Grid item xs={12} md={6}>
-          <TextField
-            label="Location* (City, ST or Remote)"
-            fullWidth
-            value={values.location}
-            onChange={handleChange("location")}
-            onBlur={handleBlur("location")}
-            error={showError("location")}
-            helperText={helperTextFor("location")}
-          />
+          <div
+            className={locationLocked ? "recruiter-locked-field" : undefined}
+            data-lock-message={locationLocked ? locationLockMessage : undefined}
+            tabIndex={locationLocked ? 0 : undefined}
+          >
+            <TextField
+              label={locationLabel}
+              fullWidth
+              value={values.location}
+              onChange={handleChange("location")}
+              onBlur={handleBlur("location")}
+              error={showError("location")}
+              helperText={helperTextFor("location", locationHelper)}
+              placeholder={locationPlaceholder}
+              disabled={locationLocked}
+            />
+          </div>
         </Grid>
 
         <Grid item xs={12} md={6}>
@@ -1266,6 +1437,39 @@ export default function JobForm({
             helperText={helperTextFor("employment_types")}
           />
         </Grid>
+
+        {locationMode === "multiple" ? (
+          <Grid item xs={12} md={6}>
+            <TextField
+              label="Additional areas"
+              fullWidth
+              value={values.additional_locations_text}
+              onChange={handleAdditionalLocationsChange}
+              placeholder="The Woodlands, Conroe, North Houston"
+              disabled={locationLocked}
+            />
+          </Grid>
+        ) : null}
+
+        {locationMode !== "remote" ? (
+          <Grid item xs={12} md={6}>
+            <div
+              className={locationLocked ? "recruiter-locked-field" : undefined}
+              data-lock-message={locationLocked ? locationLockMessage : undefined}
+              tabIndex={locationLocked ? 0 : undefined}
+            >
+              <TextField
+                label="Map address"
+                fullWidth
+                value={values.map_address}
+                onChange={handleChange("map_address")}
+                placeholder="123 Main St, Spring, TX 77380"
+                helperText="Improves map accuracy. Not shown on the job ad."
+                disabled={locationLocked}
+              />
+            </div>
+          </Grid>
+        ) : null}
 
         <Grid item xs={12}>
           <Box className="recruiter-search-details">
@@ -1454,8 +1658,8 @@ export default function JobForm({
                   onChange={() => handleApplyDestinationModeChange("default")}
                 />
                 <span>
-                  <strong>Use Account Apply Method</strong>
-                  <small>Best for practices with one careers page or hiring inbox.</small>
+                  <strong>Use Default Email</strong>
+                  <small>Use the email saved on your recruiter account.</small>
                 </span>
               </label>
               <label className="recruiter-apply-option">
@@ -1467,7 +1671,7 @@ export default function JobForm({
                   onChange={() => handleApplyDestinationModeChange("url")}
                 />
                 <span>
-                  <strong>Custom Apply URL</strong>
+                  <strong>Application Page URL</strong>
                   <small>Use a unique employer-hosted page for this opening.</small>
                 </span>
               </label>
@@ -1480,7 +1684,7 @@ export default function JobForm({
                   onChange={() => handleApplyDestinationModeChange("email")}
                 />
                 <span>
-                  <strong>Custom Apply Email</strong>
+                  <strong>Alternate Application Email</strong>
                   <small>Send applicants directly to a job-specific inbox.</small>
                 </span>
               </label>
@@ -1503,7 +1707,7 @@ export default function JobForm({
 
             {values.apply_destination_mode === "url" ? (
               <TextField
-                label="Custom Apply URL*"
+                label="Application Page URL*"
                 fullWidth
                 value={values.external_apply_url}
                 onChange={handleChange("external_apply_url")}
@@ -1516,7 +1720,8 @@ export default function JobForm({
 
             {values.apply_destination_mode === "email" ? (
               <TextField
-                label="Custom Apply Email*"
+                className="recruiter-custom-apply-email-field"
+                label="Alternate Application Email*"
                 fullWidth
                 value={values.application_email}
                 onChange={handleChange("application_email")}
@@ -1708,7 +1913,7 @@ export default function JobForm({
               </Button>
             ) : (
               <Button type="button" variant="contained" disabled={submitting} onClick={handlePublish}>
-                {submitting ? "Publishing..." : "Publish"}
+                {submitting ? "Publishing..." : "Publish Job"}
               </Button>
             )}
           </Stack>

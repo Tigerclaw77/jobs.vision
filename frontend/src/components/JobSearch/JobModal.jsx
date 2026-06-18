@@ -26,6 +26,18 @@ function applyEmailFor(job = {}) {
   return job.application_email || job.applicationEmail || "";
 }
 
+function displayLocation(job = {}) {
+  const base = String(job.location || [job.city, job.state].filter(Boolean).join(", ")).trim();
+  if (!base) return "";
+  const isMultiple = job.location_mode === "multiple" || job.location_precision === "multiple";
+  return isMultiple ? `${base} + nearby locations` : base;
+}
+
+function textList(values) {
+  const list = Array.isArray(values) ? values : String(values || "").split(",");
+  return list.map((value) => String(value || "").trim()).filter(Boolean).join(", ");
+}
+
 const REPORT_REASONS = [
   ["expired", "Expired"],
   ["broken_apply_link", "Broken Apply Link"],
@@ -86,6 +98,7 @@ export default function JobModal({
   if (!isOpen || !job) return null;
 
   const role = normalizeRole(job.role) || job.role;
+  const modalLocation = displayLocation(job);
   const opportunityLabels =
     role === "optometrist"
       ? labelsForValues(OPPORTUNITY_TYPE_LABELS, job.opportunity_types || job.opportunity_type)
@@ -107,6 +120,7 @@ export default function JobModal({
     ["Role", ROLE_LABELS[role] || job.role || ""],
     ["Opportunity Type", opportunityLabels.join(", ")],
     ["Practice Type", practiceTypeLabels.length ? "" : PRACTICE_TYPE_LABELS[job.practice_type] || ""],
+    ["Additional Areas", textList(job.additional_locations)],
     ["Work Arrangement", labelsForValues(WORK_ARRANGEMENT_LABELS, job.work_arrangements || job.work_arrangement).join(", ")],
     ["Saturday Schedule", SATURDAY_SCHEDULE_LABELS[job.saturday_schedule] || ""],
     ["Sign-on Bonus", job.sign_on_bonus || ""],
@@ -257,7 +271,7 @@ export default function JobModal({
           </div>
         )}
         {job.company && <p className="modal-company">{job.company}</p>}
-        {job.location && <p className="modal-location">{job.location}</p>}
+        {modalLocation && <p className="modal-location">{modalLocation}</p>}
         {employmentLine && <p className="modal-employment">{employmentLine}</p>}
         {compensationLine && <p className="modal-compensation">{compensationLine}</p>}
 

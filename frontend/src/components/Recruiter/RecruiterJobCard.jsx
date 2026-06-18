@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown, ChevronRight, Pause, Pencil, Play, RotateCcw, Trash2 } from "lucide-react";
 import {
   COMPENSATION_TYPE_LABELS,
   EMPLOYMENT_TYPE_LABELS,
@@ -54,10 +55,30 @@ function labels(values, map) {
   return labelsForValues(map, values).join(", ");
 }
 
+function textList(values) {
+  const list = Array.isArray(values) ? values : String(values || "").split(",");
+  return list.map((value) => String(value || "").trim()).filter(Boolean).join(", ");
+}
+
 function locationText(job = {}) {
-  if (job.location) return job.location;
-  const cityState = [job.city, job.state].filter(Boolean).join(", ");
-  return cityState || "Not set";
+  const city = String(job.city || "").trim();
+  const state = String(job.state || job.state_code || "").trim().toUpperCase();
+  const location = String(job.location || "").trim();
+  const isMultiple = job.location_mode === "multiple" || job.location_precision === "multiple";
+  const suffix = isMultiple ? " + nearby locations" : "";
+
+  if (city && state) return `${city}, ${state}${suffix}`;
+  if (location) {
+    if (
+      state &&
+      !/remote/i.test(location) &&
+      !new RegExp(`\\b${state.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(location)
+    ) {
+      return `${location}, ${state}${suffix}`;
+    }
+    return `${location}${suffix}`;
+  }
+  return city || state || "Not set";
 }
 
 function applyMethod(job = {}) {
@@ -101,7 +122,10 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
   const id = job.id || job._id;
   const role = normalizeRole(job.role) || job.role;
   const roleLabel = ROLE_LABELS[role] || job.role || "Job";
-  const statusLabel = STATUS_LABELS[job.status] || (job.is_archived ? "Removed" : job.status || "Unknown");
+  const isPaidDraft = job.status === "draft" && !job.is_archived && job.payment?.active === true;
+  const statusLabel = isPaidDraft
+    ? "Ready to publish"
+    : STATUS_LABELS[job.status] || (job.is_archived ? "Removed" : job.status || "Unknown");
   const employment = compactEmployment(job);
   const workSetting = labels(job.work_arrangements || job.work_arrangement, WORK_ARRANGEMENT_LABELS);
   const opportunity =
@@ -118,7 +142,8 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
   const canViewPublicListing = job.status === "active" && !job.is_archived;
   const publicListingHref = id ? `/jobs?jobId=${encodeURIComponent(id)}` : "/jobs";
   const titleText = job.title || "Untitled job";
-  const hasOverflowActions = onEdit || onPause || onResume || onArchive || onUnarchive;
+  const isLive = job.status === "active" && !job.is_archived;
+  const isPaused = job.status === "paused" && !job.is_archived;
 
   const badges = useMemo(() => {
     const listingTier =
@@ -142,14 +167,67 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
     if (confirmed) await action(payload);
   };
 
+  const handleRowClick = (event) => {
+    if (event.target.closest?.("a, button, summary, details")) return;
+    setExpanded((current) => !current);
+  };
+
+  const toggleExpanded = (event) => {
+    event.stopPropagation();
+    setExpanded((current) => !current);
+  };
+
+  const statusAction = (() => {
+    if (isPaidDraft && onEdit) {
+      return {
+        label: "Publish",
+        className: "primary",
+        icon: Play,
+        onClick: () => onEdit(job),
+      };
+    }
+    if ((isLive || job.status === "pending_domain") && onPause) {
+      return {
+        label: "Pause",
+        className: "secondary",
+        icon: Pause,
+        onClick: () => confirmAndRun(`Pause "${titleText}" and hide it from public search and the map?`, onPause),
+      };
+    }
+    if (isPaused && onResume) {
+      return {
+        label: "Publish",
+        className: "primary",
+        icon: Play,
+        onClick: () => confirmAndRun(`Publish "${titleText}" so candidates can find it again?`, onResume),
+      };
+    }
+    return null;
+  })();
+  const StatusIcon = statusAction?.icon;
+  const ExpandIcon = expanded ? ChevronDown : ChevronRight;
+
   return (
-    <article className="recruiter-job-row">
-      <div className="recruiter-job-row-main">
+    <article className="recruiter-job-row" data-expanded={expanded ? "true" : "false"}>
+      <div className="recruiter-job-row-main" onClick={handleRowClick}>
         <div className="recruiter-job-cell recruiter-job-title-cell">
           <div className="recruiter-job-title-line">
+            <button
+              type="button"
+              className="recruiter-row-expand-toggle"
+              aria-label={`${expanded ? "Collapse" : "Expand"} ${titleText}`}
+              aria-expanded={expanded}
+              onClick={toggleExpanded}
+            >
+              <ExpandIcon size={15} aria-hidden="true" />
+            </button>
             <h3>
               {canViewPublicListing ? (
-                <Link to={publicListingHref} className="recruiter-job-title-link">
+                <Link
+                  to={publicListingHref}
+                  className="recruiter-job-title-link"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   {titleText}
                 </Link>
               ) : (
@@ -184,84 +262,37 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
           {employment}
         </div>
         <div className="recruiter-job-cell" data-label="Status">
-          <span className={`recruiter-status-pill ${String(job.status || "").replace(/_/g, "-")}`}>
+          <span
+            className={`recruiter-status-pill ${
+              isPaidDraft ? "ready-to-publish" : String(job.status || "").replace(/_/g, "-")
+            }`}
+          >
             {statusLabel}
           </span>
         </div>
         <div className="recruiter-job-cell" data-label="Posted">
           {formatDate(postedAt)}
         </div>
-        <div className="recruiter-job-cell recruiter-job-performance" data-label="Performance">
-          <div className="recruiter-job-performance-stats">
-            <span>Views {formatCount(analyticsViews)}</span>
-            <span>Clicks {formatCount(applyClicks)}</span>
-            <span>Rate {formatRate(applyRate)}</span>
-            <span>Saves {formatCount(saves)}</span>
-          </div>
-          <small>Last click {formatOptionalDate(lastApplyClick)}</small>
-        </div>
-
-        <div className="recruiter-job-actions" aria-label={`Actions for ${job.title || "job"}`}>
-          <button
-            type="button"
-            className="recruiter-details-toggle"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((current) => !current)}
-          >
-            Details
-          </button>
-          {hasOverflowActions && (
-            <details className="recruiter-overflow-menu">
-              <summary aria-label={`More actions for ${titleText}`}>
-                <span aria-hidden="true">⋮</span>
-              </summary>
-              <div className="recruiter-overflow-menu-list">
-                {onEdit && (
-                  <button type="button" onClick={() => onEdit(job)}>
-                    Edit
-                  </button>
-                )}
-                {onPause && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      confirmAndRun(`Hide "${titleText}" from public search and the map?`, onPause)
-                    }
-                  >
-                    Hide
-                  </button>
-                )}
-                {onResume && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      confirmAndRun(`Make "${titleText}" visible to candidates again?`, onResume)
-                    }
-                  >
-                    Make Live
-                  </button>
-                )}
-                {onArchive && (
-                  <button
-                    type="button"
-                    className="danger"
-                    onClick={() =>
-                      confirmAndRun(`Remove "${titleText}" from your postings?`, onArchive)
-                    }
-                  >
-                    Remove
-                  </button>
-                )}
-                {onUnarchive && (
-                  <button
-                    type="button"
-                    onClick={() => confirmAndRun(`Restore "${titleText}" to your postings?`, onUnarchive)}
-                  >
-                    Restore
-                  </button>
-                )}
-              </div>
-            </details>
+        <div
+          className="recruiter-job-actions"
+          aria-label={`Actions for ${job.title || "job"}`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {statusAction && (
+            <button
+              type="button"
+              className={`recruiter-row-action ${statusAction.className}`}
+              onClick={statusAction.onClick}
+            >
+              {StatusIcon && <StatusIcon size={14} aria-hidden="true" />}
+              <span>{statusAction.label}</span>
+            </button>
+          )}
+          {onEdit && !job.is_archived && (
+            <button type="button" className="recruiter-row-action edit" onClick={() => onEdit(job)}>
+              <Pencil size={14} aria-hidden="true" />
+              <span>Edit</span>
+            </button>
           )}
         </div>
       </div>
@@ -271,6 +302,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
           <dl>
             <DetailItem label="Opportunity Type" value={opportunity} />
             <DetailItem label="Practice Type" value={PRACTICE_TYPE_LABELS[job.practice_type]} />
+            <DetailItem label="Additional Areas" value={textList(job.additional_locations)} />
             <DetailItem label="Saturday Schedule" value={SATURDAY_SCHEDULE_LABELS[job.saturday_schedule]} />
             <DetailItem label="Work Setting" value={workSetting} />
             <DetailItem label="Compensation Type" value={COMPENSATION_TYPE_LABELS[job.compensation_type]} />
@@ -289,6 +321,29 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
             <DetailItem label="Relocation" value={job.relocation_assistance ? "Available" : ""} />
             <DetailItem label="Student Loan" value={job.student_loan_assistance ? "Available" : ""} />
           </dl>
+          {(onArchive || onUnarchive) && (
+            <div className="recruiter-job-expanded-actions">
+              {onArchive && (
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => confirmAndRun(`Remove "${titleText}" from your postings?`, onArchive)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                  Remove
+                </button>
+              )}
+              {onUnarchive && (
+                <button
+                  type="button"
+                  onClick={() => confirmAndRun(`Restore "${titleText}" to your postings?`, onUnarchive)}
+                >
+                  <RotateCcw size={14} aria-hidden="true" />
+                  Restore
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </article>

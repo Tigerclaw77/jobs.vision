@@ -101,6 +101,13 @@ function compactCompensation(job = {}) {
   return { primary, secondary: "" };
 }
 
+function displayLocation(job = {}) {
+  const base = String(job.location || [job.city, job.state].filter(Boolean).join(", ")).trim();
+  if (!base) return "";
+  const isMultiple = job.location_mode === "multiple" || job.location_precision === "multiple";
+  return isMultiple ? `${base} + nearby locations` : base;
+}
+
 export default function JobCard({
   job,
   isFavorite,
@@ -123,6 +130,7 @@ export default function JobCard({
   const role = normalizeRole(job.role) || job.role;
   const cardTitle = conciseTitle(job, role);
   const cardCompensation = compactCompensation(job);
+  const cardLocation = displayLocation(job);
   const listingTier =
     job.listing_tier ||
     (job.featured ? "featured" : job.source === "discovery" ? "imported" : "");
@@ -217,7 +225,7 @@ export default function JobCard({
         )}
         <h3 className="job-title">{cardTitle}</h3>
         {job.company && <p className="job-company">{job.company}</p>}
-        {job.location && <p className="job-location">{job.location}</p>}
+        {cardLocation && <p className="job-location">{cardLocation}</p>}
         {cardCompensation.primary && (
           <p className="job-compensation">
             <span>{cardCompensation.primary}</span>

@@ -218,6 +218,37 @@
   flex-shrink: 0;
 }
 
+.header-dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #b7dce8;
+  background: #eef9fc;
+  color: #005a78;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05);
+}
+
+.header-dashboard-link:hover {
+  background: #e0f4f9;
+  border-color: #8fc7d8;
+  color: #063f53;
+}
+
+.header-dashboard-link svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+
 .slide-drawer {
   position: fixed;
   top: 60px;
@@ -370,6 +401,7 @@
    ========================= */
 .account-link:focus-visible,
 .admin-view-mode-dot:focus-visible,
+.header-dashboard-link:focus-visible,
 .header-signout-button:focus-visible,
 .nav a.icon:focus-visible,
 .drawer-item:focus-visible,

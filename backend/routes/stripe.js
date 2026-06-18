@@ -187,7 +187,12 @@ router.post("/checkout", requireAuth, async (req, res) => {
 
     const customerId = await getOrCreateCustomer(profile);
     const baseUrl = frontendUrl();
-    const successPath = plan.audience === "recruiter" ? "/recruiter/dashboard" : "/profile";
+    const successPath =
+      plan.audience === "recruiter" && recruiterPostingMetadata?.jobId
+        ? `/recruiter/editjob/${encodeURIComponent(recruiterPostingMetadata.jobId)}`
+        : plan.audience === "recruiter"
+        ? "/recruiter/dashboard"
+        : "/profile";
     const cancelPath = plan.audience === "recruiter" ? "/pricing?audience=recruiter" : "/";
 
     const metadata = {

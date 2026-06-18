@@ -781,3 +781,73 @@
   color: #ffffff !important;
   box-shadow: 0 12px 26px rgba(123, 77, 216, 0.24) !important;
 }
+
+/* Pricing hover stability: hover must not change layout metrics. */
+.home-pricing-cards .pricing-root.is-glass .card {
+  box-sizing: border-box;
+  transform-origin: center center;
+  border-width: 1px !important;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card:hover {
+  border-width: 1px !important;
+  transform: translateY(-2px);
+}
+
+.home-pricing-cards .pricing-root.is-glass .card.plan-free,
+.home-pricing-cards .pricing-root.is-glass .card.plan-staff,
+.home-pricing-cards .pricing-root.is-glass .card.plan-free:hover,
+.home-pricing-cards .pricing-root.is-glass .card.plan-staff:hover {
+  border-color: rgba(203, 213, 225, 0.95) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card.plan-plus,
+.home-pricing-cards .pricing-root.is-glass .card.plan-manager,
+.home-pricing-cards .pricing-root.is-glass .card.plan-plus:hover,
+.home-pricing-cards .pricing-root.is-glass .card.plan-manager:hover {
+  border-color: rgba(8, 126, 139, 0.96) !important;
+  box-shadow:
+    0 14px 34px rgba(8, 126, 139, 0.2),
+    0 0 0 1px rgba(8, 126, 139, 0.18) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card.plan-premium,
+.home-pricing-cards .pricing-root.is-glass .card.plan-doctor,
+.home-pricing-cards .pricing-root.is-glass .card.plan-premium:hover,
+.home-pricing-cards .pricing-root.is-glass .card.plan-doctor:hover {
+  border-color: rgba(123, 77, 216, 0.88) !important;
+  box-shadow:
+    0 13px 32px rgba(123, 77, 216, 0.18),
+    0 0 0 1px rgba(123, 77, 216, 0.14) !important;
+}
+
+.home-pricing-cards .pricing-root.is-glass .actions {
+  min-height: 92px;
+  justify-content: flex-end;
+}
+
+.home-pricing-cards .pricing-root.is-glass .fineprint {
+  box-sizing: border-box;
+  width: min(var(--cta-width), 100%);
+  min-height: 2.7em;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.home-pricing-cards .pricing-root.is-glass .actions .btn,
+.home-pricing-cards .pricing-root.is-glass .actions .btn:hover,
+.home-pricing-cards .pricing-root.is-glass .actions .btn:focus-visible {
+  box-sizing: border-box;
+  transform: none;
+}
+
+.home-pricing-cards .pricing-root.is-glass .btn.primary:hover,
+.home-pricing-cards .pricing-root.is-glass .btn.ghost:hover {
+  transform: translateY(-1px);
+}

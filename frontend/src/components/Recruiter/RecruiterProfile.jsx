@@ -101,7 +101,16 @@ const RecruiterProfile = () => {
   const handleChange = (field) => (event) => {
     const value =
       event.target.type === "checkbox" ? event.target.checked : event.target.value;
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      if (field === "applicationUseAccountEmail" && value) {
+        return {
+          ...prev,
+          applicationUseAccountEmail: true,
+          applicationEmail: prev.email || prev.applicationEmail,
+        };
+      }
+      return { ...prev, [field]: value };
+    });
     setStatus("");
     setError("");
   };
@@ -237,7 +246,12 @@ const RecruiterProfile = () => {
                       checked={form.applicationUseAccountEmail}
                       onChange={handleChange("applicationUseAccountEmail")}
                     />
-                    <span>Use account email as the default apply email ({form.email || "no email on file"})</span>
+                    <span>
+                      Use account email as the default apply email ({form.email || "no email on file"})
+                      {form.applicationUseAccountEmail && form.email ? (
+                        <small className="profile-check-note">Default apply email: {form.email}</small>
+                      ) : null}
+                    </span>
                   </label>
                 </div>
                 <div className="profile-grid" style={{ marginTop: 14 }}>

@@ -9,6 +9,7 @@ const {
 } = require("../services/recruiterPostingPayments.js");
 const {
   LOCATION_MAP_ERROR,
+  normalizeCityStateLocation,
   resolveJobCoordinates,
 } = require("../services/jobLocationService.js");
 
@@ -185,6 +186,7 @@ const LOCATION_PRECISIONS = new Set([
   "multiple",
   "unknown",
 ]);
+const LOCATION_MODES = new Set(["single", "multiple", "remote"]);
 const SATURDAY_SCHEDULES = new Set([
   "none",
   "occasional",
@@ -216,6 +218,8 @@ const PUBLIC_JOB_COLUMN_NAMES = [
   "location",
   "city",
   "state",
+  "location_mode",
+  "additional_locations",
   "latitude",
   "longitude",
   "role",
@@ -310,6 +314,8 @@ const PUBLIC_JOB_COLUMN_FALLBACKS = {
     "case when featured = true then 'featured' when source in ('discovery', 'import', 'imported') or external_apply_url is not null then 'imported' else 'standard_paid' end as listing_tier",
   listing_opportunity_type: "'job'::text as listing_opportunity_type",
   location_precision: "'unknown'::text as location_precision",
+  location_mode: "'single'::text as location_mode",
+  additional_locations: "array[]::text[] as additional_locations",
   claimed_by_user_id: "null::text as claimed_by_user_id",
   claimed_at: "null::timestamptz as claimed_at",
   claim_status: "'unclaimed'::text as claim_status",
@@ -409,6 +415,10 @@ function normalizeListingTier(value, fallback = "standard_paid") {
 
 function normalizeLocationPrecision(value, fallback = "unknown") {
   return normalizeEnum(value, LOCATION_PRECISIONS, fallback);
+}
+
+function normalizeLocationMode(value, fallback = "single") {
+  return normalizeEnum(value, LOCATION_MODES, fallback);
 }
 
 function normalizeSaturdaySchedule(value) {
@@ -786,10 +796,133 @@ function sameText(a, b) {
   return cleanText(a).toLowerCase() === cleanText(b).toLowerCase();
 }
 
+function normalizeStateInput(value) {
+  const text = cleanText(value);
+  if (!text) return null;
+  const parsed = normalizeCityStateLocation(`Remote, ${text}`);
+  return parsed.state || text.toUpperCase();
+}
+
+function normalizeAdditionalLocations(value) {
+  const locations = [];
+  const seen = new Set();
+  for (const item of toInputArray(value) || []) {
+    const text = cleanText(item);
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    locations.push(text);
+  }
+  if (locations.length > 8) {
+    throw requestError(
+      400,
+      "List up to 8 additional nearby areas.",
+      "additional_locations_limit_exceeded"
+    );
+  }
+  return locations;
+}
+
+function sameTextArray(a, b) {
+  const left = normalizeAdditionalLocations(a).map((item) => item.toLowerCase()).join("|");
+  const right = normalizeAdditionalLocations(b).map((item) => item.toLowerCase()).join("|");
+  return left === right;
+}
+
+function normalizeJobLocationFields(fields = {}) {
+  const locationMode = normalizeLocationMode(fields.location_mode ?? fields.locationMode, "single");
+  const locationText = cleanText(fields.location);
+  const parsed = normalizeCityStateLocation(locationText);
+  const rawCity = cleanText(fields.city) || parsed.city || "";
+  const rawState = fields.state ?? parsed.state;
+  const state = normalizeStateInput(rawState);
+
+  if (locationMode === "remote") {
+    return {
+      location: state ? `Remote, ${state}` : locationText,
+      city: null,
+      state,
+      location_mode: "remote",
+      location_precision: "remote",
+      additional_locations: [],
+    };
+  }
+
+  const city = rawCity || null;
+  const normalizedLocation = [city, state].filter(Boolean).join(", ") || locationText;
+  const additionalLocations =
+    locationMode === "multiple"
+      ? normalizeAdditionalLocations(fields.additional_locations ?? fields.additionalLocations)
+      : [];
+
+  return {
+    location: normalizedLocation,
+    city,
+    state,
+    location_mode: locationMode,
+    location_precision:
+      locationMode === "multiple"
+        ? "multiple"
+        : cleanText(fields.geocodeAddress || fields.geocode_address)
+        ? "facility"
+        : "city",
+    additional_locations: additionalLocations,
+  };
+}
+
+function locationNeedsCoordinates(fields = {}) {
+  return normalizeLocationMode(fields.location_mode ?? fields.locationMode, "single") !== "remote";
+}
+
+async function resolveCoordinatesForJob(fields, { required = false } = {}) {
+  if (!locationNeedsCoordinates(fields)) return null;
+  return resolveJobCoordinates(fields, { required });
+}
+
 function didLocationChange(body, job) {
-  return ["location", "city", "state"].some(
+  const textChanged = ["location", "city", "state", "location_mode"].some(
     (field) => field in body && !sameText(body[field], job?.[field])
   );
+  if (textChanged) return true;
+  if ("additional_locations" in body || "additionalLocations" in body) {
+    return !sameTextArray(
+      body.additional_locations ?? body.additionalLocations,
+      job?.additional_locations
+    );
+  }
+  return false;
+}
+
+function assertPublishableJobFields(fields = {}, applyDestination = {}) {
+  const missing = [];
+  if (!cleanText(fields.title)) missing.push("job title");
+  normalizeRole(fields.role, { required: true });
+
+  const locationFields = normalizeJobLocationFields(fields);
+  if (locationFields.location_mode === "remote") {
+    if (!locationFields.state) missing.push("licensing state");
+  } else if (!locationFields.city || !locationFields.state) {
+    missing.push("city and state");
+  }
+
+  const employmentInput =
+    Array.isArray(fields.employment_types) && fields.employment_types.length
+      ? fields.employment_types
+      : fields.employment_type || fields.type;
+  const employmentTypes = normalizeEmploymentTypes(employmentInput) || [];
+  if (!employmentTypes.length) missing.push("employment type");
+
+  if (!applyDestination.external_apply_url && !applyDestination.application_email) {
+    missing.push("apply method");
+  }
+
+  if (missing.length) {
+    throw requestError(
+      400,
+      `Complete ${missing.join(", ")} before publishing.`,
+      "posting_incomplete"
+    );
+  }
 }
 
 async function enforceRecruiterCanPost(req, res, excludeJobId = null, role = null) {
@@ -1624,7 +1757,11 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
     const role = normalizeRole(req.body.role, { required: true });
     if (shouldPublish && (await enforceRecruiterCanPost(req, res, null, role))) return;
 
-    const coordinates = await resolveJobCoordinates(req.body, { required: shouldPublish });
+    const locationFields = normalizeJobLocationFields(req.body);
+    const coordinates = await resolveCoordinatesForJob(
+      { ...req.body, ...locationFields },
+      { required: shouldPublish }
+    );
     const rawEmploymentType = req.body.employment_type ?? req.body.type;
     const legacyRemoteEmployment = isLegacyRemoteEmployment(rawEmploymentType);
     let employment_types = normalizeEmploymentTypes(
@@ -1649,7 +1786,10 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       req.body.listing_opportunity_type ?? req.body.marketplace_opportunity_type,
       "job"
     );
-    const location_precision = normalizeLocationPrecision(req.body.location_precision, "city");
+    const location_precision = normalizeLocationPrecision(
+      req.body.location_precision,
+      locationFields.location_precision
+    );
     const saturday_schedule = normalizeSaturdaySchedule(req.body.saturday_schedule);
     const clinical_focuses = normalizeClinicalFocuses(
       req.body.clinical_focuses ?? req.body.clinical_focus
@@ -1712,15 +1852,20 @@ router.post("/", requireAuth, requireJobManager, async (req, res) => {
       profile: applyProfile,
       forPublication: shouldPublish,
     });
+    if (shouldPublish) {
+      assertPublishableJobFields({ ...req.body, ...locationFields, role }, applyDestination);
+    }
 
     const payload = {
       title: req.body.title,
       description: req.body.description ?? null,
       company: employer_name ?? null,
       employer_name: employer_name ?? null,
-      location: req.body.location ?? null,
-      city: req.body.city ?? null,
-      state: req.body.state ?? null,
+      location: locationFields.location ?? null,
+      city: locationFields.city ?? null,
+      state: locationFields.state ?? null,
+      location_mode: locationFields.location_mode,
+      additional_locations: locationFields.additional_locations,
       latitude: coordinates?.latitude ?? null,
       longitude: coordinates?.longitude ?? null,
       role,
@@ -1853,6 +1998,8 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       "location",
       "city",
       "state",
+      "location_mode",
+      "additional_locations",
       "latitude",
       "longitude",
       "role",
@@ -1902,10 +2049,10 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
       if (key in req.body) updates[key] = req.body[key];
     }
     updates.hours = null;
+    const hasBeenPublished = Boolean(job.first_activated_at) || !["draft"].includes(job.status);
     if ("role" in updates) {
       updates.role = normalizeRole(updates.role, { required: true });
       const roleChanged = updates.role !== normalizeRole(job.role);
-      const hasBeenPublished = Boolean(job.first_activated_at) || !["draft"].includes(job.status);
       if (roleChanged && hasBeenPublished) {
         throw requestError(
           400,
@@ -1982,17 +2129,45 @@ router.patch("/:id", requireAuth, requireJobManager, async (req, res) => {
     }
     const nextRole = updates.role || job.role;
 
-    const locationChanged = didLocationChange(req.body, job);
+    const locationFieldsProvided = [
+      "location",
+      "city",
+      "state",
+      "location_mode",
+      "locationMode",
+      "additional_locations",
+      "additionalLocations",
+    ].some((field) => field in req.body);
+    const nextLocationFields = locationFieldsProvided
+      ? normalizeJobLocationFields({ ...job, ...req.body })
+      : null;
+    if (nextLocationFields) {
+      updates.location = nextLocationFields.location;
+      updates.city = nextLocationFields.city;
+      updates.state = nextLocationFields.state;
+      updates.location_mode = nextLocationFields.location_mode;
+      updates.location_precision = nextLocationFields.location_precision;
+      updates.additional_locations = nextLocationFields.additional_locations;
+    }
+
+    const locationChanged = nextLocationFields ? didLocationChange(nextLocationFields, job) : false;
+    if (locationChanged && hasBeenPublished) {
+      throw requestError(
+        400,
+        "Location is locked after publication. Create a new posting for a different location.",
+        "location_locked"
+      );
+    }
     const coordinateFieldsProvided =
       Object.prototype.hasOwnProperty.call(req.body, "latitude") ||
       Object.prototype.hasOwnProperty.call(req.body, "longitude");
     if (locationChanged || coordinateFieldsProvided) {
-      const coordinates = await resolveJobCoordinates(
-        { ...job, ...req.body },
+      const coordinates = await resolveCoordinatesForJob(
+        { ...job, ...req.body, ...(nextLocationFields || {}) },
         { required: true }
       );
-      updates.latitude = coordinates.latitude;
-      updates.longitude = coordinates.longitude;
+      updates.latitude = coordinates?.latitude ?? null;
+      updates.longitude = coordinates?.longitude ?? null;
     } else {
       delete updates.latitude;
       delete updates.longitude;
@@ -2173,7 +2348,12 @@ router.post("/:id/publish", requireAuth, requireJobManager, async (req, res) => 
       profile: applyProfile,
       forPublication: true,
     });
-    const coordinates = await resolveJobCoordinates({ ...job, ...req.body }, { required: true });
+    const publishLocationFields = normalizeJobLocationFields({ ...job, ...req.body });
+    const coordinates = await resolveCoordinatesForJob(
+      { ...job, ...req.body, ...publishLocationFields },
+      { required: true }
+    );
+    assertPublishableJobFields({ ...job, ...req.body }, applyDestination);
     const nextStatus =
       job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
 
@@ -2182,8 +2362,8 @@ router.post("/:id/publish", requireAuth, requireJobManager, async (req, res) => 
       {
         status: nextStatus,
         is_archived: false,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
         external_apply_url: applyDestination.external_apply_url,
         application_email: applyDestination.application_email,
         last_activated_at: nextStatus === "active" ? nowIso : job.last_activated_at,
@@ -2237,15 +2417,15 @@ router.post("/:id/unarchive", requireAuth, requireJobManager, async (req, res) =
       profile: applyProfile,
       forPublication: true,
     });
-    const coordinates = await resolveJobCoordinates(job, { required: true });
+    const coordinates = await resolveCoordinatesForJob(job, { required: true });
 
     const update = buildUpdate(
       "public.jobs",
       {
         status: nextStatus,
         is_archived: false,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
         external_apply_url: applyDestination.external_apply_url,
         application_email: applyDestination.application_email,
         archived_at: null,
@@ -2346,7 +2526,7 @@ router.post("/:id/resume", requireAuth, requireJobManager, async (req, res) => {
       profile: applyProfile,
       forPublication: true,
     });
-    const coordinates = await resolveJobCoordinates(job, { required: true });
+    const coordinates = await resolveCoordinatesForJob(job, { required: true });
     const nextStatus =
       job.employer_brand && !job.employer_brand_verified ? "pending_domain" : "active";
 
@@ -2355,8 +2535,8 @@ router.post("/:id/resume", requireAuth, requireJobManager, async (req, res) => {
       {
         status: nextStatus,
         is_archived: false,
-        latitude: coordinates.latitude,
-        longitude: coordinates.longitude,
+        latitude: coordinates?.latitude ?? null,
+        longitude: coordinates?.longitude ?? null,
         external_apply_url: applyDestination.external_apply_url,
         application_email: applyDestination.application_email,
         last_activated_at: nextStatus === "active" ? nowIso : job.last_activated_at,

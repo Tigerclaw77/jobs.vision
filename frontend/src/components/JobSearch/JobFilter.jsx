@@ -120,7 +120,7 @@ export default function JobFilter({
   const hasLocation =
     Boolean(String(filters.location || "").trim()) ||
     (Number.isFinite(Number(filters.lat)) && Number.isFinite(Number(filters.lng)));
-  const canUseRadius = canUseMapSearch && hasLocation && !isStateLocationSearch;
+  const canUseRadius = hasLocation && !isStateLocationSearch;
   const selectedRoles = Array.isArray(filters.roles)
     ? filters.roles.map((role) => normalizeRole(role) || role).filter(Boolean)
     : [];
@@ -263,9 +263,7 @@ export default function JobFilter({
             onChange={(e) => set({ radiusMi: Number(e.target.value) })}
             disabled={!canUseRadius}
             title={
-              !canUseMapSearch
-                ? "Map search requires Plus or Premium"
-                : isStateLocationSearch
+              isStateLocationSearch
                 ? "State searches include all matching jobs in the state"
                 : hasLocation
                 ? "Search radius"

@@ -594,7 +594,6 @@ export default function JobList() {
   const isStateLocationSearch = Boolean(stateLocationSearch);
   const hasLocationText = Boolean(normalizedLocation);
   const hasActiveRadius =
-    canUseMapSearch &&
     !isStateLocationSearch &&
     hasLocationText &&
     geocodeStatus === "success" &&
@@ -621,12 +620,6 @@ export default function JobList() {
   }, [filters.q, lookup]);
 
   useEffect(() => {
-    if (!canUseMapSearch) {
-      setGeocodeStatus("idle");
-      setGeocodeMessage("");
-      return;
-    }
-
     const location = cleanLocationInput(filters.location);
     if (!location) {
       setGeocodeStatus("idle");
@@ -685,10 +678,10 @@ export default function JobList() {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [canUseMapSearch, filters.location, filters.lat, filters.lng]);
+  }, [filters.location, filters.lat, filters.lng]);
 
   useEffect(() => {
-    if (!canUseMapSearch || !hasActiveRadius) return;
+    if (!hasActiveRadius) return;
 
     const missing = (jobs || [])
       .filter((job) => !finitePoint(job?.latitude ?? job?.lat, job?.longitude ?? job?.lng))
@@ -719,7 +712,7 @@ export default function JobList() {
     return () => {
       cancelled = true;
     };
-  }, [jobs, canUseMapSearch, hasActiveRadius, jobLocationCoords]);
+  }, [jobs, hasActiveRadius, jobLocationCoords]);
 
   // chips are derived from persistent filters (so they don't vanish while typing)
   const quickTags = useMemo(() => {
@@ -851,7 +844,6 @@ export default function JobList() {
       const stateLocation = detectStateLocation(location);
       const stateFilterCode = stateLocation?.code || "";
       const locationRadiusActive =
-        canUseMapSearch &&
         !stateFilterCode &&
         geocodeStatus === "success" &&
         Boolean(locationText && center);

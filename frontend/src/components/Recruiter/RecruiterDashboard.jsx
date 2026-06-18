@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   archiveJob,
@@ -19,6 +19,8 @@ import { recruiterCompletionSummary, shapeProfileForm } from "../Profile/profile
 import "../../styles/Profile.css";
 
 const RecruiterDashboard = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user: reduxUser, userRole: reduxUserRole } = useSelector((state) => state.auth);
   const {
     user: effectiveUser,
@@ -55,6 +57,7 @@ const RecruiterDashboard = () => {
   const [editingJob, setEditingJob] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
+  const [checkoutNotice, setCheckoutNotice] = useState("");
 
   const categorizeJobs = useCallback((jobs = []) => {
     const active = jobs.filter(
@@ -81,7 +84,24 @@ const RecruiterDashboard = () => {
     ]);
 
     if (jobsResult.status === "fulfilled") {
-      categorizeJobs(jobsResult.value || []);
+      const jobs = jobsResult.value || [];
+      categorizeJobs(jobs);
+
+      const params = new URLSearchParams(location.search);
+      const checkoutJobId = params.get("checkout") === "success" ? params.get("jobId") : "";
+      if (checkoutJobId) {
+        const paidJob = jobs.find((job) => String(job.id || job._id) === String(checkoutJobId));
+        if (paidJob) {
+          setEditingJob(paidJob);
+          setShowForm(true);
+          setCheckoutNotice(
+            paidJob.payment?.active
+              ? "Payment received. Publish when ready."
+              : "Payment received. We are confirming it with Stripe; publish will unlock shortly."
+          );
+          navigate("/recruiter/dashboard", { replace: true });
+        }
+      }
     } else {
       console.error("Error fetching recruiter jobs:", jobsResult.reason?.message || jobsResult.reason);
       setDashboardError("Could not load recruiter jobs.");
@@ -101,7 +121,7 @@ const RecruiterDashboard = () => {
       setProfileCompletion(null);
     }
 
-  }, [categorizeJobs, profileFallbackUser]);
+  }, [categorizeJobs, location.search, navigate, profileFallbackUser]);
 
   const isAdmin = String(userRole || user?.userRole || "").toLowerCase() === "admin";
   const uniqueJobs = useMemo(() => {
@@ -115,6 +135,9 @@ const RecruiterDashboard = () => {
     return Array.from(byId.values());
   }, [categorizedJobs]);
   const paidPostingCount = uniqueJobs.filter((job) => job.payment?.active === true).length;
+  const paidDraftJobs = uniqueJobs.filter(
+    (job) => job.status === "draft" && !job.is_archived && job.payment?.active === true
+  );
   const paidPostingSummary = paidPostingCount
     ? `${paidPostingCount} paid posting${paidPostingCount === 1 ? "" : "s"}`
     : "No paid postings yet";
@@ -136,7 +159,7 @@ const RecruiterDashboard = () => {
     try {
       await archiveJob(jobId);
       await getRecruiterDashboard();
-      alert("Posting removed.");
+      setCheckoutNotice("Posting removed.");
     } catch (error) {
       console.error("Error archiving job:", error.message);
       alert("Failed to remove posting.");
@@ -147,10 +170,10 @@ const RecruiterDashboard = () => {
     try {
       await pauseJob(jobId);
       await getRecruiterDashboard();
-      alert("Posting hidden. It is no longer visible in public search or map.");
+      setCheckoutNotice("Posting paused. It is hidden from public search and the map.");
     } catch (error) {
       console.error("Error pausing job:", error.message);
-      alert("Failed to hide posting.");
+      alert(error?.response?.data?.error || "Failed to pause posting.");
     }
   }, [getRecruiterDashboard]);
 
@@ -158,7 +181,7 @@ const RecruiterDashboard = () => {
     try {
       await resumeJob(jobId);
       await getRecruiterDashboard();
-      alert("Posting is live again.");
+      setCheckoutNotice("Posting is live again.");
     } catch (error) {
       console.error("Error resuming job:", error.message);
       alert(error?.response?.data?.error || "Failed to make posting live.");
@@ -169,7 +192,7 @@ const RecruiterDashboard = () => {
     try {
       await unarchiveJob(jobId);
       await getRecruiterDashboard();
-      alert("Posting restored.");
+      setCheckoutNotice("Posting restored.");
     } catch (error) {
       console.error("Error unarchiving job:", error.message);
       alert("Failed to restore posting.");
@@ -191,6 +214,7 @@ const RecruiterDashboard = () => {
         </div>
 
         {dashboardError && <p className="dashboard-error">{dashboardError}</p>}
+        {checkoutNotice && <p className="dashboard-success">{checkoutNotice}</p>}
 
         <section className="recruiter-listings-section" aria-label="My jobs">
           {!showForm ? (
@@ -230,6 +254,22 @@ const RecruiterDashboard = () => {
                 Cancel
               </button>
             </>
+          )}
+
+          {!showForm && paidDraftJobs.length > 0 && (
+            <section className="recruiter-paid-drafts" aria-label="Paid jobs ready to publish">
+              {paidDraftJobs.map((job) => (
+                <div className="recruiter-paid-draft-row" key={job.id || job._id}>
+                  <div>
+                    <strong>{job.title || "Untitled job"}</strong>
+                    <span>Payment received - ready to publish</span>
+                  </div>
+                  <button type="button" onClick={() => handleEdit(job)}>
+                    Publish
+                  </button>
+                </div>
+              ))}
+            </section>
           )}
 
           <div className="recruiter-listings-heading">
