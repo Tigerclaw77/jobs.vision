@@ -797,7 +797,7 @@
 
 .home-pricing-cards .pricing-root.is-glass .card:hover {
   border-width: 1px !important;
-  transform: translateY(-2px);
+  transform: none !important;
 }
 
 .home-pricing-cards .pricing-root.is-glass .card.plan-free,
@@ -863,5 +863,5 @@
 
 .home-pricing-cards .pricing-root.is-glass .btn.primary:hover,
 .home-pricing-cards .pricing-root.is-glass .btn.ghost:hover {
-  transform: translateY(-1px);
+  transform: none !important;
 }
