@@ -74,7 +74,7 @@ const RECRUITER_PLAN_PRICING = {
   },
   doctor: {
     firstMonth: "$299 first month",
-    renewal: "$149/mo after",
+    renewal: "$199/mo after",
   },
 };
 

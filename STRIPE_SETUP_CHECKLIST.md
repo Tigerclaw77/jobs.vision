@@ -36,7 +36,7 @@ Create these recurring monthly prices. Do not assume Stripe generated IDs.
 |---|---:|---|---|
 | `jobs.vision Recruiter Staff` | `$49.00` | Monthly | `recruiter_staff_monthly` |
 | `jobs.vision Recruiter Manager` | `$99.00` | Monthly | `recruiter_manager_monthly` |
-| `jobs.vision Recruiter Doctor` | `$149.00` | Monthly | `recruiter_doctor_monthly` |
+| `jobs.vision Recruiter Doctor` | `$199.00` | Monthly | `recruiter_doctor_monthly` |
 | `jobs.vision Candidate Plus` | `$20.00` | Monthly | `candidate_plus_monthly` |
 | `jobs.vision Candidate Premium` | `$50.00` | Monthly | `candidate_premium_monthly` |
 

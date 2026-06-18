@@ -21,7 +21,7 @@ These are the exact recurring Stripe Prices needed.
 |---|---|---:|---|---|---|
 | `jobs.vision Recruiter Staff` | `recruiter_staff_monthly` | `4900` | `usd` | `month` | `app=jobs.vision`, `audience=recruiter`, `plan_key=staff`, `db_plan=recruiter_staff`, `price_kind=monthly_recurring` |
 | `jobs.vision Recruiter Manager` | `recruiter_manager_monthly` | `9900` | `usd` | `month` | `app=jobs.vision`, `audience=recruiter`, `plan_key=manager`, `db_plan=recruiter_manager`, `price_kind=monthly_recurring` |
-| `jobs.vision Recruiter Doctor` | `recruiter_doctor_monthly` | `14900` | `usd` | `month` | `app=jobs.vision`, `audience=recruiter`, `plan_key=doctor`, `db_plan=recruiter_doctor`, `price_kind=monthly_recurring` |
+| `jobs.vision Recruiter Doctor` | `recruiter_doctor_monthly` | `19900` | `usd` | `month` | `app=jobs.vision`, `audience=recruiter`, `plan_key=doctor`, `db_plan=recruiter_doctor`, `price_kind=monthly_recurring` |
 | `jobs.vision Candidate Plus` | `candidate_plus_monthly` | `2000` | `usd` | `month` | `app=jobs.vision`, `audience=candidate`, `plan_key=plus`, `db_plan=candidate_plus`, `price_kind=monthly_recurring` |
 | `jobs.vision Candidate Premium` | `candidate_premium_monthly` | `5000` | `usd` | `month` | `app=jobs.vision`, `audience=candidate`, `plan_key=premium`, `db_plan=candidate_premium`, `price_kind=monthly_recurring` |
 
@@ -53,7 +53,7 @@ Frontend source: `frontend/src/components/PricingTable.jsx`
 |---|---|
 | Staff | `$79 first month`, `$49 per month thereafter` |
 | Manager | `$149 first month`, `$99 per month thereafter` |
-| Doctor | `$299 first month`, `$149 per month thereafter` |
+| Doctor | `$299 first month`, `$199 per month thereafter` |
 | Free | `$0/month`, Browse jobs, Apply to jobs, Save up to 5 jobs |
 | Plus | `$20/month`, Unlimited saves, Map search, Email alerts, Weekly matching |
 | Premium | `$50/month`, SMS alerts, Priority profile placement, Featured candidate badge, Unlimited saves |

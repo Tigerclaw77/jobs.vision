@@ -18,7 +18,7 @@ const PricingTiers = () => {
         <div style={styles.tier}>
           <h3>Doctor Position</h3>
           <p>$299 first month</p>
-          <p>$149/mo after</p>
+          <p>$199/mo after</p>
         </div>
       </div>
     </div>

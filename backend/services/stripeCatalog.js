@@ -41,7 +41,7 @@ const STRIPE_PRODUCTS = [
     dbPlan: "recruiter_doctor",
     name: "jobs.vision Recruiter Doctor",
     recurringLookupKey: "recruiter_doctor_monthly",
-    recurringAmountCents: 14900,
+    recurringAmountCents: 19900,
     firstMonthAdjustmentLookupKey: "recruiter_doctor_first_month_adjustment",
     firstMonthAdjustmentAmountCents: 15000,
     entitlement: {

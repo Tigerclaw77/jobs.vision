@@ -31,7 +31,7 @@ const RECRUITER_PLANS = [
     name: "Doctor Position",
     headline: "Post high-impact optometrist openings with stronger visibility.",
     firstMonth: 299,
-    renewal: 149,
+    renewal: 199,
     bullets: [
       "Optometrist-focused listing",
       "30-day listing with strongest visibility",
