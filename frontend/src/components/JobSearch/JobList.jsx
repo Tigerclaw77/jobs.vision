@@ -44,6 +44,13 @@ import "../../styles/jobSearch.css";
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const PAGE_SIZE = 12;
 const FREE_SAVE_LIMIT = 5;
+const EMPLOYER_CLAIM_ROLES = new Set([
+  "recruiter",
+  "employer",
+  "practice_owner",
+  "hiring_manager",
+  "admin",
+]);
 const SORT_OPTIONS = [
   { value: JOB_SORT_MODES.BEST_MATCH, label: "Best Match" },
   { value: JOB_SORT_MODES.NEWEST, label: "Newest" },
@@ -421,6 +428,8 @@ export default function JobList() {
   const userRole = String(authUser?.userRole || effectiveAuth.role || "").toLowerCase();
   const isCandidateUser = userRole === "candidate";
   const isAdminUser = userRole === "admin";
+  const canShowClaimControls =
+    effectiveAuth.isAuthenticated && EMPLOYER_CLAIM_ROLES.has(userRole);
   const canUseMapSearch =
     userRole === "admin" || authUser?.entitlements?.candidate?.features?.mapSearch === true;
   const canUseAdvancedOdFilters = canUseMapSearch;
@@ -1391,12 +1400,12 @@ const removeQuickTag = (tag) => {
               appliedTooltip={appliedTooltipFor(job._id)}
               hideTooltip={hideTooltipFor(job._id)}
               restoreTooltip={restoreTooltipFor(job._id)}
-              claimTooltip={claimTooltipFor(job)}
+              claimTooltip={canShowClaimControls ? claimTooltipFor(job) : undefined}
               onFavoriteClick={handleFavorite}
               onApplyClick={handleApply}
               onHideClick={handleHideJob}
               onRestoreClick={handleRestoreJob}
-              onClaimClick={handleClaimListing}
+              onClaimClick={canShowClaimControls ? handleClaimListing : undefined}
               onAdminRemoveClick={isAdminUser ? handleAdminRemoveJob : undefined}
               onClick={() => {
                 setSelectedJob(job);
@@ -1441,12 +1450,12 @@ const removeQuickTag = (tag) => {
         appliedTooltip={selectedJob ? appliedTooltipFor(selectedJob._id) : ""}
         hideTooltip={selectedJob ? hideTooltipFor(selectedJob._id) : ""}
         restoreTooltip={selectedJob ? restoreTooltipFor(selectedJob._id) : ""}
-        claimTooltip={selectedJob ? claimTooltipFor(selectedJob) : ""}
+        claimTooltip={canShowClaimControls && selectedJob ? claimTooltipFor(selectedJob) : ""}
         onFavoriteClick={handleFavorite}
         onApply={handleApply}
         onHide={handleHideJob}
         onRestore={handleRestoreJob}
-        onClaim={handleClaimListing}
+        onClaim={canShowClaimControls ? handleClaimListing : undefined}
         onClose={closeJobModal}
         isAuthed={isAuthed}
         onListingView={handleListingView}

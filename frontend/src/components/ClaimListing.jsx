@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { claimJobListing, fetchPublicJob } from "../utils/api.supabase";
 import { useAuth } from "./auth/AuthProvider";
 import "./ClaimListing.css";
@@ -96,6 +96,48 @@ export default function ClaimListing() {
   const alreadyClaimed = job?.claim_status === "claimed" || Boolean(job?.claimed_by_user_id);
   const claimPending = job?.claim_status === "pending";
 
+  if (auth.loading) {
+    return (
+      <main className="claim-listing-page text-on-dim">
+        <section className="claim-listing-panel">
+          <button type="button" className="claim-back" onClick={() => navigate("/jobs")}>
+            Back to Jobs
+          </button>
+          <p className="claim-message">Checking your account...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="claim-listing-page text-on-dim">
+        <section className="claim-listing-panel">
+          <button type="button" className="claim-back" onClick={() => navigate("/jobs")}>
+            Back to Jobs
+          </button>
+          <p className="claim-message">Redirecting to sign in...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!canSubmit) {
+    return (
+      <main className="claim-listing-page text-on-dim">
+        <section className="claim-listing-panel">
+          <button type="button" className="claim-back" onClick={() => navigate("/jobs")}>
+            Back to Jobs
+          </button>
+          <h1>Listing management unavailable</h1>
+          <p className="claim-intro">
+            Listing management is available only to employer-capable accounts.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="claim-listing-page text-on-dim">
       <section className="claim-listing-panel">
@@ -141,23 +183,7 @@ export default function ClaimListing() {
           </div>
         </div>
 
-        {auth.loading ? (
-          <p className="claim-message">Checking your account...</p>
-        ) : !isAuthenticated ? (
-          <div className="claim-auth-box">
-            <p>Sign in with a recruiter account to submit a claim request.</p>
-            <Link to={`/login?next=${encodeURIComponent(returnTo)}`}>
-              Sign In
-            </Link>
-          </div>
-        ) : !canSubmit ? (
-          <div className="claim-auth-box">
-            <p>Listing claims require an employer-capable account.</p>
-            <Link to={`/recruiter/register?next=${encodeURIComponent(returnTo)}`}>
-              Create Recruiter Account
-            </Link>
-          </div>
-        ) : alreadyClaimed || claimPending ? null : (
+        {alreadyClaimed || claimPending ? null : (
           <form className="claim-form" onSubmit={handleSubmit}>
             <label>
               Your Name

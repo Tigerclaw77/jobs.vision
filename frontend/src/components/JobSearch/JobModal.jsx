@@ -169,7 +169,7 @@ export default function JobModal({
       className: `job-listing-badge opportunity ${listingOpportunityType}`,
       label: LISTING_OPPORTUNITY_TYPE_LABELS[listingOpportunityType] || listingOpportunityType,
     },
-    isClaimedListing && {
+    onClaim && isClaimedListing && {
       key: "claimed",
       className: "job-listing-badge claimed",
       label: "Claimed",
