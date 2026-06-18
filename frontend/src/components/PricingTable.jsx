@@ -260,7 +260,8 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           : "Post Job"}
                       </button>
                       <p className="fineprint">
-                        Renews monthly. Cancel anytime. Prices shown in USD.
+                        <span>Renews monthly. Cancel anytime.</span>
+                        <span>Prices shown in USD.</span>
                       </p>
                     </div>
                   </div>
