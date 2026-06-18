@@ -670,9 +670,10 @@
 .home-pricing-cards .pricing-root.is-glass .card.plan-manager {
   background:
     linear-gradient(180deg, rgba(247, 251, 250, 0.56) 0%, rgba(221, 243, 239, 0.44) 100%) !important;
-  border: 2px solid rgba(8, 126, 139, 0.58) !important;
+  border: 1px solid rgba(8, 126, 139, 0.58) !important;
   box-shadow:
     0 18px 40px rgba(8, 126, 139, 0.18),
+    0 0 0 1px rgba(8, 126, 139, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
 }
 
@@ -830,6 +831,19 @@
 .home-pricing-cards .pricing-root.is-glass .actions {
   min-height: 92px;
   justify-content: flex-end;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card-head .subtitle {
+  min-height: 2.75em;
+  line-height: 1.35;
+}
+
+.home-pricing-cards .pricing-root.is-glass .bullets {
+  min-height: 4.5em;
+}
+
+.home-pricing-cards .pricing-root.is-glass .bullets li {
+  line-height: 1.35;
 }
 
 .home-pricing-cards .pricing-root.is-glass .fineprint {

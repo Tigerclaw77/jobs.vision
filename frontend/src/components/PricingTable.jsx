@@ -260,7 +260,7 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           : "Post Job"}
                       </button>
                       <p className="fineprint">
-                        Recurring 30-day listing cycle. Cancel anytime. Prices shown in USD.
+                        Renews monthly. Cancel anytime. Prices shown in USD.
                       </p>
                     </div>
                   </div>
