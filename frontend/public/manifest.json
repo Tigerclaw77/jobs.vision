@@ -1,6 +1,7 @@
 {
   "short_name": "jobs.vision",
-  "name": "jobs.vision",
+  "name": "jobs.vision - Optometry and Eye Care Jobs",
+  "description": "Optometry and eye care jobs for optometrists, opticians, technicians, and practice teams.",
   "icons": [
     {
       "src": "favicon.svg",
@@ -8,8 +9,8 @@
       "type": "image/svg+xml"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#0f766e",
   "background_color": "#ffffff"
 }

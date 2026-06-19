@@ -50,6 +50,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import Unauthorized from "./components/Unauthorized";
 import ManualOverride from "./components/ManualOverride.jsx";
 import Footer from "./components/Footer";
+import { trackPageView } from "./marketingAnalytics";
 
 // 🔑 Single source of truth for auth/session/profile
 import AuthProvider, { useAuth } from "./components/auth/AuthProvider";
@@ -193,6 +194,16 @@ function PublicOnlyRoute({ children }) {
   return children;
 }
 
+function MarketingAnalyticsRouteTracker() {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    trackPageView(`${pathname}${search}`);
+  }, [pathname, search]);
+
+  return null;
+}
+
 function RouteLoading({ message = "Loading..." }) {
   return (
     <div
@@ -269,6 +280,7 @@ function AppShell() {
           {/* Controllers */}
           <RouteDimming />
           <AutoFillPatch />
+          <MarketingAnalyticsRouteTracker />
           <div className="bg-dimmer" />
 
           <div className="main-content">

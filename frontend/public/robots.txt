@@ -1,5 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
 
-Sitemap: https://jobs.vision/sitemap.xml
+Sitemap: https://www.jobs.vision/sitemap.xml
