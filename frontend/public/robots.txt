@@ -2,4 +2,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.jobs.vision/sitemap.xml
+Sitemap: https://www.jobs.vision/api/sitemap.xml

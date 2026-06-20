@@ -15,6 +15,7 @@ import {
   labelsForValues,
   normalizeRole,
 } from "../../utils/jobTaxonomy";
+import { jobPath } from "../../utils/jobSeo";
 
 const STATUS_LABELS = {
   draft: "Unfinished",
@@ -140,7 +141,7 @@ const RecruiterJobCard = ({ job, onEdit, onPause, onResume, onArchive, onUnarchi
   const applyRate = Number(job.apply_rate ?? job.applyRate ?? 0);
   const lastApplyClick = job.last_apply_click_at || job.lastApplyClickAt || null;
   const canViewPublicListing = job.status === "active" && !job.is_archived;
-  const publicListingHref = id ? `/jobs?jobId=${encodeURIComponent(id)}` : "/jobs";
+  const publicListingHref = id ? jobPath(job) : "/jobs";
   const titleText = job.title || "Untitled job";
   const isLive = job.status === "active" && !job.is_archived;
   const isPaused = job.status === "paused" && !job.is_archived;

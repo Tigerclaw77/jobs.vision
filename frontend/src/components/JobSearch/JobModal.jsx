@@ -1,5 +1,6 @@
 // src/components/JobSearch/JobModal.jsx
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import { reportListingIssue } from "../../utils/api";
 import {
@@ -17,6 +18,7 @@ import {
   labelsForValues,
   normalizeRole,
 } from "../../utils/jobTaxonomy";
+import { jobPath } from "../../utils/jobSeo";
 
 function externalApplyUrlFor(job = {}) {
   return job.external_apply_url || job.apply_url || job.applyUrl || "";
@@ -68,6 +70,7 @@ export default function JobModal({
   isAuthed,
   onListingView,
   onOutboundApply,
+  detailHref,
 }) {
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("expired");
@@ -153,6 +156,7 @@ export default function JobModal({
     : null;
   const isClaimedListing = claimStatus === "claimed" || Boolean(job.claimed_by_user_id);
   const showClaimAction = Boolean(onClaim && isImportedListing && !isClaimedListing);
+  const publicDetailHref = detailHref || jobPath(job);
   const badges = [
     listingTier === "featured" && {
       key: "featured",
@@ -431,6 +435,9 @@ export default function JobModal({
               {isAuthed ? "Mark as Applied" : "Sign in to Mark Applied"}
             </button>
           )}
+          <Link className="btn-secondary" to={publicDetailHref}>
+            View Full Listing
+          </Link>
           <button className="btn-secondary" onClick={onClose}>
             Close
           </button>

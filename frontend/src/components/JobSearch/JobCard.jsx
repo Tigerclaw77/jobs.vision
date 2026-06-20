@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Star, CheckCircle, EyeOff, RotateCcw } from "lucide-react";
 import {
   LISTING_OPPORTUNITY_TYPE_LABELS,
@@ -9,6 +10,7 @@ import {
   normalizeRole,
   normalizeMultiValue,
 } from "../../utils/jobTaxonomy";
+import { jobPath } from "../../utils/jobSeo";
 
 function valuesFrom(job, arrayKey, singleKey, fallbackKey) {
   return normalizeMultiValue(job?.[arrayKey] || job?.[singleKey] || job?.[fallbackKey]);
@@ -116,6 +118,7 @@ export default function JobCard({
   claimTooltip,
   isClaiming = false,
   onAdminRemoveClick,
+  detailHref,
 }) {
   const role = normalizeRole(job.role) || job.role;
   const cardTitle = uniquePostingIdentity(job, role);
@@ -152,6 +155,7 @@ export default function JobCard({
     listingTier === "featured" ? "job-card-featured" : "",
     isHidden ? "job-card-hidden" : "",
   ].filter(Boolean).join(" ");
+  const publicDetailHref = detailHref || jobPath(job);
 
   return (
     <div
@@ -214,7 +218,15 @@ export default function JobCard({
             ))}
           </div>
         )}
-        <h3 className="job-title">{cardTitle}</h3>
+        <h3 className="job-title">
+          <Link
+            className="job-title-link"
+            to={publicDetailHref}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {cardTitle}
+          </Link>
+        </h3>
         {cardRoleLine && <p className="job-role-line">{cardRoleLine}</p>}
         {cardLocation && <p className="job-location">{cardLocation}</p>}
         {cardCompensation.primary && (

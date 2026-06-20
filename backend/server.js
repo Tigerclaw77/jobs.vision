@@ -16,6 +16,7 @@ if (process.env.NODE_ENV === "production" && stripeSkipVerify) {
 }
 
 const { one, query } = require("./services/db");
+const { jobPath } = require("./services/jobSeo");
 const {
   getPlanFromSubscription,
   normalizeStripeStatus,
@@ -499,6 +500,126 @@ app.get(apiPaths("/api/health"), (_req, res) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
+});
+
+function publicSiteOrigin() {
+  return (
+    process.env.PUBLIC_SITE_URL ||
+    process.env.FRONTEND_URL ||
+    "https://www.jobs.vision"
+  ).replace(/\/+$/, "");
+}
+
+function escapeXml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function sitemapDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function sitemapUrl({ loc, lastmod, changefreq, priority }) {
+  return [
+    "  <url>",
+    `    <loc>${escapeXml(loc)}</loc>`,
+    lastmod ? `    <lastmod>${escapeXml(lastmod)}</lastmod>` : "",
+    changefreq ? `    <changefreq>${escapeXml(changefreq)}</changefreq>` : "",
+    priority ? `    <priority>${escapeXml(priority)}</priority>` : "",
+    "  </url>",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+app.get(apiPaths("/api/sitemap.xml"), async (_req, res) => {
+  try {
+    const origin = publicSiteOrigin();
+    const corePages = [
+      { path: "/", changefreq: "weekly", priority: "1.0" },
+      { path: "/jobs", changefreq: "daily", priority: "0.9" },
+      { path: "/pricing", changefreq: "monthly", priority: "0.7" },
+      { path: "/candidate/register", changefreq: "monthly", priority: "0.7" },
+      { path: "/recruiter/register", changefreq: "monthly", priority: "0.7" },
+      { path: "/terms", changefreq: "yearly", priority: "0.4" },
+      { path: "/privacy", changefreq: "yearly", priority: "0.4" },
+      { path: "/contact", changefreq: "yearly", priority: "0.4" },
+    ];
+
+    const jobs = await query(
+      `
+        select
+          jobs.id,
+          jobs.title,
+          jobs.company,
+          jobs.employer_name,
+          jobs.practice_name,
+          jobs.parent_company,
+          jobs.location,
+          jobs.city,
+          jobs.state,
+          jobs.updated_at,
+          jobs.posted_at,
+          jobs.created_at
+        from public.jobs jobs
+        where jobs.status = 'active'
+          and jobs.is_archived = false
+          and not exists (
+            select 1
+            from public.job_imports ji
+            where ji.published_job_id = jobs.id
+              and (
+                ji.status = 'rejected'
+                or ji.recommendation = 'reject'
+                or ji.review_action = 'reject'
+                or coalesce(ji.role_badge, '') = 'OTHER'
+              )
+          )
+        order by coalesce(jobs.updated_at, jobs.posted_at, jobs.created_at) desc
+        limit 50000
+      `
+    );
+
+    const urls = [
+      ...corePages.map((page) =>
+        sitemapUrl({
+          loc: `${origin}${page.path}`,
+          changefreq: page.changefreq,
+          priority: page.priority,
+        })
+      ),
+      ...(jobs.rows || []).map((job) =>
+        sitemapUrl({
+          loc: `${origin}${jobPath(job)}`,
+          lastmod: sitemapDate(job.updated_at || job.posted_at || job.created_at),
+          changefreq: "daily",
+          priority: "0.8",
+        })
+      ),
+    ];
+
+    const xml = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls,
+      "</urlset>",
+      "",
+    ].join("\n");
+
+    res.set("Content-Type", "application/xml; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=300, s-maxage=900");
+    return res.send(xml);
+  } catch (e) {
+    console.error("Sitemap generation error:", e);
+    return res.status(500).type("text/plain").send("Failed to generate sitemap");
+  }
 });
 
 // =======================

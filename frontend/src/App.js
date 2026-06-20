@@ -36,6 +36,7 @@ import Profile from "./components/Profile";
 import CandidateDashboard from "./components/Candidate/CandidateDashboard";
 import SearchJobs from "./components/Candidate/SearchJobs";
 import JobList from "./components/JobSearch/JobList";
+import JobDetailPage from "./components/JobSearch/JobDetailPage";
 import ClaimListing from "./components/ClaimListing";
 import VerifyEmail from "./components/VerifyEmail";
 import ForgotPassword from "./components/ForgotPassword";
@@ -323,6 +324,8 @@ function AppShell() {
 
             {/* Open job search page */}
             <Route path="/jobs" element={<JobList />} />
+            <Route path="/jobs/:jobId" element={<JobDetailPage />} />
+            <Route path="/jobs/:jobId/:slug" element={<JobDetailPage />} />
             <Route path="/claim-listing/:jobId" element={<ClaimListing />} />
             <Route path="/terms" element={<TermsOfService />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
