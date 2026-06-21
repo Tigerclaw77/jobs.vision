@@ -33,7 +33,7 @@ These are one-time Prices, not recurring Prices. They are needed to make the fir
 |---|---|---:|---|---:|---|
 | `jobs.vision Recruiter Staff` | `recruiter_staff_first_month_adjustment` | `3000` | `usd` | `$79.00` | `app=jobs.vision`, `audience=recruiter`, `plan_key=staff`, `db_plan=recruiter_staff`, `price_kind=first_month_adjustment` |
 | `jobs.vision Recruiter Manager` | `recruiter_manager_first_month_adjustment` | `5000` | `usd` | `$149.00` | `app=jobs.vision`, `audience=recruiter`, `plan_key=manager`, `db_plan=recruiter_manager`, `price_kind=first_month_adjustment` |
-| `jobs.vision Recruiter Doctor` | `recruiter_doctor_first_month_adjustment` | `15000` | `usd` | `$299.00` | `app=jobs.vision`, `audience=recruiter`, `plan_key=doctor`, `db_plan=recruiter_doctor`, `price_kind=first_month_adjustment` |
+| `jobs.vision Recruiter Doctor` | `recruiter_doctor_first_month_adjustment` | `10000` | `usd` | `$299.00` | `app=jobs.vision`, `audience=recruiter`, `plan_key=doctor`, `db_plan=recruiter_doctor`, `price_kind=first_month_adjustment` |
 
 ## Checkout Line Item Shape
 

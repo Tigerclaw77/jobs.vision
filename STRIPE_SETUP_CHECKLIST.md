@@ -53,7 +53,7 @@ Create these one-time prices:
 |---|---:|---:|---|
 | `jobs.vision Recruiter Staff` | `$30.00` | `$79.00` | `recruiter_staff_first_month_adjustment` |
 | `jobs.vision Recruiter Manager` | `$50.00` | `$149.00` | `recruiter_manager_first_month_adjustment` |
-| `jobs.vision Recruiter Doctor` | `$150.00` | `$299.00` | `recruiter_doctor_first_month_adjustment` |
+| `jobs.vision Recruiter Doctor` | `$100.00` | `$299.00` | `recruiter_doctor_first_month_adjustment` |
 
 Candidate plans do not need first-month adjustment prices.
 

@@ -43,7 +43,7 @@ const STRIPE_PRODUCTS = [
     recurringLookupKey: "recruiter_doctor_monthly",
     recurringAmountCents: 19900,
     firstMonthAdjustmentLookupKey: "recruiter_doctor_first_month_adjustment",
-    firstMonthAdjustmentAmountCents: 15000,
+    firstMonthAdjustmentAmountCents: 10000,
     entitlement: {
       table: "recruiter_entitlements",
       values: { plan: "recruiter_doctor", max_active_jobs: 10 },
