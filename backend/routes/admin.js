@@ -34,6 +34,7 @@ const {
 } = require("../services/jobLocationService");
 const { inferEmployerAttribution } = require("../services/employerAttribution");
 const { sendEmail } = require("../services/email");
+const { jobPath, plainText } = require("../services/jobSeo");
 
 const APP_URL = (process.env.APP_URL || process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/+$/, "");
 
@@ -80,6 +81,73 @@ const CONTACT_STATUSES = new Set([
   "claimed",
   "declined",
 ]);
+const SEO_HEALTH_SHORT_DESCRIPTION_LIMIT = 100;
+const SEO_HEALTH_SAMPLE_LIMIT = 8;
+const SEO_HEALTH_SCRAPER_ARTIFACTS = [
+  "Enable JavaScript",
+  "Powered by",
+  "Show More",
+  "cookie",
+  "cookies",
+  "Cookie Policy",
+  "Accept Cookies",
+  "Accept All",
+  "Privacy Policy",
+  "Terms of Use",
+  "Terms and Conditions",
+  "Skip to main content",
+  "Job Alert",
+  "Create Alert",
+  "Sign In",
+];
+const SEO_HEALTH_JOB_COLUMNS = {
+  id: "id",
+  title: "title",
+  description: "description",
+  company: "company",
+  employer_name: "employer_name",
+  employer_brand: "employer_brand",
+  practice_name: "practice_name",
+  parent_company: "parent_company",
+  location: "location",
+  city: "city",
+  state: "state",
+  compensation_type: "compensation_type",
+  salary_min: "salary_min",
+  salary_max: "salary_max",
+  hourly_min: "hourly_min",
+  hourly_max: "hourly_max",
+  daily_rate: "daily_rate",
+  compensation_notes: "compensation_notes",
+  salary: "salary",
+  external_apply_url: "external_apply_url",
+  application_email: "application_email",
+  posted_at: "posted_at",
+  created_at: "created_at",
+  updated_at: "updated_at",
+};
+const SEO_HEALTH_JOB_COLUMN_FALLBACKS = {
+  employer_name: "null::text as employer_name",
+  employer_brand: "null::text as employer_brand",
+  practice_name: "null::text as practice_name",
+  parent_company: "company::text as parent_company",
+  compensation_type: "null::text as compensation_type",
+  salary_min: "null::numeric as salary_min",
+  salary_max: "null::numeric as salary_max",
+  hourly_min: "null::numeric as hourly_min",
+  hourly_max: "null::numeric as hourly_max",
+  daily_rate: "null::numeric as daily_rate",
+  compensation_notes: "null::text as compensation_notes",
+  salary: "null::text as salary",
+  external_apply_url: "null::text as external_apply_url",
+  application_email: "null::text as application_email",
+  posted_at: "created_at as posted_at",
+  created_at: "null::timestamptz as created_at",
+  updated_at: "null::timestamptz as updated_at",
+};
+let cachedSeoHealthJobColumns = null;
+let cachedSeoHealthJobColumnsAt = 0;
+const SEO_HEALTH_JOB_COLUMNS_CACHE_MS = 60_000;
 const ROLE_TAG_TO_JOB_ROLE = {
   optometrist: "optometrist",
   optician: "optician",
@@ -107,6 +175,151 @@ function toTrimmedString(value) {
 function toNullableText(value) {
   const text = toTrimmedString(value);
   return text || null;
+}
+
+function escapeRegexText(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const SEO_HEALTH_SCRAPER_ARTIFACT_REGEX = SEO_HEALTH_SCRAPER_ARTIFACTS.map(escapeRegexText).join("|");
+
+function seoHealthRejectedImportVisibilityFilter(jobAlias = "jobs") {
+  return `
+    not exists (
+      select 1
+      from public.job_imports ji
+      where ji.published_job_id = ${jobAlias}.id
+        and (
+          ji.status = 'rejected'
+          or ji.recommendation = 'reject'
+          or ji.review_action = 'reject'
+          or coalesce(ji.role_badge, '') = 'OTHER'
+        )
+    )
+  `;
+}
+
+async function getSeoHealthJobColumns() {
+  const now = Date.now();
+  if (cachedSeoHealthJobColumns && now - cachedSeoHealthJobColumnsAt < SEO_HEALTH_JOB_COLUMNS_CACHE_MS) {
+    return cachedSeoHealthJobColumns;
+  }
+
+  const result = await query(
+    `
+      select column_name
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'jobs'
+    `
+  );
+  const available = new Set((result.rows || []).map((row) => row.column_name));
+
+  cachedSeoHealthJobColumns = Object.entries(SEO_HEALTH_JOB_COLUMNS)
+    .map(([alias, column]) => (available.has(column) ? `${column} as ${alias}` : SEO_HEALTH_JOB_COLUMN_FALLBACKS[alias]))
+    .filter(Boolean)
+    .join(",");
+  cachedSeoHealthJobColumnsAt = now;
+
+  return cachedSeoHealthJobColumns;
+}
+
+function seoHealthPublicJobsSql(columns) {
+  return `
+    select ${columns}
+    from public.jobs jobs
+    where jobs.status = 'active'
+      and jobs.is_archived = false
+      and ${seoHealthRejectedImportVisibilityFilter("jobs")}
+  `;
+}
+
+function seoHealthIssueConditions() {
+  return {
+    missingDescription: "char_length(btrim(coalesce(description, ''))) = 0",
+    shortDescription:
+      `char_length(btrim(coalesce(description, ''))) > 0 and char_length(btrim(coalesce(description, ''))) < ${SEO_HEALTH_SHORT_DESCRIPTION_LIMIT}`,
+    scraperArtifacts: "coalesce(description, '') ~* $1",
+    missingSalary: `
+      compensation_type is null
+      and salary_min is null
+      and salary_max is null
+      and hourly_min is null
+      and hourly_max is null
+      and daily_rate is null
+      and char_length(btrim(coalesce(salary, ''))) = 0
+      and char_length(btrim(coalesce(compensation_notes, ''))) = 0
+    `,
+    missingEmployer: `
+      char_length(btrim(coalesce(company, ''))) = 0
+      and char_length(btrim(coalesce(employer_name, ''))) = 0
+      and char_length(btrim(coalesce(employer_brand, ''))) = 0
+      and char_length(btrim(coalesce(practice_name, ''))) = 0
+      and char_length(btrim(coalesce(parent_company, ''))) = 0
+    `,
+    missingLocation: `
+      char_length(btrim(coalesce(location, ''))) = 0
+      and char_length(btrim(coalesce(city, ''))) = 0
+      and char_length(btrim(coalesce(state, ''))) = 0
+    `,
+    missingApplyDestination: `
+      char_length(btrim(coalesce(external_apply_url, ''))) = 0
+      and char_length(btrim(coalesce(application_email, ''))) = 0
+    `,
+  };
+}
+
+function seoHealthArtifactMatches(description = "") {
+  const text = plainText(description);
+  return SEO_HEALTH_SCRAPER_ARTIFACTS.filter((artifact) =>
+    new RegExp(escapeRegexText(artifact), "i").test(text)
+  );
+}
+
+function seoHealthJobSample(row = {}) {
+  const description = plainText(row.description || "");
+  const employer =
+    toTrimmedString(row.company) ||
+    toTrimmedString(row.employer_name) ||
+    toTrimmedString(row.employer_brand) ||
+    toTrimmedString(row.practice_name) ||
+    toTrimmedString(row.parent_company);
+  const location = [toTrimmedString(row.city), toTrimmedString(row.state)].filter(Boolean).join(", ");
+
+  return {
+    id: row.id,
+    title: row.title || "Untitled job",
+    employer: employer || null,
+    location: location || toNullableText(row.location),
+    path: jobPath(row),
+    descriptionLength: description.length,
+    artifactMatches: seoHealthArtifactMatches(description),
+    salary:
+      toNullableText(row.salary) ||
+      toNullableText(row.compensation_notes) ||
+      toNullableText(row.compensation_type),
+    applyDestination: toNullableText(row.external_apply_url) || toNullableText(row.application_email),
+    updatedAt: row.updated_at || row.posted_at || row.created_at || null,
+  };
+}
+
+async function seoHealthSampleRows(columns, whereSql, params = [], orderSql = "updated_at desc nulls last") {
+  const limitParam = params.length + 1;
+  const result = await query(
+    `
+      with public_jobs as (${seoHealthPublicJobsSql(columns)})
+      select
+        *,
+        char_length(btrim(coalesce(description, ''))) as description_length
+      from public_jobs
+      where ${whereSql}
+      order by ${orderSql}
+      limit $${limitParam}
+    `,
+    [...params, SEO_HEALTH_SAMPLE_LIMIT]
+  );
+
+  return (result.rows || []).map(seoHealthJobSample);
 }
 
 function escapeHtml(value = "") {
@@ -852,6 +1065,117 @@ router.get("/dashboard", requireAdmin(), async (_req, res) => {
   } catch (e) {
     console.error("admin/dashboard error", e);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/seo-health", requireAdmin(), async (_req, res) => {
+  try {
+    const columns = await getSeoHealthJobColumns();
+    const publicJobsSql = seoHealthPublicJobsSql(columns);
+    const sitemapJobsSql = seoHealthPublicJobsSql(columns);
+    const conditions = seoHealthIssueConditions();
+
+    const counts = await one(
+      `
+        with public_jobs as (${publicJobsSql}),
+        sitemap_jobs as (${sitemapJobsSql})
+        select
+          (select count(*)::int from public_jobs) as active_public_jobs,
+          (select count(*)::int from sitemap_jobs) as jobs_in_sitemap,
+          (select count(*)::int from public_jobs where ${conditions.shortDescription}) as short_descriptions,
+          (select count(*)::int from public_jobs where ${conditions.missingDescription}) as missing_descriptions,
+          (select count(*)::int from public_jobs where ${conditions.scraperArtifacts}) as scraper_artifacts,
+          (select count(*)::int from public_jobs where ${conditions.missingSalary}) as missing_salary,
+          (select count(*)::int from public_jobs where ${conditions.missingEmployer}) as missing_employer,
+          (select count(*)::int from public_jobs where ${conditions.missingLocation}) as missing_location,
+          (select count(*)::int from public_jobs where ${conditions.missingApplyDestination}) as missing_apply_destination,
+          (
+            select count(*)::int
+            from sitemap_jobs sitemap
+            left join public_jobs public_api on public_api.id = sitemap.id
+            where public_api.id is null
+          ) as api_non_200
+      `,
+      [SEO_HEALTH_SCRAPER_ARTIFACT_REGEX]
+    );
+
+    const [
+      shortDescriptions,
+      missingDescriptions,
+      scraperArtifacts,
+      missingSalary,
+      missingEmployer,
+      missingLocation,
+      missingApplyDestination,
+      apiNon200,
+    ] = await Promise.all([
+      seoHealthSampleRows(
+        columns,
+        conditions.shortDescription,
+        [],
+        "description_length asc, coalesce(updated_at, posted_at, created_at) desc nulls last"
+      ),
+      seoHealthSampleRows(columns, conditions.missingDescription),
+      seoHealthSampleRows(columns, conditions.scraperArtifacts, [SEO_HEALTH_SCRAPER_ARTIFACT_REGEX]),
+      seoHealthSampleRows(columns, conditions.missingSalary),
+      seoHealthSampleRows(columns, conditions.missingEmployer),
+      seoHealthSampleRows(columns, conditions.missingLocation),
+      seoHealthSampleRows(columns, conditions.missingApplyDestination),
+      (async () => {
+        const result = await query(
+          `
+            with public_jobs as (${publicJobsSql}),
+            sitemap_jobs as (${sitemapJobsSql})
+            select sitemap.*
+            from sitemap_jobs sitemap
+            left join public_jobs public_api on public_api.id = sitemap.id
+            where public_api.id is null
+            order by coalesce(sitemap.updated_at, sitemap.posted_at, sitemap.created_at) desc nulls last
+            limit $1
+          `,
+          [SEO_HEALTH_SAMPLE_LIMIT]
+        );
+        return (result.rows || []).map(seoHealthJobSample);
+      })(),
+    ]);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      thresholds: {
+        shortDescriptionCharacters: SEO_HEALTH_SHORT_DESCRIPTION_LIMIT,
+        sampleLimit: SEO_HEALTH_SAMPLE_LIMIT,
+        scraperArtifacts: SEO_HEALTH_SCRAPER_ARTIFACTS,
+      },
+      counts: {
+        activePublicJobs: counts?.active_public_jobs || 0,
+        jobsInSitemap: counts?.jobs_in_sitemap || 0,
+        descriptionsUnder100: counts?.short_descriptions || 0,
+        missingDescriptions: counts?.missing_descriptions || 0,
+        scraperArtifactDescriptions: counts?.scraper_artifacts || 0,
+        missingSalary: counts?.missing_salary || 0,
+        missingEmployer: counts?.missing_employer || 0,
+        missingLocation: counts?.missing_location || 0,
+        missingApplyDestination: counts?.missing_apply_destination || 0,
+        apiNon200: counts?.api_non_200 || 0,
+      },
+      samples: {
+        shortDescriptions,
+        missingDescriptions,
+        scraperArtifacts,
+        missingSalary,
+        missingEmployer,
+        missingLocation,
+        missingApplyDestination,
+        apiNon200,
+      },
+      checks: {
+        publicJobFilter: "status=active, is_archived=false, rejected imports excluded",
+        apiNon200Method: "sitemap jobs are compared with the public job API visibility filter",
+      },
+    });
+  } catch (e) {
+    console.error("admin/seo-health error", e);
+    res.status(500).json({ error: "Failed to load SEO health report" });
   }
 });
 

@@ -106,6 +106,11 @@ export const fetchMarketplaceDashboard = async () => {
   return data;
 };
 
+export const fetchSeoHealthReport = async () => {
+  const { data } = await axiosInstance.get("/admin/seo-health");
+  return data;
+};
+
 export const fetchManualOverrides = async (status = "pending") => {
   const { data } = await axiosInstance.get("/manual-overrides", { params: { status } });
   return data?.items || [];

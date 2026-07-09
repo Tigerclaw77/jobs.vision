@@ -1,6 +1,7 @@
 // frontend/src/components/Admin/AdminDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { Link as RouterLink } from "react-router-dom";
+import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
 import axiosInstance, { fetchAdminDashboard } from "../../utils/api"; // ← fixed path
 import UserTable from "./UserTable";
 import StatsCards from "./StatsCards";
@@ -93,6 +94,15 @@ const AdminDashboard = () => {
             className="glass-button"
           >
             Discovery Sources
+          </Button>
+          <Button
+            component={RouterLink}
+            to="/admin/seo-health"
+            variant="outlined"
+            className="glass-button"
+            startIcon={<AssessmentOutlinedIcon />}
+          >
+            SEO Health
           </Button>
           <Button
             component={RouterLink}

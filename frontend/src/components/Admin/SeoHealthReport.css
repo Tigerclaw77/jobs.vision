@@ -1,0 +1,164 @@
+.seo-health-page {
+  width: 100%;
+}
+
+.seo-health-subtitle {
+  color: rgba(248, 250, 252, 0.78);
+  margin-top: 4px;
+}
+
+.seo-health-message {
+  background: rgba(127, 29, 29, 0.82);
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 8px;
+  color: #fff1f2;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+}
+
+.seo-health-metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 18px;
+}
+
+.seo-health-metric {
+  border: 1px solid rgba(226, 232, 240, 0.2);
+  border-radius: 8px;
+  box-shadow: none;
+  min-height: 128px;
+  padding: 16px;
+}
+
+.seo-health-metric-good {
+  background: linear-gradient(180deg, rgba(6, 78, 59, 0.94), rgba(20, 83, 45, 0.9));
+}
+
+.seo-health-metric-warning {
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.96), rgba(133, 77, 14, 0.9));
+}
+
+.seo-health-metric-danger {
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.96), rgba(153, 27, 27, 0.9));
+}
+
+.seo-health-metric-neutral {
+  background: rgba(15, 23, 42, 0.86);
+}
+
+.seo-health-metric-label {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.seo-health-metric-value {
+  color: #ffffff;
+  font-weight: 900;
+  line-height: 1.1;
+  margin-top: 10px;
+}
+
+.seo-health-metric-helper {
+  color: rgba(255, 255, 255, 0.78);
+  display: block;
+  margin-top: 8px;
+}
+
+.seo-health-sections {
+  display: grid;
+  gap: 14px;
+}
+
+.seo-health-section {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  box-shadow: none;
+  color: #0f172a;
+  padding: 16px;
+}
+
+.seo-health-section h3 {
+  color: #0f172a;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
+.seo-health-empty {
+  color: #475569;
+  font-weight: 700;
+  margin: 0;
+}
+
+.seo-health-table-wrap {
+  overflow-x: auto;
+}
+
+.seo-health-table {
+  border-collapse: collapse;
+  min-width: 980px;
+  width: 100%;
+}
+
+.seo-health-table th,
+.seo-health-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.seo-health-table th {
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.seo-health-table td {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.seo-health-table td:first-child {
+  min-width: 240px;
+}
+
+.seo-health-table td:first-child strong,
+.seo-health-table td:first-child span {
+  display: block;
+}
+
+.seo-health-table td:first-child span {
+  color: #64748b;
+  font-size: 0.76rem;
+  margin-top: 3px;
+  word-break: break-all;
+}
+
+.seo-health-muted {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.seo-health-destination {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .seo-health-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .seo-health-metric {
+    min-height: 116px;
+    padding: 14px;
+  }
+}
