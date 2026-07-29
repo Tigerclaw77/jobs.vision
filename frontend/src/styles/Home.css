@@ -701,6 +701,78 @@ body.dim-strong .text-on-dim .MuiTypography-root {
   color: #fff !important;
 }
 
+/* Conversion proof shown only when its live metric is available. */
+.marketplace-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.8rem, 2vw, 1.4rem);
+  width: min(920px, calc(100vw - 2rem));
+  padding: 0.8rem 1rem;
+  box-sizing: border-box;
+  color: var(--jv-text);
+  background: rgba(247, 251, 250, 0.72);
+  border: 1px solid rgba(95, 183, 178, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(20, 35, 55, 0.08);
+}
+
+.marketplace-proof p {
+  min-width: 0;
+  max-width: 680px;
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.marketplace-proof-stat {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  padding-right: clamp(0.8rem, 2vw, 1.4rem);
+  border-right: 1px solid rgba(8, 126, 139, 0.26);
+  line-height: 1.1;
+}
+
+.marketplace-proof-stat strong {
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-weight: 950;
+}
+
+.marketplace-proof-stat span {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.hero-title,
+.hero-copy,
+.role-strip,
+.marketplace-proof {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .marketplace-proof {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .marketplace-proof-stat {
+    padding: 0 0 0.7rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(8, 126, 139, 0.26);
+  }
+
+  .marketplace-proof p {
+    text-align: center;
+  }
+}
+
 body.dim-bg .text-on-dim .MuiTableCell-root,
 body.dim-strong .text-on-dim .MuiTableCell-root {
   color: #fff;

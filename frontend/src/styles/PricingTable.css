@@ -897,3 +897,115 @@
 .home-pricing-cards .pricing-root.is-glass .btn.ghost:hover {
   transform: translateY(-1px) !important;
 }
+
+/* Pricing clarity and resilient wrapping. */
+.pricing-root .pricing-context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: min(760px, 100%);
+  margin: 0 auto 1rem;
+  padding: 0.75rem 1rem;
+  box-sizing: border-box;
+  color: var(--ink);
+  background: rgba(247, 251, 250, 0.76);
+  border: 1px solid rgba(8, 126, 139, 0.3);
+  border-radius: 14px;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.pricing-root .pricing-context-title {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.pricing-root .pricing-context span {
+  color: var(--ink-3);
+  font-size: 0.9rem;
+}
+
+.pricing-root .billing-summary {
+  margin: 0 0 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.pricing-root .card,
+.pricing-root .card-head,
+.pricing-root .card-body,
+.pricing-root .title,
+.pricing-root .subtitle,
+.pricing-root .price-block,
+.pricing-root .bullets,
+.pricing-root .actions,
+.pricing-root .fineprint {
+  min-width: 0;
+}
+
+.pricing-root .card-head .title,
+.pricing-root .card-head .subtitle,
+.pricing-root .bullets li,
+.pricing-root .fineprint,
+.pricing-root .fineprint span {
+  overflow-wrap: anywhere;
+}
+
+.pricing-root .price-line {
+  flex-wrap: wrap;
+  row-gap: 0.15rem;
+}
+
+.pricing-root .actions .btn {
+  min-height: 46px;
+  height: auto;
+  padding: 0.7rem 1rem;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.home-pricing-cards .pricing-root.is-glass .fineprint span {
+  white-space: normal;
+}
+
+.home-pricing-cards .pricing-root.is-glass .card-head .subtitle,
+.home-pricing-cards .pricing-root.is-glass .bullets,
+.home-pricing-cards .pricing-root.is-glass .actions,
+.home-pricing-cards .pricing-root.is-glass .fineprint {
+  min-height: 0;
+}
+
+@media (max-width: 960px) {
+  .pricing-root .card {
+    min-height: 0;
+  }
+
+  .pricing-root .pricing-context {
+    margin-bottom: 0.85rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .pricing-root,
+  .pricing-tables {
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+  }
+
+  .seg-tabs {
+    height: auto;
+    min-height: var(--seg-h);
+  }
+
+  .seg-tabs .seg-btn {
+    min-height: calc(var(--seg-h) - 8px);
+    height: auto;
+    padding: 0.45rem 0.55rem;
+    line-height: 1.2;
+    white-space: normal;
+  }
+}

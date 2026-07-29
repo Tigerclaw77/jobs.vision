@@ -164,7 +164,11 @@ export default function CandidateRegistration() {
     <Container maxWidth="sm">
       <Paper elevation={5} className="glass-form register-form">
         <Typography variant="h4" align="center" gutterBottom>
-          Candidate Registration
+          Create Your Free Candidate Account
+        </Typography>
+        <Typography variant="body2" align="center" sx={{ mb: 2 }}>
+          Save promising eye-care roles and keep your search organized. Paid upgrades are
+          optional.
         </Typography>
         <Button
           component={RouterLink}
@@ -294,7 +298,7 @@ export default function CandidateRegistration() {
             fullWidth
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Registering..." : "Register as Candidate"}
+            {isSubmitting ? "Creating account..." : "Create Free Candidate Account"}
           </Button>
         </form>
       </Paper>

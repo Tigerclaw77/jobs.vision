@@ -148,3 +148,110 @@ input::-webkit-credentials-auto-fill-button {
 .glass-form .MuiOutlinedInput-input:-moz-autofill-preview::first-line {
   color: #111 !important;
 }
+
+/* Registration purchase context and responsive form safeguards. */
+.registration-plan-summary {
+  margin: 0 0 0.9rem;
+  padding: 0.9rem;
+  box-sizing: border-box;
+  color: var(--form-ink, #111);
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(8, 126, 139, 0.3);
+  border-radius: 14px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.registration-plan-kicker {
+  margin: 0 0 0.15rem;
+  color: #087e8b;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.registration-plan-summary h2 {
+  margin: 0 0 0.7rem;
+  font-size: clamp(1.15rem, 4vw, 1.45rem);
+  line-height: 1.2;
+}
+
+.registration-plan-summary dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.registration-plan-summary dl > div {
+  min-width: 0;
+}
+
+.registration-plan-summary dt {
+  color: #53565a;
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.registration-plan-summary dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.93rem;
+  font-weight: 850;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.glass-form .registration-reassurance {
+  margin-bottom: 0.7rem;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.glass-form,
+.glass-form form,
+.glass-form .MuiFormControl-root,
+.glass-form .MuiInputBase-root,
+.glass-form .MuiButton-root,
+.glass-form .MuiAlert-root {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.glass-form .MuiInputLabel-root {
+  width: auto;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.glass-form .MuiButton-root {
+  min-height: 42px;
+  height: auto;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.glass-form .MuiFormControlLabel-root {
+  max-width: 100%;
+  align-items: flex-start;
+}
+
+.glass-form .MuiFormControlLabel-label,
+.glass-form .MuiAlert-message,
+.glass-form .MuiTypography-root {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 480px) {
+  .registration-plan-summary dl {
+    grid-template-columns: 1fr;
+  }
+}

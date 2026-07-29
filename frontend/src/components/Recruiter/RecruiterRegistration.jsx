@@ -18,6 +18,27 @@ import GlassTextField from "../ui/GlassTextField";
 import { neonAuth, normalizeSessionResult } from "../../utils/neonAuthClient";
 import "../../styles/forms.css";
 
+const RECRUITER_PLAN_DETAILS = {
+  staff: {
+    name: "Staff Job Listing",
+    firstMonth: 79,
+    renewal: 49,
+    role: "optician",
+  },
+  manager: {
+    name: "Manager Job Listing",
+    firstMonth: 149,
+    renewal: 99,
+    role: "practice_manager",
+  },
+  doctor: {
+    name: "Doctor Job Listing",
+    firstMonth: 299,
+    renewal: 199,
+    role: "optometrist",
+  },
+};
+
 /** Free domains (tune as needed) */
 const FREE_EMAIL_DOMAINS = new Set([
   "gmail.com",
@@ -126,7 +147,16 @@ const recruiterSchema = Yup.object({
 export default function RecruiterRegistration() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const nextPath = searchParams.get("next") || "";
+  const selectedPlanKey = searchParams.get("postingPlan") || "";
+  const selectedPlan = RECRUITER_PLAN_DETAILS[selectedPlanKey] || null;
+  const selectedRole = searchParams.get("role") || selectedPlan?.role || "";
+  const requestedNextPath = searchParams.get("next") || "";
+  const purchaseNextPath = useMemo(() => {
+    if (!selectedPlan) return requestedNextPath;
+    const params = new URLSearchParams({ postingPlan: selectedPlanKey });
+    if (selectedRole) params.set("role", selectedRole);
+    return `/recruiter/addjob?${params.toString()}`;
+  }, [requestedNextPath, selectedPlan, selectedPlanKey, selectedRole]);
   const base = window.location.origin;
 
   const {
@@ -144,6 +174,10 @@ export default function RecruiterRegistration() {
 
   const recruiterType = watch("recruiterType");
   const emailWatch = watch("email") || "";
+  const signInParams = new URLSearchParams();
+  if (emailWatch) signInParams.set("email", emailWatch);
+  if (purchaseNextPath) signInParams.set("next", purchaseNextPath);
+  const signInPath = `/login${signInParams.toString() ? `?${signInParams.toString()}` : ""}`;
 
   const [toast, setToast] = useState({
     open: false,
@@ -162,7 +196,7 @@ export default function RecruiterRegistration() {
 
   const onSubmit = async (data) => {
     const email = normalize(data.email);
-    const verifyPath = buildVerifyPath(email, nextPath);
+    const verifyPath = buildVerifyPath(email, purchaseNextPath);
     const emailRedirectTo = `${base}${verifyPath}`;
     setExistingAccountEmail("");
     const firstName = data.firstName?.trim();
@@ -238,25 +272,49 @@ export default function RecruiterRegistration() {
     <Container maxWidth="sm">
       <Paper elevation={5} className="glass-form register-form">
         <Typography variant="h4" align="center" gutterBottom>
-          Create Recruiter Account
+          Create Your Free Recruiter Account
         </Typography>
         <Typography variant="body2" align="center" sx={{ mb: 1.5 }}>
           Already have an account?{" "}
-          <RouterLink to={`/login${emailWatch ? `?email=${encodeURIComponent(emailWatch)}` : ""}`}>
-            Sign In
-          </RouterLink>
+          <RouterLink to={signInPath}>Sign In</RouterLink>
+        </Typography>
+
+        {selectedPlan && (
+          <section className="registration-plan-summary" aria-label="Selected listing">
+            <p className="registration-plan-kicker">Selected listing</p>
+            <h2>{selectedPlan.name}</h2>
+            <dl>
+              <div>
+                <dt>Price today</dt>
+                <dd>${selectedPlan.firstMonth}</dd>
+              </div>
+              <div>
+                <dt>Renewal price</dt>
+                <dd>${selectedPlan.renewal}</dd>
+              </div>
+              <div>
+                <dt>Billing cadence</dt>
+                <dd>Every 30 days until canceled</dd>
+              </div>
+            </dl>
+          </section>
+        )}
+
+        <Typography className="registration-reassurance" variant="body2" align="center">
+          Creating your recruiter account is free. You&apos;ll review payment before
+          completing your purchase.
         </Typography>
         <Typography variant="body2" align="center" sx={{ mb: 2 }}>
           After this, we will email a 6-digit code so you can verify your account before posting.
         </Typography>
         <Button
           component={RouterLink}
-          to="/"
+          to={selectedPlan ? `/?audience=recruiter&recommendedPlan=${selectedPlanKey}` : "/"}
           variant="text"
           fullWidth
           sx={{ mb: 1 }}
         >
-          Back to Home
+          {selectedPlan ? "Back to pricing" : "Back to home"}
         </Button>
 
         {existingAccountEmail && (
@@ -280,7 +338,7 @@ export default function RecruiterRegistration() {
               </Button>
               <Button
                 component={RouterLink}
-                to={buildVerifyPath(existingAccountEmail, nextPath)}
+                to={buildVerifyPath(existingAccountEmail, purchaseNextPath)}
                 size="small"
                 variant="outlined"
               >
@@ -417,7 +475,7 @@ export default function RecruiterRegistration() {
             fullWidth
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Creating account..." : "Create Account"}
+            {isSubmitting ? "Creating account..." : "Create Free Recruiter Account"}
           </Button>
         </form>
       </Paper>

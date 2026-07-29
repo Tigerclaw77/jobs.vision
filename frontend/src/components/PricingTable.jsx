@@ -6,35 +6,35 @@ import "../styles/PricingTable.css";
 const RECRUITER_PLANS = [
   {
     key: "staff",
-    name: "Staff Position",
-    headline: "Post support-team openings without overspending.",
+    name: "Staff Job Listing",
+    headline: "Reach eye-care support professionals without sorting through unrelated applicants.",
     firstMonth: 79,
     renewal: 49,
     bullets: [
-      "Front desk, techs, assistants",
-      "30-day listing, basic visibility",
+      "For front desk, technicians, and assistants",
+      "One eye-care job listing live for 30 days",
     ],
   },
   {
     key: "manager",
-    name: "Manager Position",
-    headline: "Post leadership openings for your optical or clinic team.",
+    name: "Manager Job Listing",
+    headline: "Put your leadership opening in front of an eye-care-focused audience.",
     firstMonth: 149,
     renewal: 99,
     bullets: [
-      "Office/optical managers",
-      "30-day listing with enhanced visibility",
+      "For office and optical managers",
+      "One eye-care job listing live for 30 days",
     ],
   },
   {
     key: "doctor",
-    name: "Doctor Position",
-    headline: "Post high-impact optometrist openings with stronger visibility.",
+    name: "Doctor Job Listing",
+    headline: "Connect your optometrist opening with professionals already looking in eye care.",
     firstMonth: 299,
     renewal: 199,
     bullets: [
-      "Optometrist-focused listing",
-      "30-day listing with strongest visibility",
+      "For optometrist openings",
+      "One eye-care job listing live for 30 days",
     ],
   },
 ];
@@ -45,7 +45,11 @@ const CANDIDATE_PLANS = [
     name: "Basic",
     price: 0,
     period: "month",
-    bullets: ["Browse jobs", "Apply to jobs", "Save up to 5 jobs"],
+    bullets: [
+      "Explore eye-care roles",
+      "Apply directly with employers",
+      "Save up to 5 promising jobs",
+    ],
     cta: { label: "Browse Jobs", href: "/jobs" },
   },
   {
@@ -53,7 +57,12 @@ const CANDIDATE_PLANS = [
     name: "Plus",
     price: 20,
     period: "month",
-    bullets: ["Unlimited saves", "Map search", "Email alerts", "Weekly matching"],
+    bullets: [
+      "Keep every opportunity organized",
+      "See opportunities that fit your commute",
+      "Get notified when matching positions become available",
+      "Receive a weekly shortlist",
+    ],
     cta: { label: "Create account", href: "/candidate/register" },
   },
   {
@@ -62,10 +71,10 @@ const CANDIDATE_PLANS = [
     price: 50,
     period: "month",
     bullets: [
-      "SMS alerts",
-      "Priority profile placement",
-      "Featured candidate badge",
-      "Unlimited saves",
+      "Get matching job alerts by text",
+      "Stand out when employers browse candidates",
+      "Show employers you are actively looking",
+      "Keep every opportunity organized",
     ],
     cta: { label: "Create account", href: "/candidate/register" },
   },
@@ -119,6 +128,15 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
   const startCheckout = async (plan, audience) => {
     const registerPath = audience === "recruiter" ? "/recruiter/register" : "/candidate/register";
     if (!user?.id) {
+      if (audience === "recruiter") {
+        const role = RECRUITER_PLAN_PRESELECT_ROLE[plan.key] || "";
+        const params = new URLSearchParams({
+          postingPlan: plan.key,
+          ...(role ? { role } : {}),
+        });
+        nav(`${registerPath}?${params.toString()}`);
+        return;
+      }
       nav(registerPath);
       return;
     }
@@ -189,6 +207,18 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
           </div>
         )}
 
+        {isRecruiter && (
+          <div className="pricing-context" role="note">
+            <strong className="pricing-context-title">
+              Recruiter accounts are free. You only pay when posting a job listing.
+            </strong>
+            <span>
+              Reach an eye-care-focused audience and spend less time screening unrelated
+              applicants.
+            </span>
+          </div>
+        )}
+
         {/* Panels */}
         <div
           id={panelId}
@@ -228,16 +258,21 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           <span className="currency">$</span>
                           <span className="amount">{p.firstMonth}</span>
                         </span>
-                        <span className="period">first month</span>
+                        <span className="period">first 30 days</span>
                       </div>
                       <div className="price-line">
                         <span className="price small">
                           <span className="currency">$</span>
                           <span className="amount">{p.renewal}</span>
                         </span>
-                        <span className="period">/mo after</span>
+                        <span className="period">every 30 days after</span>
                       </div>
                     </div>
+
+                    <p className="billing-summary">
+                      ${p.firstMonth} for your first 30-day listing. Active listings renew
+                      every 30 days for ${p.renewal} until canceled.
+                    </p>
 
                     <ul className="bullets">
                       {p.bullets.map((b, i) => (
@@ -257,10 +292,10 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
                           ? "Not valid for this posting"
                           : loadingPlan === p.key
                           ? "Starting..."
-                          : "Post Job"}
+                          : "Post this job"}
                       </button>
                       <p className="fineprint">
-                        <span>Renews monthly. Cancel anytime.</span>
+                        <span>One listing per purchase. Cancel renewal anytime.</span>
                         <span>Prices shown in USD.</span>
                       </p>
                     </div>

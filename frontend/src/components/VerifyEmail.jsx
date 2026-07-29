@@ -32,6 +32,11 @@ function redirectForRole(role) {
   return "/candidate/dashboard";
 }
 
+function safeNextPath(value = "") {
+  if (!value.startsWith("/") || value.startsWith("//")) return "";
+  return value;
+}
+
 async function fetchMe(accessToken) {
   const res = await fetch(`${apiBaseUrl()}/auth/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -76,6 +81,7 @@ export default function VerifyEmail() {
   const dispatch = useDispatch();
   const { refreshAuth } = useAuth();
   const initialEmail = normalizeEmail(getParam("email") || "");
+  const nextPath = safeNextPath(getParam("next") || "");
   const [phase, setPhase] = useState(initialEmail ? "otp" : "loading");
   const [message, setMessage] = useState("");
   const [email, setEmail] = useState(initialEmail);
@@ -128,10 +134,10 @@ export default function VerifyEmail() {
       setPhase("success");
       setMessage("Email verified. Redirecting...");
       setTimeout(() => {
-        navigate(redirectForRole(role), { replace: true });
+        navigate(nextPath || redirectForRole(role), { replace: true });
       }, 600);
     },
-    [dispatch, navigate, refreshAuth]
+    [dispatch, navigate, nextPath, refreshAuth]
   );
 
   useEffect(() => {
@@ -244,7 +250,10 @@ export default function VerifyEmail() {
         type: "signup",
         email: normalizedEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/verify-email?email=${encodeURIComponent(normalizedEmail)}`,
+          emailRedirectTo: `${window.location.origin}/verify-email?${new URLSearchParams({
+            email: normalizedEmail,
+            ...(nextPath ? { next: nextPath } : {}),
+          }).toString()}`,
         },
       });
       if (error) throw error;
