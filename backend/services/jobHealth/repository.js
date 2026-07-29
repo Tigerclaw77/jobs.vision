@@ -90,6 +90,64 @@ async function getJobsDueForVerification({ limit = 100 } = {}) {
   ).then((result) => result.rows || []);
 }
 
+async function claimJobsDueForVerification({ limit = 100, leaseMinutes = 15 } = {}) {
+  const safeLeaseMinutes = Math.min(60, Math.max(1, Number(leaseMinutes) || 15));
+  return query(
+    `
+      with due as (
+        select id
+        from public.jobs
+        where is_archived = false
+          and status in ('active', 'paused', 'pending_domain')
+          and next_verification_at <= now()
+          and (
+            verification_lease_expires_at is null
+            or verification_lease_expires_at <= now()
+          )
+        order by
+          case health_status
+            when 'broken' then 0
+            when 'stale' then 1
+            when 'warning' then 2
+            when 'unknown' then 3
+            else 4
+          end,
+          next_verification_at asc,
+          created_at asc
+        for update skip locked
+        limit $1
+      )
+      update public.jobs jobs
+      set
+        verification_lease_id = gen_random_uuid(),
+        verification_lease_expires_at = now() + make_interval(mins => $2)
+      from due
+      where jobs.id = due.id
+      returning
+        jobs.id,
+        jobs.title,
+        jobs.company,
+        jobs.employer_name,
+        jobs.location,
+        jobs.source,
+        jobs.source_url,
+        jobs.external_apply_url,
+        jobs.posted_at,
+        jobs.created_at,
+        jobs.health_score,
+        jobs.health_status,
+        jobs.health_confidence_score,
+        jobs.verification_status,
+        jobs.last_verified_at,
+        jobs.last_successful_verification_at,
+        jobs.next_verification_at,
+        jobs.verification_lease_id,
+        jobs.verification_lease_expires_at
+    `,
+    [boundedLimit(limit), safeLeaseMinutes]
+  ).then((result) => result.rows || []);
+}
+
 async function recordHealthCheck(check) {
   return one(
     `
@@ -148,6 +206,7 @@ async function saveHealthEvaluation({
   evidenceCheckIds = [],
   nextVerificationAt,
   actorType = "automation",
+  leaseId = null,
 }) {
   const client = await pool.connect();
   try {
@@ -182,8 +241,13 @@ async function saveHealthEvaluation({
           health_reason_code = $9,
           health_reason_codes = $10,
           health_policy_version = $11,
+          verification_lease_id = null,
+          verification_lease_expires_at = null,
+          verification_attempt_count = verification_attempt_count + 1,
+          verification_last_error = null,
           updated_at = now()
         where id = $1
+          and ($12::uuid is null or verification_lease_id = $12::uuid)
         returning ${JOB_HEALTH_SELECT}
       `,
       [
@@ -198,8 +262,12 @@ async function saveHealthEvaluation({
         evaluation.primaryReasonCode,
         evaluation.reasonCodes || [],
         evaluation.policyVersion,
+        leaseId,
       ]
     );
+    if (!updatedResult.rows[0]) {
+      throw new Error(`Verification lease no longer belongs to this worker: ${jobId}`);
+    }
 
     await client.query(
       `
@@ -291,11 +359,39 @@ async function saveHealthEvaluation({
   }
 }
 
+async function releaseVerificationLease(
+  jobId,
+  leaseId,
+  { error = null, retryAfterMinutes = 30 } = {}
+) {
+  const safeRetryMinutes = Math.min(
+    1_440,
+    Math.max(1, Number(retryAfterMinutes) || 30)
+  );
+  return one(
+    `
+      update public.jobs
+      set
+        verification_lease_id = null,
+        verification_lease_expires_at = null,
+        verification_attempt_count = verification_attempt_count + 1,
+        verification_last_error = $3,
+        next_verification_at = now() + make_interval(mins => $4),
+        updated_at = now()
+      where id = $1
+        and verification_lease_id = $2::uuid
+      returning ${JOB_HEALTH_SELECT}
+    `,
+    [jobId, leaseId, error ? String(error).slice(0, 500) : null, safeRetryMinutes]
+  );
+}
+
 module.exports = {
+  claimJobsDueForVerification,
   getActiveJobHealthPolicy,
   getJobHealth,
   getJobsDueForVerification,
   recordHealthCheck,
+  releaseVerificationLease,
   saveHealthEvaluation,
 };
-
