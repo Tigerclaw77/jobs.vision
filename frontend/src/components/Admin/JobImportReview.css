@@ -72,7 +72,7 @@
 
 .job-import-review__tallies {
   display: grid;
-  grid-template-columns: repeat(9, minmax(92px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: 8px;
 }
 
@@ -364,6 +364,58 @@
 
 .job-import-review__reason {
   margin-top: 10px;
+}
+
+.job-import-review__quality--passed.MuiChip-root {
+  background: #047857;
+  border-color: #86efac;
+  color: #ffffff;
+}
+
+.job-import-review__quality--quarantined.MuiChip-root {
+  background: #b45309;
+  border-color: #fde68a;
+  color: #ffffff;
+}
+
+.job-import-review__quality--rejected.MuiChip-root {
+  background: #b91c1c;
+  border-color: #fecaca;
+  color: #ffffff;
+}
+
+.job-import-review__quality-reason {
+  min-width: 0;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(253, 230, 138, 0.46);
+  border-radius: 10px;
+  background: rgba(180, 83, 9, 0.2);
+}
+
+.job-import-review__quality-reason span,
+.job-import-review__quality-reason strong,
+.job-import-review__quality-reason small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.job-import-review__quality-reason span {
+  color: #fde68a;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.job-import-review__quality-reason strong {
+  margin-top: 4px;
+  color: #ffffff;
+}
+
+.job-import-review__quality-reason small {
+  margin-top: 4px;
+  color: #fef3c7;
 }
 
 .job-import-review__details {

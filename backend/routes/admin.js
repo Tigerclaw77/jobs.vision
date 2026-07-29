@@ -426,6 +426,7 @@ function normalizeLocationPrecision(value, fallback = "unknown") {
 
 function blockedImportPublishReason(row = {}, normalizedJob = {}) {
   const status = toTrimmedString(row.status).toLowerCase();
+  const qualityStatus = toTrimmedString(row.quality_status || "legacy_unchecked").toLowerCase();
   const recommendation = toTrimmedString(
     normalizedJob.recommendation || row.recommendation
   ).toLowerCase();
@@ -433,6 +434,9 @@ function blockedImportPublishReason(row = {}, normalizedJob = {}) {
 
   if (status === "rejected") {
     return "Rejected imports cannot be published.";
+  }
+  if (!["passed", "legacy_unchecked"].includes(qualityStatus)) {
+    return `Import quality status "${qualityStatus}" must be resolved before publishing.`;
   }
   if (row.evergreen === true || normalizedJob.evergreen === true || status === "evergreen") {
     return "Evergreen imports are reserved for future openings/talent-pool handling and cannot be published as active jobs.";
@@ -997,6 +1001,9 @@ async function jobImportReviewSummary() {
           and auto_decision = 'reject'
       )::int as auto_rejected,
       count(*) filter (where status = 'published')::int as published_live,
+      count(*) filter (where quality_status = 'passed')::int as quality_passed,
+      count(*) filter (where quality_status = 'quarantined')::int as quality_quarantined,
+      count(*) filter (where quality_status = 'rejected')::int as quality_rejected,
       0::int as removed
     from public.job_imports
   `);
@@ -1013,6 +1020,9 @@ async function jobImportReviewSummary() {
     autoApproved: Number(summary?.auto_approved || 0),
     autoRejected: Number(summary?.auto_rejected || 0),
     publishedLive: Number(summary?.published_live || 0),
+    qualityPassed: Number(summary?.quality_passed || 0),
+    qualityQuarantined: Number(summary?.quality_quarantined || 0),
+    qualityRejected: Number(summary?.quality_rejected || 0),
     removed: Number(summary?.removed || 0),
   };
 }
@@ -1025,6 +1035,7 @@ async function highConfidenceApproveRows() {
       and coalesce(evergreen, false) = false
       and recommendation = 'approve'
       and classification_confidence_score >= 95
+      and coalesce(quality_status, 'legacy_unchecked') in ('passed', 'legacy_unchecked')
       and coalesce(role_badge, '') not in ('UNKNOWN', 'OTHER', 'OMD')
       and coalesce(normalized_apply_url, apply_url, normalized_job->>'applyUrl', '') <> ''
     order by classification_confidence_score desc, discovered_at desc
@@ -1843,6 +1854,7 @@ router.get("/job-imports", requireAdmin(), async (req, res) => {
       listingTier: req.query.listingTier || req.query.listing_tier || "all",
       listingOpportunityType:
         req.query.listingOpportunityType || req.query.listing_opportunity_type || "all",
+      qualityStatus: req.query.qualityStatus || req.query.quality_status || "all",
     });
     res.json({
       summary: await jobImportReviewSummary(),

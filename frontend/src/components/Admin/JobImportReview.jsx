@@ -63,6 +63,9 @@ const EMPTY_SUMMARY = {
   autoApproved: 0,
   autoRejected: 0,
   publishedLive: 0,
+  qualityPassed: 0,
+  qualityQuarantined: 0,
+  qualityRejected: 0,
   removed: 0,
 };
 const EMPTY_BACKFILL_STATUS = {
@@ -140,6 +143,9 @@ function normalizedFromItem(item = {}) {
       "",
     reviewAction: normalized.reviewAction || item.review_action || "",
     reviewSource: normalized.reviewSource || item.review_source || "",
+    qualityStatus: item.quality_status || "legacy_unchecked",
+    qualityScore: item.quality_score ?? null,
+    qualityReasonCodes: item.quality_reason_codes || [],
     role: "",
   };
 }
@@ -277,6 +283,14 @@ function statusLabel(status) {
   return String(status || "needs_review").replace(/_/g, " ");
 }
 
+function qualityLabel(status) {
+  return `Quality: ${String(status || "legacy_unchecked").replace(/_/g, " ")}`;
+}
+
+function isQualityPublishable(item = {}) {
+  return ["passed", "legacy_unchecked"].includes(item.quality_status || "legacy_unchecked");
+}
+
 function relevanceLabel(value) {
   if (value === true) return "YES";
   if (value === false) return "NO";
@@ -337,6 +351,7 @@ function JobImportReview() {
   const [status, setStatus] = useState("needs_review");
   const [listingTierFilter, setListingTierFilter] = useState("all");
   const [listingOpportunityFilter, setListingOpportunityFilter] = useState("all");
+  const [qualityStatusFilter, setQualityStatusFilter] = useState("all");
   const [items, setItems] = useState([]);
   const [edits, setEdits] = useState({});
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
@@ -367,7 +382,8 @@ function JobImportReview() {
   async function loadImports(
     nextStatus = status,
     nextListingTier = listingTierFilter,
-    nextListingOpportunity = listingOpportunityFilter
+    nextListingOpportunity = listingOpportunityFilter,
+    nextQualityStatus = qualityStatusFilter
   ) {
     setLoading(true);
     setMessage("");
@@ -376,6 +392,7 @@ function JobImportReview() {
         status: nextStatus,
         listingTier: nextListingTier,
         listingOpportunityType: nextListingOpportunity,
+        qualityStatus: nextQualityStatus,
         limit: 200,
       });
       fetchJobImportReviewSummary()
@@ -403,9 +420,9 @@ function JobImportReview() {
   }
 
   useEffect(() => {
-    loadImports(status, listingTierFilter, listingOpportunityFilter);
+    loadImports(status, listingTierFilter, listingOpportunityFilter, qualityStatusFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, listingTierFilter, listingOpportunityFilter]);
+  }, [status, listingTierFilter, listingOpportunityFilter, qualityStatusFilter]);
 
   const pendingCount = useMemo(
     () => items.filter((item) => item.status === "needs_review").length,
@@ -430,7 +447,11 @@ function JobImportReview() {
   const publishableItems = useMemo(
     () =>
       visibleItems.filter(
-        (item) => item.status !== "published" && item.status !== "rejected" && item.status !== "evergreen"
+        (item) =>
+          item.status !== "published" &&
+          item.status !== "rejected" &&
+          item.status !== "evergreen" &&
+          isQualityPublishable(item)
       ),
     [visibleItems]
   );
@@ -441,7 +462,8 @@ function JobImportReview() {
           selectedIds.has(item.id) &&
           item.status !== "published" &&
           item.status !== "rejected" &&
-          item.status !== "evergreen"
+          item.status !== "evergreen" &&
+          isQualityPublishable(item)
       ),
     [visibleItems, selectedIds]
   );
@@ -711,6 +733,9 @@ function JobImportReview() {
     ["Auto-rejected", summary.autoRejected],
     ["Review queue", summary.reviewQueue ?? summary.pendingReview],
     ["Published/live", summary.publishedLive],
+    ["Quality passed", summary.qualityPassed],
+    ["Quarantined", summary.qualityQuarantined],
+    ["Quality rejected", summary.qualityRejected],
     ["Deleted/removed", summary.removed],
   ];
   const reviewFilterOptions = [
@@ -794,6 +819,21 @@ function JobImportReview() {
                   {option.label}
                 </MenuItem>
               ))}
+            </Select>
+          </Stack>
+          <Stack direction="row" gap={1} alignItems="center">
+            <Typography variant="body2">Quality</Typography>
+            <Select
+              size="small"
+              value={qualityStatusFilter}
+              onChange={(event) => setQualityStatusFilter(event.target.value)}
+              className="job-import-review__select"
+            >
+              <MenuItem value="all">All</MenuItem>
+              <MenuItem value="passed">Passed</MenuItem>
+              <MenuItem value="quarantined">Quarantined</MenuItem>
+              <MenuItem value="rejected">Rejected</MenuItem>
+              <MenuItem value="legacy_unchecked">Legacy unchecked</MenuItem>
             </Select>
           </Stack>
         </Stack>
@@ -1108,7 +1148,7 @@ function JobImportReview() {
                   <Checkbox
                     checked={selectedIds.has(item.id)}
                     onChange={(event) => toggleSelected(item.id, event.target.checked)}
-                    disabled={item.status === "published"}
+                    disabled={item.status === "published" || !isQualityPublishable(item)}
                   />
                   <span
                     className={`job-import-review__role-badge job-import-review__role-badge--${classification.roleBadge.toLowerCase()}`}
@@ -1135,6 +1175,13 @@ function JobImportReview() {
                   />
                   <Chip label={`${Math.round(classification.confidence)}% confidence`} size="small" />
                   <Chip label={statusLabel(item.status)} size="small" />
+                  <Chip
+                    label={qualityLabel(item.quality_status)}
+                    size="small"
+                    className={`job-import-review__quality job-import-review__quality--${
+                      item.quality_status || "legacy_unchecked"
+                    }`}
+                  />
                   {item.auto_decision_applied ? (
                     <Chip label={`AUTO ${String(item.auto_decision || "").toUpperCase()}`} size="small" />
                   ) : null}
@@ -1172,6 +1219,20 @@ function JobImportReview() {
                   <span>Reason</span>
                   <strong>{classification.recommendationReason}</strong>
                 </div>
+                {!isQualityPublishable(item) ? (
+                  <div className="job-import-review__quality-reason">
+                    <span>Import quality gate</span>
+                    <strong>
+                      {(item.quality_reason_codes || [])
+                        .map((reason) => statusLabel(reason))
+                        .join(", ") || "Quality review required"}
+                    </strong>
+                    <small>
+                      Score {Math.round(Number(item.quality_score || 0))}/100. This import cannot
+                      be published until it passes the quality gate.
+                    </small>
+                  </div>
+                ) : null}
               </Box>
 
               <Grid container spacing={2} className="job-import-review__fields">
@@ -1363,7 +1424,7 @@ function JobImportReview() {
                 <Button
                   onClick={() => handleApprove(item.id)}
                   variant="contained"
-                  disabled={item.status === "published"}
+                  disabled={item.status === "published" || !isQualityPublishable(item)}
                 >
                   Approve / Publish
                 </Button>

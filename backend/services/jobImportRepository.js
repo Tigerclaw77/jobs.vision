@@ -1,6 +1,7 @@
 const { one, query } = require("./db");
 const { classifyJobForReview } = require("../../src/lib/job-discovery/classifier");
 const { inferEmployerAttribution } = require("./employerAttribution");
+const { evaluateImportQuality } = require("./jobImportQuality");
 
 function toTextArray(values = []) {
   if (!Array.isArray(values)) return [];
@@ -153,7 +154,13 @@ function normalizedJobFromImportRow(row = {}) {
   };
 }
 
-async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob, discoveredBy = null }) {
+async function saveDiscoveredJobImport({
+  source,
+  discoveryResult,
+  normalizedJob,
+  discoveredBy = null,
+  importBatchId = null,
+}) {
   const listingOpportunityType = enumOrDefault(
     normalizedJob.listingOpportunityType,
     LISTING_OPPORTUNITY_TYPES,
@@ -194,10 +201,68 @@ async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob,
   normalizedWithListing.parentCompany = attribution.parentCompany;
   normalizedWithListing.employerBrand = attribution.employerBrand;
   normalizedWithListing.practiceName = attribution.practiceName;
+  const preliminaryQuality = evaluateImportQuality({
+    description:
+      normalizedWithListing.description || discoveryResult.rawDescription || "",
+    applyUrl:
+      normalizedWithListing.applyUrl || discoveryResult.applyUrl || "",
+  });
+  const duplicateDescription = preliminaryQuality.fingerprint
+    ? Boolean(
+        await one(
+          `
+            select id
+            from public.job_imports
+            where description_fingerprint = $1
+              and duplicate_key <> $2
+              and lower(coalesce(normalized_company, employer_name, '')) = lower($3)
+              and lower(coalesce(normalized_title, raw_title, '')) = lower($4)
+              and lower(coalesce(normalized_location, raw_location, '')) = lower($5)
+              and status <> 'rejected'
+            limit 1
+          `,
+          [
+            preliminaryQuality.fingerprint,
+            normalizedWithListing.duplicateKey,
+            normalizedWithListing.company || source.employerName || "",
+            normalizedWithListing.title || discoveryResult.rawTitle || "",
+            normalizedWithListing.location || discoveryResult.rawLocation || "",
+          ]
+        )
+      )
+    : false;
+  const quality = evaluateImportQuality({
+    description:
+      normalizedWithListing.description || discoveryResult.rawDescription || "",
+    applyUrl:
+      normalizedWithListing.applyUrl || discoveryResult.applyUrl || "",
+    duplicateDescription,
+  });
+  normalizedWithListing.importQuality = {
+    status: quality.status,
+    score: quality.score,
+    reasonCodes: quality.reasonCodes,
+  };
   const evergreenPolicy = evergreenPolicyFromJob(normalizedWithListing);
-  const status = evergreenPolicy.evergreen ? "evergreen" : normalizedWithListing.status || "needs_review";
+  const status =
+    quality.status === "rejected"
+      ? "rejected"
+      : quality.status === "quarantined"
+      ? "needs_review"
+      : evergreenPolicy.evergreen
+      ? "evergreen"
+      : normalizedWithListing.status || "needs_review";
   const classification = classificationFromJob(normalizedWithListing);
-  const autoDecision = autoDecisionForClassification(classification, normalizedWithListing);
+  const classificationDecision = autoDecisionForClassification(
+    classification,
+    normalizedWithListing
+  );
+  const autoDecision =
+    quality.status === "rejected"
+      ? { applied: true, decision: "reject" }
+      : quality.status === "passed"
+      ? classificationDecision
+      : { applied: false, decision: null };
   const params = [
     source.employerName,
     source.employerWebsiteUrl,
@@ -255,6 +320,13 @@ async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob,
     dateOrNull(normalizedWithListing.sourceUpdatedAt),
     intOrNull(normalizedWithListing.sourcePostingAgeDays),
     dateOrNull(normalizedWithListing.freshnessCheckedAt) || new Date().toISOString(),
+    importBatchId,
+    quality.status,
+    quality.score,
+    quality.reasonCodes,
+    JSON.stringify(quality.details),
+    quality.checkedAt,
+    quality.fingerprint,
   ];
 
   return one(
@@ -315,14 +387,22 @@ async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob,
         source_posted_at,
         source_updated_at,
         source_posting_age_days,
-        freshness_checked_at
+        freshness_checked_at,
+        import_batch_id,
+        quality_status,
+        quality_score,
+        quality_reason_codes,
+        quality_details,
+        quality_checked_at,
+        description_fingerprint
       )
       values (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
         $11, $12, $13::text[], $14, $15, $16, $17, $18, $19, $20,
         $21, $22, $23::text[], $24::text[], $25, $26, $27::jsonb, $28::jsonb, $29,
         $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
-        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56
+        $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56,
+        $57, $58, $59, $60::text[], $61::jsonb, $62, $63
       )
       on conflict (duplicate_key) do update set
         source_url = excluded.source_url,
@@ -374,7 +454,15 @@ async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob,
         source_updated_at = excluded.source_updated_at,
         source_posting_age_days = excluded.source_posting_age_days,
         freshness_checked_at = excluded.freshness_checked_at,
+        import_batch_id = coalesce(excluded.import_batch_id, public.job_imports.import_batch_id),
+        quality_status = excluded.quality_status,
+        quality_score = excluded.quality_score,
+        quality_reason_codes = excluded.quality_reason_codes,
+        quality_details = excluded.quality_details,
+        quality_checked_at = excluded.quality_checked_at,
+        description_fingerprint = excluded.description_fingerprint,
         status = case
+          when excluded.quality_status = 'rejected' then 'rejected'
           when public.job_imports.status in ('published', 'rejected') then public.job_imports.status
           else excluded.status
         end,
@@ -386,16 +474,86 @@ async function saveDiscoveredJobImport({ source, discoveryResult, normalizedJob,
 }
 
 async function saveDiscoveryRun(discoveryRun, options = {}) {
+  const batch =
+    options.importBatchId
+      ? { id: options.importBatchId }
+      : await one(
+          `
+            insert into public.job_import_batches (
+              source_type,
+              source_label,
+              importer_version,
+              metadata
+            )
+            values ($1, $2, $3, $4::jsonb)
+            returning *
+          `,
+          [
+            discoveryRun.source?.sourceType || "unknown",
+            discoveryRun.source?.employerName ||
+              discoveryRun.source?.careersUrl ||
+              discoveryRun.source?.employerWebsiteUrl ||
+              "Unknown source",
+            options.importerVersion || "job-discovery-v1",
+            JSON.stringify({
+              careersUrl: discoveryRun.source?.careersUrl || null,
+              discoveredAt: discoveryRun.discoveredAt || null,
+              notes: discoveryRun.notes || [],
+            }),
+          ]
+        );
   const saved = [];
-  for (const item of discoveryRun.jobs || []) {
-    saved.push(
-      await saveDiscoveredJobImport({
-        source: discoveryRun.source,
-        discoveryResult: item.discoveryResult,
-        normalizedJob: item.normalizedJob,
-        discoveredBy: options.discoveredBy || null,
-      })
+  try {
+    for (const item of discoveryRun.jobs || []) {
+      saved.push(
+        await saveDiscoveredJobImport({
+          source: discoveryRun.source,
+          discoveryResult: item.discoveryResult,
+          normalizedJob: item.normalizedJob,
+          discoveredBy: options.discoveredBy || null,
+          importBatchId: batch.id,
+        })
+      );
+    }
+    const counts = saved.reduce(
+      (result, row) => {
+        result.total += 1;
+        const key = row.quality_status || "legacy_unchecked";
+        result[key] = (result[key] || 0) + 1;
+        return result;
+      },
+      { total: 0, passed: 0, quarantined: 0, rejected: 0, legacy_unchecked: 0 }
     );
+    if (!options.importBatchId) {
+      await query(
+        `
+          update public.job_import_batches
+          set status = 'completed', counts = $1::jsonb, completed_at = now()
+          where id = $2
+        `,
+        [JSON.stringify(counts), batch.id]
+      );
+    }
+  } catch (error) {
+    if (!options.importBatchId) {
+      await query(
+        `
+          update public.job_import_batches
+          set
+            status = 'failed',
+            counts = $1::jsonb,
+            metadata = metadata || $2::jsonb,
+            completed_at = now()
+          where id = $3
+        `,
+        [
+          JSON.stringify({ total: saved.length }),
+          JSON.stringify({ error: error?.message || "Import batch failed." }),
+          batch.id,
+        ]
+      );
+    }
+    throw error;
   }
   return saved;
 }
@@ -406,6 +564,7 @@ async function listJobImports({
   offset = 0,
   listingTier = "all",
   listingOpportunityType = "all",
+  qualityStatus = "all",
 } = {}) {
   const params = [];
   const where = [];
@@ -420,6 +579,10 @@ async function listJobImports({
   if (listingOpportunityType && listingOpportunityType !== "all") {
     params.push(listingOpportunityType);
     where.push(`listing_opportunity_type = $${params.length}`);
+  }
+  if (qualityStatus && qualityStatus !== "all") {
+    params.push(qualityStatus);
+    where.push(`quality_status = $${params.length}`);
   }
   params.push(Math.min(500, Math.max(1, Number(limit) || 50)));
   const limitParam = params.length;
@@ -569,6 +732,16 @@ async function updateJobImport(id, updates = {}) {
 }
 
 async function markJobImportPublished(id, jobId, reviewedBy, options = {}) {
+  const importRow = await getJobImport(id);
+  const qualityStatus = importRow?.quality_status || "legacy_unchecked";
+  if (!["passed", "legacy_unchecked"].includes(qualityStatus)) {
+    const error = new Error(
+      `Import quality status "${qualityStatus}" must be resolved before publishing.`
+    );
+    error.code = "import_quality_blocked";
+    error.statusCode = 400;
+    throw error;
+  }
   return updateJobImport(id, {
     status: "published",
     reviewedBy,
