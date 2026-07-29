@@ -655,6 +655,9 @@ app.use(apiPaths("/api"), recruiterDomainsRouter);
 const manualOverrides = require('./routes/manualOverrides.js');
 app.use(apiPaths('/api/manual-overrides'), manualOverrides);
 
+const internalJobHealthRoutes = require("./routes/internalJobHealth");
+app.use(apiPaths("/api/internal/job-health"), internalJobHealthRoutes);
+
 // Welcome
 app.get("/", (req, res) => {
   res.send("Welcome to the API! Use endpoints like /api/jobs, /api/favorites, /api/applications");

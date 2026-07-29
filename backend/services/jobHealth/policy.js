@@ -21,9 +21,17 @@ const DEFAULT_JOB_HEALTH_POLICY = Object.freeze({
     broken: 1,
     unknown: 1,
   }),
+  lifecycle: Object.freeze({
+    failureConfirmationsRequired: 2,
+    archiveConfirmationsRequired: 3,
+    restoreConfirmationsRequired: 1,
+    archiveAfterHiddenDays: 14,
+    recentEvidenceWindowDays: 7,
+  }),
   automation: Object.freeze({
     shadowMode: true,
     allowAutomaticHide: false,
+    allowAutomaticRestore: true,
     allowAutomaticArchive: false,
   }),
 });
@@ -44,6 +52,10 @@ function mergeJobHealthPolicy(policy = {}) {
       ...DEFAULT_JOB_HEALTH_POLICY.scheduleHours,
       ...(policy.scheduleHours || {}),
     },
+    lifecycle: {
+      ...DEFAULT_JOB_HEALTH_POLICY.lifecycle,
+      ...(policy.lifecycle || {}),
+    },
     automation: {
       ...DEFAULT_JOB_HEALTH_POLICY.automation,
       ...(policy.automation || {}),
@@ -55,4 +67,3 @@ module.exports = {
   DEFAULT_JOB_HEALTH_POLICY,
   mergeJobHealthPolicy,
 };
-

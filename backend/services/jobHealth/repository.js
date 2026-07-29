@@ -2,6 +2,9 @@ const { pool, query, one } = require("../db");
 
 const JOB_HEALTH_SELECT = `
   id,
+  status,
+  is_archived,
+  archived_at,
   health_score,
   health_status,
   health_confidence_score,
@@ -12,7 +15,10 @@ const JOB_HEALTH_SELECT = `
   health_reason_code,
   health_reason_codes,
   health_policy_version,
-  health_hidden_at
+  health_hidden_at,
+  health_previous_status,
+  health_hidden_reason,
+  health_archived_at
 `;
 
 function boundedLimit(value, fallback = 100, max = 500) {
@@ -141,10 +147,41 @@ async function claimJobsDueForVerification({ limit = 100, leaseMinutes = 15 } = 
         jobs.last_verified_at,
         jobs.last_successful_verification_at,
         jobs.next_verification_at,
+        jobs.health_hidden_at,
+        jobs.health_previous_status,
+        jobs.health_hidden_reason,
+        jobs.health_archived_at,
+        jobs.status,
+        jobs.is_archived,
+        jobs.archived_at,
         jobs.verification_lease_id,
         jobs.verification_lease_expires_at
     `,
     [boundedLimit(limit), safeLeaseMinutes]
+  ).then((result) => result.rows || []);
+}
+
+async function getRecentHealthChecks(jobId, { limit = 10, windowDays = 7 } = {}) {
+  const safeWindowDays = Math.min(90, Math.max(1, Number(windowDays) || 7));
+  return query(
+    `
+      select
+        id,
+        verifier_key,
+        verifier_version,
+        outcome,
+        confidence_score,
+        reason_codes,
+        completed_at,
+        http_status,
+        error_code
+      from public.job_health_checks
+      where job_id = $1
+        and completed_at >= now() - make_interval(days => $3)
+      order by completed_at desc, created_at desc
+      limit $2
+    `,
+    [jobId, boundedLimit(limit, 10, 50), safeWindowDays]
   ).then((result) => result.rows || []);
 }
 
@@ -386,11 +423,145 @@ async function releaseVerificationLease(
   );
 }
 
+async function applyHealthLifecycleAction({
+  jobId,
+  action,
+  reasonCode,
+  reason = null,
+  policyVersion,
+  evidenceCheckIds = [],
+  evidence = {},
+  actorType = "automation",
+}) {
+  if (!["hide", "restore", "archive"].includes(action)) {
+    throw new Error(`Unsupported health lifecycle action: ${action}`);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const previousResult = await client.query(
+      `
+        select ${JOB_HEALTH_SELECT}
+        from public.jobs
+        where id = $1
+        for update
+      `,
+      [jobId]
+    );
+    const previous = previousResult.rows[0];
+    if (!previous) throw new Error(`Job not found: ${jobId}`);
+
+    let updatedResult;
+    if (action === "hide") {
+      updatedResult = await client.query(
+        `
+          update public.jobs
+          set
+            health_previous_status = coalesce(health_previous_status, status),
+            health_hidden_at = coalesce(health_hidden_at, now()),
+            health_hidden_reason = $2,
+            status = case when status = 'active' then 'paused' else status end,
+            updated_at = now()
+          where id = $1
+            and is_archived = false
+          returning ${JOB_HEALTH_SELECT}
+        `,
+        [jobId, reasonCode]
+      );
+    } else if (action === "restore") {
+      updatedResult = await client.query(
+        `
+          update public.jobs
+          set
+            status = case
+              when status = 'paused' and health_previous_status = 'active' then 'active'
+              else status
+            end,
+            health_hidden_at = null,
+            health_hidden_reason = null,
+            health_previous_status = null,
+            updated_at = now()
+          where id = $1
+            and is_archived = false
+          returning ${JOB_HEALTH_SELECT}
+        `,
+        [jobId]
+      );
+    } else {
+      updatedResult = await client.query(
+        `
+          update public.jobs
+          set
+            health_previous_status = coalesce(health_previous_status, status),
+            health_hidden_at = coalesce(health_hidden_at, now()),
+            health_hidden_reason = $2,
+            health_archived_at = coalesce(health_archived_at, now()),
+            status = 'archived',
+            is_archived = true,
+            archived_at = coalesce(archived_at, now()),
+            updated_at = now()
+          where id = $1
+          returning ${JOB_HEALTH_SELECT}
+        `,
+        [jobId, reasonCode]
+      );
+    }
+
+    const updated = updatedResult.rows[0];
+    if (!updated) throw new Error(`Lifecycle action did not update job: ${jobId}`);
+
+    await client.query(
+      `
+        insert into public.job_health_events (
+          job_id,
+          event_type,
+          actor_type,
+          previous_status,
+          new_status,
+          reason_code,
+          reason,
+          policy_version,
+          evidence_check_ids,
+          metadata
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `,
+      [
+        jobId,
+        action === "hide" ? "hidden" : action === "restore" ? "restored" : "archived",
+        actorType,
+        previous.status,
+        updated.status,
+        reasonCode || null,
+        reason,
+        policyVersion || null,
+        evidenceCheckIds,
+        {
+          lifecycleEvidence: json(evidence),
+          previousJobStatus: previous.status,
+          newJobStatus: updated.status,
+        },
+      ]
+    );
+
+    await client.query("commit");
+    return updated;
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
+  applyHealthLifecycleAction,
   claimJobsDueForVerification,
   getActiveJobHealthPolicy,
   getJobHealth,
   getJobsDueForVerification,
+  getRecentHealthChecks,
   recordHealthCheck,
   releaseVerificationLease,
   saveHealthEvaluation,

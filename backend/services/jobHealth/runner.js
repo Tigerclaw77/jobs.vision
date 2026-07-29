@@ -1,8 +1,11 @@
 const { evaluateJobHealth } = require("./scoring");
 const { nextVerificationAtFor } = require("./scheduler");
+const { decideHealthLifecycle } = require("./lifecycle");
 const {
+  applyHealthLifecycleAction,
   claimJobsDueForVerification,
   getActiveJobHealthPolicy,
+  getRecentHealthChecks,
   recordHealthCheck,
   releaseVerificationLease,
   saveHealthEvaluation,
@@ -39,6 +42,7 @@ async function verifyAndScoreJob(job, {
 async function runDueJobHealthChecks({
   limit = 50,
   leaseMinutes = 15,
+  concurrency = 5,
   verifier = verifyExternalApplication,
   verifierOptions = {},
 } = {}) {
@@ -50,10 +54,14 @@ async function runDueJobHealthChecks({
     claimed: jobs.length,
     completed: 0,
     failed: 0,
+    lifecycleErrors: 0,
     outcomes: {},
+    actions: {},
+    recommendedActions: {},
   };
 
-  for (const job of jobs) {
+  async function processJob(job) {
+    let evaluationSaved = false;
     try {
       const result = await verifyAndScoreJob(job, {
         policy,
@@ -64,23 +72,65 @@ async function runDueJobHealthChecks({
         jobId: job.id,
         ...result.verification.check,
       });
-      await saveHealthEvaluation({
+      const updatedJob = await saveHealthEvaluation({
         jobId: job.id,
         evaluation: result.evaluation,
         evidenceCheckIds: [check.id],
         nextVerificationAt: result.nextVerificationAt,
         leaseId: job.verification_lease_id,
       });
+      evaluationSaved = true;
       summary.completed += 1;
       const outcome = result.verification.check.outcome;
       summary.outcomes[outcome] = (summary.outcomes[outcome] || 0) + 1;
+
+      try {
+        const recentChecks = await getRecentHealthChecks(job.id, {
+          limit: Math.max(
+            policy.lifecycle?.archiveConfirmationsRequired || 3,
+            policy.lifecycle?.failureConfirmationsRequired || 2
+          ) + 2,
+          windowDays: policy.lifecycle?.recentEvidenceWindowDays || 7,
+        });
+        const decision = decideHealthLifecycle({
+          job: { ...job, ...updatedJob },
+          evaluation: result.evaluation,
+          recentChecks,
+          policy,
+        });
+        if (decision.recommendedAction) {
+          summary.recommendedActions[decision.recommendedAction] =
+            (summary.recommendedActions[decision.recommendedAction] || 0) + 1;
+        }
+        if (decision.action !== "none") {
+          await applyHealthLifecycleAction({
+            jobId: job.id,
+            action: decision.action,
+            reasonCode: decision.reasonCode,
+            policyVersion: result.evaluation.policyVersion,
+            evidenceCheckIds: [check.id],
+            evidence: decision.evidence,
+          });
+          summary.actions[decision.action] =
+            (summary.actions[decision.action] || 0) + 1;
+        }
+      } catch {
+        summary.lifecycleErrors += 1;
+      }
     } catch (error) {
       summary.failed += 1;
-      await releaseVerificationLease(job.id, job.verification_lease_id, {
-        error: error?.message || String(error),
-        retryAfterMinutes: 30,
-      }).catch(() => {});
+      if (!evaluationSaved) {
+        await releaseVerificationLease(job.id, job.verification_lease_id, {
+          error: error?.message || String(error),
+          retryAfterMinutes: 30,
+        }).catch(() => {});
+      }
     }
+  }
+
+  const safeConcurrency = Math.min(10, Math.max(1, Number(concurrency) || 5));
+  for (let index = 0; index < jobs.length; index += safeConcurrency) {
+    await Promise.all(jobs.slice(index, index + safeConcurrency).map(processJob));
   }
 
   return summary;

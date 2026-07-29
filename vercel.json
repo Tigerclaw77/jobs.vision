@@ -12,5 +12,11 @@
       "framework": "express",
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/internal/job-health/run",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
