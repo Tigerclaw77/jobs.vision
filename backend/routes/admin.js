@@ -148,6 +148,14 @@ const SEO_HEALTH_JOB_COLUMN_FALLBACKS = {
 let cachedSeoHealthJobColumns = null;
 let cachedSeoHealthJobColumnsAt = 0;
 const SEO_HEALTH_JOB_COLUMNS_CACHE_MS = 60_000;
+const JOB_HEALTH_STATUSES = new Set([
+  "unknown",
+  "healthy",
+  "warning",
+  "stale",
+  "broken",
+  "quarantined",
+]);
 const ROLE_TAG_TO_JOB_ROLE = {
   optometrist: "optometrist",
   optician: "optician",
@@ -175,6 +183,18 @@ function toTrimmedString(value) {
 function toNullableText(value) {
   const text = toTrimmedString(value);
   return text || null;
+}
+
+function numberInRange(value, fallback, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(value || "")
+  );
 }
 
 function escapeRegexText(value) {
@@ -1176,6 +1196,332 @@ router.get("/seo-health", requireAdmin(), async (_req, res) => {
   } catch (e) {
     console.error("admin/seo-health error", e);
     res.status(500).json({ error: "Failed to load SEO health report" });
+  }
+});
+
+router.get("/job-health/summary", requireAdmin(), async (_req, res) => {
+  try {
+    const [counts, policy] = await Promise.all([
+      one(`
+        select
+          count(*)::int as total,
+          count(*) filter (where health_status = 'healthy' and is_archived = false)::int as healthy,
+          count(*) filter (where health_status = 'warning' and is_archived = false)::int as warning,
+          count(*) filter (where health_status = 'stale' and is_archived = false)::int as stale,
+          count(*) filter (where health_status = 'broken' and is_archived = false)::int as broken,
+          count(*) filter (where health_status = 'unknown' and is_archived = false)::int as unknown,
+          count(*) filter (where health_status = 'quarantined' and is_archived = false)::int as quarantined,
+          count(*) filter (where health_hidden_at is not null and is_archived = false)::int as hidden,
+          count(*) filter (where is_archived = true)::int as archived,
+          count(*) filter (
+            where verification_status = 'pending'
+              and is_archived = false
+          )::int as pending_verification,
+          count(*) filter (
+            where next_verification_at < now()
+              and is_archived = false
+          )::int as overdue,
+          count(*) filter (
+            where health_hidden_at >= now() - interval '7 days'
+          )::int as hidden_last_7_days
+        from public.jobs
+      `),
+      one(`
+        select version, name, config, enabled, effective_at
+        from public.job_health_policies
+        where enabled = true
+          and (effective_at is null or effective_at <= now())
+        order by effective_at desc nulls last, created_at desc
+        limit 1
+      `),
+    ]);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      counts: {
+        total: counts?.total || 0,
+        healthy: counts?.healthy || 0,
+        warning: counts?.warning || 0,
+        stale: counts?.stale || 0,
+        broken: counts?.broken || 0,
+        unknown: counts?.unknown || 0,
+        quarantined: counts?.quarantined || 0,
+        hidden: counts?.hidden || 0,
+        archived: counts?.archived || 0,
+        pendingVerification: counts?.pending_verification || 0,
+        overdue: counts?.overdue || 0,
+        hiddenLast7Days: counts?.hidden_last_7_days || 0,
+      },
+      policy: policy
+        ? {
+            version: policy.version,
+            name: policy.name,
+            enabled: policy.enabled,
+            effectiveAt: policy.effective_at,
+            config: policy.config,
+          }
+        : null,
+    });
+  } catch (error) {
+    console.error("admin/job-health/summary error", error);
+    res.status(500).json({ error: "Failed to load Job Health summary." });
+  }
+});
+
+router.get("/job-health/jobs", requireAdmin(), async (req, res) => {
+  try {
+    const conditions = [];
+    const params = [];
+    const addParam = (value) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+
+    const healthStatus = String(req.query.healthStatus || "").toLowerCase();
+    if (JOB_HEALTH_STATUSES.has(healthStatus)) {
+      conditions.push(`jobs.health_status = ${addParam(healthStatus)}`);
+    }
+    if (req.query.source) {
+      conditions.push(`coalesce(jobs.source, '') ilike ${addParam(`%${req.query.source}%`)}`);
+    }
+    if (req.query.employer) {
+      const employer = addParam(`%${req.query.employer}%`);
+      conditions.push(`(
+        coalesce(jobs.employer_brand, '') ilike ${employer}
+        or coalesce(jobs.practice_name, '') ilike ${employer}
+        or coalesce(jobs.employer_name, '') ilike ${employer}
+        or coalesce(jobs.company, '') ilike ${employer}
+      )`);
+    }
+    if (req.query.hidden === "true") conditions.push("jobs.health_hidden_at is not null");
+    if (req.query.hidden === "false") conditions.push("jobs.health_hidden_at is null");
+    if (req.query.archived === "true") conditions.push("jobs.is_archived = true");
+    if (req.query.archived === "false") conditions.push("jobs.is_archived = false");
+    if (req.query.minScore !== undefined && req.query.minScore !== "") {
+      conditions.push(
+        `jobs.health_score >= ${addParam(numberInRange(req.query.minScore, 0, 0, 100))}`
+      );
+    }
+    if (req.query.maxScore !== undefined && req.query.maxScore !== "") {
+      conditions.push(
+        `jobs.health_score <= ${addParam(numberInRange(req.query.maxScore, 100, 0, 100))}`
+      );
+    }
+    if (req.query.ageDays !== undefined && req.query.ageDays !== "") {
+      conditions.push(
+        `coalesce(jobs.posted_at, jobs.created_at) <= now() - make_interval(days => ${addParam(
+          Math.round(numberInRange(req.query.ageDays, 0, 0, 3650))
+        )})`
+      );
+    }
+
+    const limit = Math.round(numberInRange(req.query.limit, 50, 1, 200));
+    const offset = Math.round(numberInRange(req.query.offset, 0, 0, 1_000_000));
+    const limitParam = addParam(limit);
+    const offsetParam = addParam(offset);
+    const whereSql = conditions.length ? `where ${conditions.join(" and ")}` : "";
+    const result = await query(
+      `
+        select
+          jobs.id,
+          jobs.title,
+          coalesce(
+            jobs.employer_brand,
+            jobs.practice_name,
+            jobs.employer_name,
+            jobs.company
+          ) as employer,
+          jobs.location,
+          jobs.source,
+          jobs.status,
+          jobs.is_archived,
+          jobs.health_score,
+          jobs.health_status,
+          jobs.health_confidence_score,
+          jobs.verification_status,
+          jobs.last_verified_at,
+          jobs.last_successful_verification_at,
+          jobs.next_verification_at,
+          jobs.health_reason_code,
+          jobs.health_reason_codes,
+          jobs.health_hidden_at,
+          jobs.health_hidden_reason,
+          jobs.health_archived_at,
+          jobs.verification_attempt_count,
+          jobs.verification_last_error,
+          latest_check.http_status as last_http_status,
+          latest_check.outcome as last_check_outcome,
+          latest_check.completed_at as last_check_completed_at,
+          count(*) over()::int as total_count
+        from public.jobs jobs
+        left join lateral (
+          select http_status, outcome, completed_at
+          from public.job_health_checks checks
+          where checks.job_id = jobs.id
+          order by checks.completed_at desc nulls last, checks.created_at desc
+          limit 1
+        ) latest_check on true
+        ${whereSql}
+        order by
+          case when jobs.health_hidden_at is not null then 0 else 1 end,
+          case when jobs.is_archived then 0 else 1 end,
+          jobs.health_score asc,
+          jobs.next_verification_at asc
+        limit ${limitParam}
+        offset ${offsetParam}
+      `,
+      params
+    );
+    const rows = result.rows || [];
+    res.json({
+      items: rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        employer: row.employer,
+        location: row.location,
+        source: row.source,
+        jobStatus: row.status,
+        archived: row.is_archived,
+        healthScore: Number(row.health_score || 0),
+        healthStatus: row.health_status,
+        confidenceScore: Number(row.health_confidence_score || 0),
+        verificationStatus: row.verification_status,
+        lastVerifiedAt: row.last_verified_at,
+        lastSuccessfulVerificationAt: row.last_successful_verification_at,
+        nextVerificationAt: row.next_verification_at,
+        primaryReason: row.health_reason_code,
+        reasonCodes: row.health_reason_codes || [],
+        hiddenAt: row.health_hidden_at,
+        hiddenReason: row.health_hidden_reason,
+        healthArchivedAt: row.health_archived_at,
+        verificationAttempts: row.verification_attempt_count || 0,
+        verificationLastError: row.verification_last_error,
+        lastHttpStatus: row.last_http_status,
+        lastCheckOutcome: row.last_check_outcome,
+        lastCheckCompletedAt: row.last_check_completed_at,
+      })),
+      total: Number(rows[0]?.total_count || 0),
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error("admin/job-health/jobs error", error);
+    res.status(500).json({ error: "Failed to load Job Health listings." });
+  }
+});
+
+router.get("/job-health/jobs/:id", requireAdmin(), async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    return res.status(400).json({ error: "Invalid job ID." });
+  }
+  try {
+    const [job, checks, events] = await Promise.all([
+      one(
+        `
+          select
+            id,
+            title,
+            coalesce(employer_brand, practice_name, employer_name, company) as employer,
+            location,
+            source,
+            source_url,
+            external_apply_url,
+            status,
+            is_archived,
+            health_score,
+            health_status,
+            health_confidence_score,
+            verification_status,
+            last_verified_at,
+            last_successful_verification_at,
+            next_verification_at,
+            health_reason_code,
+            health_reason_codes,
+            health_hidden_at,
+            health_hidden_reason,
+            health_archived_at,
+            health_policy_version
+          from public.jobs
+          where id = $1
+        `,
+        [req.params.id]
+      ),
+      query(
+        `
+          select *
+          from public.job_health_checks
+          where job_id = $1
+          order by completed_at desc nulls last, created_at desc
+          limit 50
+        `,
+        [req.params.id]
+      ),
+      query(
+        `
+          select *
+          from public.job_health_events
+          where job_id = $1
+          order by created_at desc
+          limit 100
+        `,
+        [req.params.id]
+      ),
+    ]);
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    return res.json({
+      job,
+      checks: checks.rows || [],
+      events: events.rows || [],
+    });
+  } catch (error) {
+    console.error("admin/job-health/jobs/:id error", error);
+    return res.status(500).json({ error: "Failed to load Job Health details." });
+  }
+});
+
+router.post("/job-health/jobs/:id/recheck", requireAdmin(), async (req, res) => {
+  if (!isUuid(req.params.id)) {
+    return res.status(400).json({ error: "Invalid job ID." });
+  }
+  try {
+    const job = await one(
+      `
+        update public.jobs
+        set
+          next_verification_at = now(),
+          verification_status = 'pending',
+          verification_lease_id = null,
+          verification_lease_expires_at = null,
+          verification_last_error = null,
+          updated_at = now()
+        where id = $1
+        returning id, next_verification_at, verification_status
+      `,
+      [req.params.id]
+    );
+    if (!job) return res.status(404).json({ error: "Job not found." });
+    await query(
+      `
+        insert into public.job_health_events (
+          job_id,
+          event_type,
+          actor_type,
+          reason_code,
+          reason,
+          metadata
+        )
+        values ($1, 'reverify_scheduled', 'admin', 'admin_recheck', $2, $3)
+      `,
+      [
+        req.params.id,
+        toNullableText(req.body?.reason)?.slice(0, 500) || null,
+        { requestedBy: req.user?.id || null },
+      ]
+    );
+    return res.json({ ok: true, job });
+  } catch (error) {
+    console.error("admin/job-health/jobs/:id/recheck error", error);
+    return res.status(500).json({ error: "Failed to queue Job Health recheck." });
   }
 });
 

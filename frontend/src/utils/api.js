@@ -111,6 +111,29 @@ export const fetchSeoHealthReport = async () => {
   return data;
 };
 
+export const fetchJobHealthSummary = async () => {
+  const { data } = await axiosInstance.get("/admin/job-health/summary");
+  return data;
+};
+
+export const fetchJobHealthJobs = async (params = {}) => {
+  const { data } = await axiosInstance.get("/admin/job-health/jobs", { params });
+  return data;
+};
+
+export const fetchJobHealthDetails = async (jobId) => {
+  const { data } = await axiosInstance.get(`/admin/job-health/jobs/${jobId}`);
+  return data;
+};
+
+export const queueJobHealthRecheck = async (jobId, reason = "") => {
+  const { data } = await axiosInstance.post(
+    `/admin/job-health/jobs/${jobId}/recheck`,
+    { reason }
+  );
+  return data;
+};
+
 export const fetchManualOverrides = async (status = "pending") => {
   const { data } = await axiosInstance.get("/manual-overrides", { params: { status } });
   return data?.items || [];

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import AssessmentOutlinedIcon from "@mui/icons-material/AssessmentOutlined";
+import MonitorHeartOutlinedIcon from "@mui/icons-material/MonitorHeartOutlined";
 import axiosInstance, { fetchAdminDashboard } from "../../utils/api"; // ← fixed path
 import UserTable from "./UserTable";
 import StatsCards from "./StatsCards";
@@ -55,6 +56,15 @@ const AdminDashboard = () => {
         </Typography>
 
         <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+          <Button
+            component={RouterLink}
+            to="/admin/job-health"
+            variant="outlined"
+            className="glass-button"
+            startIcon={<MonitorHeartOutlinedIcon />}
+          >
+            Job Health
+          </Button>
           <Button
             component={RouterLink}
             to="/admin/manual-overrides"

@@ -24,6 +24,7 @@ import JobImportReview from "./components/Admin/JobImportReview";
 import ListingClaims from "./components/Admin/ListingClaims";
 import MarketplaceDashboard from "./components/Admin/MarketplaceDashboard";
 import ManualOverrideReview from "./components/Admin/ManualOverrideReview";
+import JobHealthDashboard from "./components/Admin/JobHealthDashboard";
 import SeoHealthReport from "./components/Admin/SeoHealthReport";
 import RecruiterDashboard from "./components/Recruiter/RecruiterDashboard";
 import RecruiterRegistration from "./components/Recruiter/RecruiterRegistration";
@@ -408,6 +409,14 @@ function AppShell() {
               element={
                 <ProtectedRoute allowedUserRoles={["admin"]}>
                   <DiscoverySources />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/job-health"
+              element={
+                <ProtectedRoute allowedUserRoles={["admin"]}>
+                  <JobHealthDashboard />
                 </ProtectedRoute>
               }
             />
