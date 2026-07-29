@@ -110,7 +110,6 @@ export default function ResetPassword() {
             <GlassTextField
               label="New Password"
               type="password"
-              enablePasswordToggle
               autoComplete="new-password"
               {...register("newPassword")}
               error={!!errors.newPassword}
@@ -123,7 +122,6 @@ export default function ResetPassword() {
             <GlassTextField
               label="Confirm New Password"
               type="password"
-              enablePasswordToggle
               autoComplete="new-password"
               {...register("confirmPassword")}
               error={!!errors.confirmPassword}

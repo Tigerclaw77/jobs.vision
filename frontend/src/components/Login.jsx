@@ -518,7 +518,12 @@ export default function Login() {
               </Stack>
             )}
 
-            <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 2 }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              justifyContent="center"
+              sx={{ mt: 2 }}
+            >
               <Button type="submit" variant="contained" className="glass-button" disabled={signingIn}>
                 {signingIn ? "Signing in..." : "Sign In"}
               </Button>

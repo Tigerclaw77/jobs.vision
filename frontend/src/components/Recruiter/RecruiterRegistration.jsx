@@ -410,7 +410,6 @@ export default function RecruiterRegistration() {
           <GlassTextField
             label="Password"
             type="password"
-            enablePasswordToggle
             {...register("password")}
             autoComplete="new-password"
             error={!!errors.password}
@@ -423,7 +422,6 @@ export default function RecruiterRegistration() {
           <GlassTextField
             label="Confirm Password"
             type="password"
-            enablePasswordToggle
             {...register("confirmPassword")}
             autoComplete="new-password"
             error={!!errors.confirmPassword}
