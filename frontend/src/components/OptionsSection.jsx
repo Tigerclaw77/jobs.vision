@@ -125,11 +125,29 @@ const OptionsSection = ({ user }) => {
             </span>
             <h3>Account</h3>
           </Link>
+          <Link to="/jobs" className="option-card">
+            <span className="option-card-visual candidate-action" aria-hidden="true">
+              <TravelExploreIcon />
+            </span>
+            <h3>Browse Jobs</h3>
+          </Link>
+          <Link to="/candidate/dashboard" className="option-card">
+            <span className="option-card-visual saved-action" aria-hidden="true">
+              <BookmarkIcon />
+            </span>
+            <h3>Saved Jobs</h3>
+          </Link>
         </>
       )}
 
       {userRole === "candidate" && (
         <>
+          <Link to="/recruiter/addjob" className="option-card">
+            <span className="option-card-visual" aria-hidden="true">
+              <PostAddIcon />
+            </span>
+            <h3>Post a Job</h3>
+          </Link>
           <Link to="/jobs" className="option-card">
             <span className="option-card-visual candidate-action" aria-hidden="true">
               <TravelExploreIcon />

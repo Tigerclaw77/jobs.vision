@@ -150,9 +150,7 @@ async function getUserEntitlements(user = {}) {
     role === "recruiter"
       ? getRecruiterEntitlement(user.id)
       : Promise.resolve(normalizeRecruiterEntitlement(null)),
-    role === "candidate"
-      ? getCandidateEntitlement(user.id)
-      : Promise.resolve(normalizeCandidateEntitlement(null)),
+    getCandidateEntitlement(user.id),
   ]);
 
   return {

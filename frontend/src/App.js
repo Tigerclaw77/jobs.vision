@@ -49,6 +49,7 @@ import Contact from "./components/Contact";
 import Users from "./components/Users";
 import AddJob from "./components/Recruiter/AddJob";
 import EditJob from "./components/Recruiter/EditJob";
+import RecruiterActivationGate from "./components/Recruiter/RecruiterActivationGate";
 import ProtectedRoute from "./ProtectedRoute";
 import Unauthorized from "./components/Unauthorized";
 import ManualOverride from "./components/ManualOverride.jsx";
@@ -127,8 +128,15 @@ function AutoFillPatch() {
  */
 function PublicOnlyRoute({ children }) {
   const { session, user, account, profile, loading, loadingProfile, role } = useAuth();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const nextPath = new URLSearchParams(search).get("next");
+  const recruiterEntryPath =
+    pathname === "/recruiter/register"
+      ? `/recruiter/addjob${search || ""}`
+      : "";
+  const candidateCanContinueToRecruiter =
+    nextPath === "/recruiter/addjob" ||
+    nextPath?.startsWith("/recruiter/addjob?");
   const metadata = {
     ...(user?.app_metadata || {}),
     ...(user?.user_metadata || {}),
@@ -183,6 +191,10 @@ function PublicOnlyRoute({ children }) {
         ? nextPath
         : authorizationRole === "recruiter" && nextPath?.startsWith("/recruiter")
         ? nextPath
+        : authorizationRole === "candidate" && candidateCanContinueToRecruiter
+        ? nextPath
+        : authorizationRole === "candidate" && recruiterEntryPath
+        ? recruiterEntryPath
         : authorizationRole === "candidate" && nextPath?.startsWith("/candidate")
         ? nextPath
         : authorizationRole === "recruiter"
@@ -466,8 +478,10 @@ function AppShell() {
             <Route
               path="/recruiter/addjob"
               element={
-                <ProtectedRoute allowedUserRoles={["recruiter", "admin"]}>
-                  <AddJob />
+                <ProtectedRoute allowedUserRoles={["candidate", "recruiter", "admin"]}>
+                  <RecruiterActivationGate>
+                    <AddJob />
+                  </RecruiterActivationGate>
                 </ProtectedRoute>
               }
             />
@@ -508,7 +522,7 @@ function AppShell() {
             <Route
               path="/candidate/dashboard"
               element={
-                <ProtectedRoute allowedUserRoles={["candidate", "admin"]}>
+                <ProtectedRoute allowedUserRoles={["candidate", "recruiter", "admin"]}>
                   <CandidateDashboard />
                 </ProtectedRoute>
               }
@@ -516,7 +530,7 @@ function AppShell() {
             <Route
               path="/candidate/profile"
               element={
-                <ProtectedRoute allowedUserRoles={["candidate", "admin"]}>
+                <ProtectedRoute allowedUserRoles={["candidate", "recruiter", "admin"]}>
                   <CandidateProfile />
                 </ProtectedRoute>
               }
@@ -524,7 +538,7 @@ function AppShell() {
             <Route
               path="/search-jobs"
               element={
-                <ProtectedRoute allowedUserRoles={["candidate", "admin"]}>
+                <ProtectedRoute allowedUserRoles={["candidate", "recruiter", "admin"]}>
                   <SearchJobs />
                 </ProtectedRoute>
               }

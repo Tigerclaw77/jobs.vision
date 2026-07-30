@@ -177,7 +177,7 @@ const CandidateDashboard = () => {
   };
 
   return (
-    <AccessGate allowedRoles={["candidate"]}>
+    <AccessGate allowedRoles={["candidate", "recruiter"]}>
       <div className="dashboard-container">
         <h1>Welcome, {user?.profile?.firstName || user?.firstName || "Candidate"}</h1>
 

@@ -5,6 +5,10 @@ const { one } = require("../services/db.js");
 const { getUserEntitlements } = require("../services/entitlements.js");
 const { upsertProfileForAuthUser } = require("../services/profileBootstrap.js");
 const { getProfileSelectList, shapeProfile } = require("../services/profileDetails.js");
+const {
+  activateRecruiterForUser,
+  canActivateRecruiter,
+} = require("../services/recruiterActivation.js");
 
 const router = express.Router();
 
@@ -72,6 +76,36 @@ router.post("/bootstrap-profile", requireAuth, async (req, res) => {
   } catch (e) {
     console.error("Bootstrap profile error:", e);
     res.status(500).json({ error: "Failed to bootstrap profile" });
+  }
+});
+
+router.post("/activate-recruiter", requireAuth, async (req, res) => {
+  try {
+    const currentRole = req.profile?.role || req.user.role;
+    if (!canActivateRecruiter(currentRole)) {
+      return res.status(403).json({ error: "This account cannot post jobs" });
+    }
+
+    const profile = await activateRecruiterForUser(req.user.id);
+    if (!profile) {
+      return res.status(403).json({ error: "This account cannot post jobs" });
+    }
+
+    req.user.role = profile.role;
+    const entitlements = await getUserEntitlements(req.user);
+
+    return res.json({
+      id: profile.id,
+      email: profile.email || req.user.email || null,
+      role: profile.role,
+      tier: entitlements.tier || null,
+      entitlements,
+      profile,
+      recruiterActivated: profile.role === "recruiter",
+    });
+  } catch (e) {
+    console.error("Recruiter activation error:", e);
+    return res.status(500).json({ error: "Unable to prepare this account for job posting" });
   }
 });
 

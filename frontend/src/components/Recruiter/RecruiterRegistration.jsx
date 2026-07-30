@@ -113,6 +113,9 @@ function isExistingAccountError(error) {
 }
 
 function isExistingAccountResponse(result) {
+  const session = normalizeSessionResult(result);
+  if (session?.access_token) return false;
+
   const user = result?.data?.user || result?.user || null;
   return Array.isArray(user?.identities) && user.identities.length === 0;
 }
@@ -327,7 +330,7 @@ export default function RecruiterRegistration() {
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
               <Button
                 component={RouterLink}
-                to={`/login?email=${encodeURIComponent(existingAccountEmail)}`}
+                to={signInPath}
                 size="small"
                 variant="contained"
               >

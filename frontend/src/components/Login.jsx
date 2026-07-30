@@ -68,6 +68,12 @@ const chooseDest = (role, next) => {
     if (r === "admin" && next.startsWith("/claim-listing/")) return next;
     if (r === "recruiter" && next.startsWith("/recruiter")) return next;
     if (r === "recruiter" && next.startsWith("/claim-listing/")) return next;
+    if (
+      r === "candidate" &&
+      (next === "/recruiter/addjob" || next.startsWith("/recruiter/addjob?"))
+    ) {
+      return next;
+    }
     if (r === "candidate" && next.startsWith("/candidate")) return next;
   }
   return pathForRole(r);
