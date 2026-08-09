@@ -15,6 +15,7 @@ import { clearNotifications } from "./store/notificationsSlice";
 import Login from "./components/Login";
 import Logout from "./components/Logout";
 import Header from "./components/Header";
+import NewJobsNotice from "./components/NewJobsNotice";
 import Home from "./components/Home";
 import PricingPage from "./components/PricingPage";
 import Notifications from "./components/Notifications";
@@ -276,6 +277,7 @@ function AppShell() {
       <AuthDiagnosticsProvider>
         <div className="App">
           <Header />
+          <NewJobsNotice />
           <AdminAuthDiagnosticsPanel />
 
           {/* Controllers */}

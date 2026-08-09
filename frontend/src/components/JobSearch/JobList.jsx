@@ -518,6 +518,7 @@ export default function JobList() {
       setFetchError("");
       try {
         const list = await fetchJobs({
+          publishedSince: filters.publishedSince || "",
           includeBrand: includeBrandFilter,
           excludeBrand: excludeBrandFilter,
           clinicalFocuses: clinicalFocusFilter,
@@ -542,6 +543,7 @@ export default function JobList() {
     clinicalFocusFilter,
     practiceTypeFilter,
     benefitFlagFilter,
+    filters.publishedSince,
   ]);
 
   useEffect(() => {

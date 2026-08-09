@@ -169,6 +169,7 @@ export async function fetchJobsPage({
   limit = 100,
   offset = 0,
   sort = "best_match",
+  publishedSince = "",
   includeBrand = [],
   excludeBrand = [],
   clinicalFocuses = [],
@@ -182,6 +183,7 @@ export async function fetchJobsPage({
     offset: String(safeOffset),
     sort,
   });
+  if (publishedSince) params.set("publishedSince", publishedSince);
   appendArrayParam(params, "includeBrand", expandBrandFilterValues(includeBrand));
   appendArrayParam(params, "excludeBrand", expandBrandFilterValues(excludeBrand));
   appendArrayParam(params, "clinicalFocuses", clinicalFocuses);
@@ -202,6 +204,7 @@ export async function fetchJobsPage({
 export async function fetchJobs({
   limit = 100,
   sort = "best_match",
+  publishedSince = "",
   includeBrand = [],
   excludeBrand = [],
   clinicalFocuses = [],
@@ -218,6 +221,7 @@ export async function fetchJobs({
       limit: safeLimit,
       offset,
       sort,
+      publishedSince,
       includeBrand,
       excludeBrand,
       clinicalFocuses,
@@ -235,6 +239,17 @@ export async function fetchJobs({
   }
 
   return jobs;
+}
+
+export async function fetchNewJobsCount(publishedSince) {
+  const params = new URLSearchParams({
+    publishedSince,
+    limit: "1",
+    offset: "0",
+    sort: "newest",
+  });
+  const data = await apiJson(`/jobs?${params.toString()}`);
+  return Number(data?.total || 0);
 }
 
 export async function fetchPublicJob(jobId) {

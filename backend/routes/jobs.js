@@ -1260,7 +1260,16 @@ async function isBrandVerifiedForRecruiter(recruiterId, employerBrand, employerD
 
 router.get("/", maybeAuth, async (req, res) => {
   try {
-    const { q, city, state, tags, sort = "best_match", limit = "20", offset = "0" } = req.query;
+    const {
+      q,
+      city,
+      state,
+      tags,
+      sort = "best_match",
+      limit = "20",
+      offset = "0",
+      publishedSince: publishedSinceQuery,
+    } = req.query;
     const tagIds = typeof tags === "string" && tags.length ? tags.split(",") : [];
     const clinicalFocuses = normalizeClinicalFocuses(
       req.query.clinicalFocuses ?? req.query.clinical_focuses ?? req.query.clinicalFocus ?? req.query.clinical_focus
@@ -1282,6 +1291,18 @@ router.get("/", maybeAuth, async (req, res) => {
     ];
     const params = [];
     let qParamIndex = null;
+
+    if (publishedSinceQuery !== undefined && publishedSinceQuery !== "") {
+      if (Array.isArray(publishedSinceQuery)) {
+        return res.status(400).json({ error: "publishedSince must be a single timestamp." });
+      }
+      const publishedSince = new Date(String(publishedSinceQuery));
+      if (!Number.isFinite(publishedSince.getTime())) {
+        return res.status(400).json({ error: "publishedSince must be a valid timestamp." });
+      }
+      params.push(publishedSince.toISOString());
+      where.push(`coalesce(jobs.first_activated_at, jobs.posted_at) >= $${params.length}::timestamptz`);
+    }
 
     if (q) {
       params.push(`%${q}%`);
