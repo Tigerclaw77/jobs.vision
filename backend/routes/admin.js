@@ -784,6 +784,99 @@ async function jobImportReviewSummary() {
   };
 }
 
+async function marketplaceHealthSummary() {
+  try {
+    const [jobs, imports, sources, lastRun] = await Promise.all([
+      one(`
+        select
+          count(*) filter (where status = 'active' and is_archived = false)::int as active_jobs,
+          count(*) filter (
+            where health_checked_at >= now() - interval '14 days'
+          )::int as checked_recently,
+          count(*) filter (
+            where status = 'active'
+              and is_archived = false
+              and (listing_source = 'imported' or source in ('discovery', 'import', 'imported'))
+              and (health_checked_at is null or health_checked_at < now() - interval '21 days')
+          )::int as stale_unverified,
+          count(*) filter (where health_status = 'suspect')::int as quarantined,
+          count(*) filter (where health_status in ('suspect', 'error'))::int as validation_failures,
+          count(*) filter (
+            where health_status = 'archived'
+              and archived_at >= now() - interval '7 days'
+          )::int as archived_this_week,
+          count(*) filter (
+            where status = 'active'
+              and is_archived = false
+              and (listing_source = 'imported' or source in ('discovery', 'import', 'imported'))
+              and coalesce(external_apply_url, source_url) is not null
+              and (health_next_check_at is null or health_next_check_at <= now())
+          )::int as validation_due
+        from public.jobs
+      `),
+      one(`
+        select count(*) filter (where created_at >= now() - interval '7 days')::int as newly_discovered
+        from public.job_imports
+      `),
+      one(`
+        select
+          count(*) filter (where enabled = true)::int as enabled_sources,
+          count(*) filter (where enabled = true and last_run_status = 'failed')::int as discovery_failures,
+          count(*) filter (
+            where enabled = true
+              and (last_run_at is null or last_run_at <= now() - interval '7 days')
+          )::int as discovery_due
+        from public.job_discovery_sources
+      `),
+      one(`
+        select status, started_at, completed_at, metrics
+        from public.job_maintenance_runs
+        where run_type = 'maintenance' and status in ('success', 'partial')
+        order by started_at desc
+        limit 1
+      `),
+    ]);
+
+    const validationDue = Number(jobs?.validation_due || 0);
+    const discoveryDue = Number(sources?.discovery_due || 0);
+    return {
+      schemaReady: true,
+      activeJobs: Number(jobs?.active_jobs || 0),
+      checkedRecently: Number(jobs?.checked_recently || 0),
+      staleUnverified: Number(jobs?.stale_unverified || 0),
+      quarantined: Number(jobs?.quarantined || 0),
+      newlyDiscovered: Number(imports?.newly_discovered || 0),
+      archivedSinceLastReport: Number(jobs?.archived_this_week || 0),
+      discoveryFailures: Number(sources?.discovery_failures || 0),
+      validationFailures: Number(jobs?.validation_failures || 0),
+      lastSuccessfulMaintenanceRun: lastRun?.completed_at || lastRun?.started_at || null,
+      lastMaintenanceStatus: lastRun?.status || null,
+      remainingScanCoverage: {
+        validationDue,
+        estimatedValidationDays: Math.ceil(validationDue / 24),
+        discoveryDue,
+        enabledDiscoverySources: Number(sources?.enabled_sources || 0),
+        estimatedDiscoveryDays: discoveryDue,
+      },
+      seoIndexabilityWarnings: [
+        "Job detail metadata and JobPosting JSON-LD are injected client-side; server-rendered HTML is still the main indexing gap.",
+        "Google Search Console verification and sitemap submission require founder action.",
+      ],
+    };
+  } catch (error) {
+    if (error?.code === "42703" || error?.code === "42P01") {
+      return {
+        schemaReady: false,
+        seoIndexabilityWarnings: [
+          "Apply migration 030_incremental_job_maintenance.sql to enable recurring health metrics.",
+          "Google Search Console verification and sitemap submission require founder action.",
+        ],
+      };
+    }
+    throw error;
+  }
+}
+
 async function highConfidenceApproveRows() {
   const result = await query(`
     select *
@@ -870,6 +963,7 @@ router.get("/marketplace-dashboard", requireAdmin(), async (_req, res) => {
       conversion,
       opportunityTypes,
       employerOutreach,
+      health,
     ] = await Promise.all([
       one(`
         select
@@ -1061,6 +1155,7 @@ router.get("/marketplace-dashboard", requireAdmin(), async (_req, res) => {
         order by imported_jobs desc, published_imported_jobs desc, employer_name asc
         limit 50
       `),
+      marketplaceHealthSummary(),
     ]);
 
     const claimMap = Object.fromEntries(
@@ -1112,6 +1207,7 @@ router.get("/marketplace-dashboard", requireAdmin(), async (_req, res) => {
         leases: Number(opportunityMap.lease || 0),
         rows: opportunityTypes.rows || [],
       },
+      health,
     });
   } catch (e) {
     console.error("admin/marketplace-dashboard error", e);

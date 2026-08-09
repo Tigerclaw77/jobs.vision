@@ -12,5 +12,15 @@
       "framework": "express",
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/billing",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/maintenance",
+      "schedule": "20 6 * * *"
+    }
+  ]
 }

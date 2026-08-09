@@ -633,3 +633,27 @@ create unique index if not exists recruiter_posting_payments_checkout_session_un
 create unique index if not exists recruiter_posting_payments_subscription_unique on public.recruiter_posting_payments (stripe_subscription_id) where stripe_subscription_id is not null;
 create index if not exists candidate_entitlements_status_idx on public.candidate_entitlements (status);
 create unique index if not exists candidate_entitlements_stripe_subscription_unique on public.candidate_entitlements (stripe_subscription_id) where stripe_subscription_id is not null;
+
+-- Incremental job freshness maintenance (migration 030).
+alter table public.jobs
+  add column if not exists health_status text not null default 'unverified',
+  add column if not exists health_checked_at timestamptz,
+  add column if not exists health_status_code integer,
+  add column if not exists health_failure_count integer not null default 0,
+  add column if not exists health_next_check_at timestamptz,
+  add column if not exists health_last_error text,
+  add column if not exists health_archive_reason text;
+
+create table if not exists public.job_maintenance_runs (
+  id uuid primary key default gen_random_uuid(),
+  run_type text not null check (run_type in ('maintenance', 'billing', 'advisory')),
+  status text not null default 'running' check (status in ('running', 'success', 'partial', 'failed')),
+  started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  metrics jsonb not null default '{}'::jsonb,
+  error_message text
+);
+
+create index if not exists jobs_health_due_idx on public.jobs (health_next_check_at, health_checked_at)
+  where status = 'active' and is_archived = false and listing_source = 'imported' and coalesce(external_apply_url, source_url) is not null;
+create index if not exists job_maintenance_runs_recent_idx on public.job_maintenance_runs (run_type, started_at desc);

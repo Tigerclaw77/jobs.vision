@@ -83,6 +83,7 @@ export default function Seo({
   ogType = "website",
   ogImage = "https://www.jobs.vision/images/clinicbg-home.webp",
   jsonLd = null,
+  noIndex = false,
 }) {
   const jsonLdText = useMemo(() => (jsonLd ? JSON.stringify(jsonLd) : ""), [jsonLd]);
 
@@ -99,6 +100,7 @@ export default function Seo({
       ["name", "twitter:title"],
       ["name", "twitter:description"],
       ["name", "twitter:image"],
+      ["name", "robots"],
     ];
     const snapshot = snapshotHead(keys);
 
@@ -114,6 +116,7 @@ export default function Seo({
     upsertMeta("name", "twitter:title", title || DEFAULT_TITLE);
     upsertMeta("name", "twitter:description", description || DEFAULT_DESCRIPTION);
     if (ogImage) upsertMeta("name", "twitter:image", ogImage);
+    if (noIndex) upsertMeta("name", "robots", "noindex, nofollow");
     if (canonical) upsertCanonical(canonical);
 
     document.getElementById("jobposting-jsonld")?.remove();
@@ -126,7 +129,7 @@ export default function Seo({
     }
 
     return () => restoreHead(snapshot, keys);
-  }, [canonical, description, jsonLdText, ogImage, ogType, title]);
+  }, [canonical, description, jsonLdText, noIndex, ogImage, ogType, title]);
 
   return null;
 }

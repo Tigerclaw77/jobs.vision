@@ -276,6 +276,7 @@ export default function JobDetailPage() {
         canonical={canonical}
         ogType="article"
         jsonLd={jsonLd}
+        noIndex={!loading && Boolean(error)}
       />
 
       <div className="job-detail-inner">

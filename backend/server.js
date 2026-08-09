@@ -655,6 +655,9 @@ app.use(apiPaths("/api"), recruiterDomainsRouter);
 const manualOverrides = require('./routes/manualOverrides.js');
 app.use(apiPaths('/api/manual-overrides'), manualOverrides);
 
+const cronRoutes = require("./routes/cron");
+app.use(apiPaths("/api/cron"), cronRoutes);
+
 // Welcome
 app.get("/", (req, res) => {
   res.send("Welcome to the API! Use endpoints like /api/jobs, /api/favorites, /api/applications");
@@ -668,7 +671,7 @@ app.use((req, res) => {
 // =======================
 // Cron job (billing engine)
 // =======================
-cron.schedule("0 3 * * *", async () => {
+if (process.env.ENABLE_IN_PROCESS_CRON === "true") cron.schedule("0 3 * * *", async () => {
   try {
     console.log("🧾 Running daily job billing engine...");
     await billJobsMonthly(

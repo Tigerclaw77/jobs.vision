@@ -6,29 +6,34 @@ const { query } = require("../services/db.js");
  * For now it summarizes active jobs per recruiter using Postgres,
  * so the cron can run without Mongo models.
  */
+async function runBillingSummary() {
+  const result = await query("select id, recruiter_id, is_archived from public.jobs");
+  const jobs = result.rows;
+
+  const byRecruiter = {};
+  let activeCount = 0;
+
+  for (const j of jobs || []) {
+    if (j && j.recruiter_id && j.is_archived === false) {
+      activeCount += 1;
+      byRecruiter[j.recruiter_id] = (byRecruiter[j.recruiter_id] || 0) + 1;
+    }
+  }
+
+  return {
+    total_jobs: (jobs || []).length,
+    active_jobs: activeCount,
+    recruiters_with_active: Object.keys(byRecruiter).length,
+    breakdown: byRecruiter,
+  };
+}
+
 async function billJobsMonthly(req, res) {
   try {
-    // Pull all jobs (min fields) and summarize in JS
-    const result = await query("select id, recruiter_id, is_archived from public.jobs");
-    const jobs = result.rows;
-
-    const byRecruiter = {};
-    let activeCount = 0;
-
-    for (const j of jobs || []) {
-      if (j && j.recruiter_id && j.is_archived === false) {
-        activeCount += 1;
-        byRecruiter[j.recruiter_id] = (byRecruiter[j.recruiter_id] || 0) + 1;
-      }
-    }
-
-    // Return a summary (you can extend to write invoices/usage later)
+    const summary = await runBillingSummary();
     return res.status(200).json({
       ok: true,
-      total_jobs: (jobs || []).length,
-      active_jobs: activeCount,
-      recruiters_with_active: Object.keys(byRecruiter).length,
-      breakdown: byRecruiter, // { recruiter_id: activeJobCount }
+      ...summary,
     });
   } catch (err) {
     console.error("Billing run failed:", err);
@@ -36,4 +41,4 @@ async function billJobsMonthly(req, res) {
   }
 }
 
-module.exports = { billJobsMonthly };
+module.exports = { billJobsMonthly, runBillingSummary };

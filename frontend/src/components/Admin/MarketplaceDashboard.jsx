@@ -10,10 +10,17 @@ const emptyData = {
   claiming: {},
   listingReports: { pendingItems: [] },
   opportunityTypes: {},
+  health: { remainingScanCoverage: {}, seoIndexabilityWarnings: [] },
 };
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString();
+}
+
+function formatDateTime(value) {
+  if (!value) return "Not yet";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
 }
 
 function MetricCard({ label, value, helper }) {
@@ -217,6 +224,20 @@ export default function MarketplaceDashboard() {
     [data.opportunityTypes]
   );
 
+  const healthMetrics = useMemo(
+    () => [
+      ["Active Jobs", data.health?.activeJobs],
+      ["Checked Recently", data.health?.checkedRecently],
+      ["Stale / Unverified", data.health?.staleUnverified],
+      ["Suspect", data.health?.quarantined],
+      ["New This Week", data.health?.newlyDiscovered],
+      ["Archived This Week", data.health?.archivedSinceLastReport],
+      ["Discovery Failures", data.health?.discoveryFailures],
+      ["Validation Failures", data.health?.validationFailures],
+    ],
+    [data.health]
+  );
+
   return (
     <Box className="marketplace-dashboard text-on-dim">
       <Stack
@@ -265,6 +286,37 @@ export default function MarketplaceDashboard() {
           {inventoryMetrics.map(([label, value]) => (
             <MetricCard key={label} label={label} value={formatNumber(value)} />
           ))}
+        </div>
+      </Section>
+
+      <Section title="Jobs.Vision Health">
+        <div className="marketplace-metric-grid">
+          {healthMetrics.map(([label, value]) => (
+            <MetricCard key={label} label={label} value={formatNumber(value)} />
+          ))}
+        </div>
+        <div className="marketplace-three-col">
+          <div>
+            <h4>Last Maintenance</h4>
+            <p className="marketplace-muted">
+              {formatDateTime(data.health?.lastSuccessfulMaintenanceRun)}
+              {data.health?.lastMaintenanceStatus ? ` (${data.health.lastMaintenanceStatus})` : ""}
+            </p>
+          </div>
+          <div>
+            <h4>Remaining Coverage</h4>
+            <p className="marketplace-muted">
+              {formatNumber(data.health?.remainingScanCoverage?.validationDue)} jobs due; about {formatNumber(
+                data.health?.remainingScanCoverage?.estimatedValidationDays
+              )} daily batches. {formatNumber(data.health?.remainingScanCoverage?.discoveryDue)} discovery sources due.
+            </p>
+          </div>
+          <div>
+            <h4>Founder Attention</h4>
+            {(data.health?.seoIndexabilityWarnings || []).map((warning) => (
+              <p className="marketplace-muted" key={warning}>{warning}</p>
+            ))}
+          </div>
         </div>
       </Section>
 
