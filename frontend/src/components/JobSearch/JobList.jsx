@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { archiveJob, createStripeCheckout } from "../../utils/api";
 import { useEffectiveAuth } from "../auth/useEffectiveAuth";
+import { trackMarketingConversion } from "../../marketingAnalytics";
 
 import {
   fetchJobs,
@@ -550,6 +551,7 @@ export default function JobList() {
 }, []);
 
   const updateFilters = (nextFilters) => {
+    trackMarketingConversion("job_search", { audience: "job_seeker" });
     const normalizedFilters = { ...nextFilters };
     if ("roles" in normalizedFilters) {
       normalizedFilters.roles = normalizeRoleFilters(normalizedFilters.roles);
@@ -999,6 +1001,14 @@ export default function JobList() {
   // pagination
   const page = parseInt(searchParams.get("page") || "1", 10);
   const paginated = filteredJobs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    if (fetchError || jobs.length === 0) return;
+    const count = filteredJobs.length;
+    trackMarketingConversion("search_results_viewed", {
+      audience: "job_seeker",
+      result_count_bucket: count === 0 ? "0" : count < 10 ? "1-9" : count < 50 ? "10-49" : "50+",
+    });
+  }, [filteredJobs.length, fetchError, jobs.length]);
   const totalPages = Math.max(1, Math.ceil((filteredJobs.length || 0) / PAGE_SIZE));
   const radiusMiles = Number(filters.radiusMi || 25);
   const jobsNoun = filteredJobs.length === 1 ? "job" : "jobs";
@@ -1222,10 +1232,15 @@ const removeQuickTag = (tag) => {
 
   const handleListingView = useCallback((jobId) => {
     recordListingView(jobId);
+    trackMarketingConversion("listing_viewed", { audience: "job_seeker" });
   }, []);
 
   const handleOutboundApply = useCallback((jobId, options = {}) => {
     recordApplyClick(jobId, options);
+    trackMarketingConversion("application_link_clicked", {
+      audience: "job_seeker",
+      destination_type: options.destinationType,
+    });
   }, []);
 
   const handleAdminRemoveJob = async (jobId) => {

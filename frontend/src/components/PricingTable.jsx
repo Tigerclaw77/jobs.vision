@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createStripeCheckout } from "../utils/api";
+import { trackRecruiterEvent } from "../recruiterAnalytics";
 import "../styles/PricingTable.css";
 
 const RECRUITER_PLANS = [
@@ -121,6 +122,9 @@ const PricingTable = ({ user, showAudienceToggle = true }) => {
   }, [defaultAudience, requestedAudience, recommendedPlan]);
 
   const isRecruiter = activeTab === "recruiter";
+  useEffect(() => {
+    if (isRecruiter) trackRecruiterEvent("recruiter_pricing_view", { page_path: "/pricing" });
+  }, [isRecruiter]);
   const plans = isRecruiter ? RECRUITER_PLANS : CANDIDATE_PLANS;
   const panelId = isRecruiter ? "panel-recruiter" : "panel-candidate";
   const tabId = isRecruiter ? "tab-recruiter" : "tab-candidate";

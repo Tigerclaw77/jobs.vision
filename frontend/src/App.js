@@ -55,6 +55,8 @@ import Unauthorized from "./components/Unauthorized";
 import ManualOverride from "./components/ManualOverride.jsx";
 import Footer from "./components/Footer";
 import { trackPageView } from "./marketingAnalytics";
+import AnalyticsConsent from "./components/AnalyticsConsent";
+import { trackRecruiterEvent } from "./recruiterAnalytics";
 
 // 🔑 Single source of truth for auth/session/profile
 import AuthProvider, { useAuth } from "./components/auth/AuthProvider";
@@ -214,6 +216,7 @@ function MarketingAnalyticsRouteTracker() {
 
   useEffect(() => {
     trackPageView(`${pathname}${search}`);
+    if (pathname === "/recruiter/register") trackRecruiterEvent("recruiter_page_view", { page_path: pathname });
   }, [pathname, search]);
 
   return null;
@@ -296,6 +299,7 @@ function AppShell() {
           <RouteDimming />
           <AutoFillPatch />
           <MarketingAnalyticsRouteTracker />
+          <AnalyticsConsent />
           <div className="bg-dimmer" />
 
           <div className="main-content">

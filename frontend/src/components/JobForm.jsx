@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { trackRecruiterEvent } from "../recruiterAnalytics";
 import {
   Box,
   Button,
@@ -804,6 +805,9 @@ export default function JobForm({
   const [touched, setTouched] = useState({});
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  useEffect(() => {
+    if (!isEditing && !isAdmin) trackRecruiterEvent("recruiter_posting_start");
+  }, [isEditing, isAdmin]);
 
   useEffect(() => {
     let mounted = true;
@@ -1099,6 +1103,7 @@ export default function JobForm({
       const nextJob = result?.job || result;
 
       setSavedJob(nextJob || null);
+      if (!isAdmin) trackRecruiterEvent("recruiter_posting_saved");
       setMessage("Posting saved. Continue to checkout when it is ready.");
       try {
         localStorage.removeItem(DRAFT_KEY);
@@ -1247,6 +1252,7 @@ export default function JobForm({
       setMessage(`Posting saved. Starting checkout for ${checkoutPostingLabel}.`);
       const { url } = await createStripeCheckout(requiredPlanKey, { jobId });
       if (!url) throw new Error("Stripe did not return a checkout URL.");
+      if (!isAdmin) trackRecruiterEvent("begin_checkout", { plan: requiredPlanKey });
       window.location.assign(url);
     } catch (err) {
       console.error("Checkout failed:", err);

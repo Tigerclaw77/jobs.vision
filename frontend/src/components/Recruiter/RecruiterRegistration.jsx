@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import GlassTextField from "../ui/GlassTextField";
 import { neonAuth, normalizeSessionResult } from "../../utils/neonAuthClient";
+import { trackRecruiterEvent } from "../../recruiterAnalytics";
 import "../../styles/forms.css";
 
 const RECRUITER_PLAN_DETAILS = {
@@ -198,6 +199,7 @@ export default function RecruiterRegistration() {
   }, [recruiterType, emailWatch]);
 
   const onSubmit = async (data) => {
+    trackRecruiterEvent("recruiter_registration_start", { recruiter_type: data.recruiterType });
     const email = normalize(data.email);
     const verifyPath = buildVerifyPath(email, purchaseNextPath);
     const emailRedirectTo = `${base}${verifyPath}`;
@@ -256,6 +258,7 @@ export default function RecruiterRegistration() {
       }
 
       await sendSignupVerificationCode(email, emailRedirectTo);
+      trackRecruiterEvent("sign_up", { recruiter_type: data.recruiterType });
       const flash = "Registration successful. Check your email for a 6-digit verification code.";
       reset();
       navigate(verifyPath, { state: { flash, severity: "success" } });

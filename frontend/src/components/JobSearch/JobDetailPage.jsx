@@ -31,6 +31,7 @@ import {
   recordListingView,
 } from "../../utils/api.supabase";
 import "./JobDetailPage.css";
+import { trackMarketingConversion } from "../../marketingAnalytics";
 
 function applyUrlFor(job = {}) {
   return job.external_apply_url || job.apply_url || job.applyUrl || "";
@@ -208,7 +209,10 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     const id = job?.id || job?._id;
-    if (id) recordListingView(id, { source: "job_detail_page" });
+    if (id) {
+      recordListingView(id, { source: "job_detail_page" });
+      trackMarketingConversion("listing_viewed", { audience: "job_seeker" });
+    }
   }, [job?.id, job?._id]);
 
   useEffect(() => {
@@ -265,6 +269,9 @@ export default function JobDetailPage() {
       destinationType,
       destination,
       source: "job_detail_page",
+    });
+    trackMarketingConversion("application_link_clicked", {
+      audience: "job_seeker", destination_type: destinationType,
     });
   }
 
