@@ -10,11 +10,16 @@
       "entrypoint": "server.js",
       "framework": "express",
       "functions": {
-        "server.js": { "maxDuration": 60 }
+        "server.js": {
+          "maxDuration": 60,
+          "includeFiles": "../frontend/build/index.html"
+        }
       }
     }
   },
   "rewrites": [
+    { "source": "/jobs/:jobId/:slug", "destination": { "service": "api" } },
+    { "source": "/jobs/:jobId", "destination": { "service": "api" } },
     { "source": "/api/(.*)", "destination": { "service": "api" } },
     { "source": "/(.*)", "destination": { "service": "web" } }
   ],

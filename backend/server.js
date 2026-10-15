@@ -16,7 +16,7 @@ if (process.env.NODE_ENV === "production" && stripeSkipVerify) {
 }
 
 const { one, query } = require("./services/db");
-const { jobPath } = require("./services/jobSeo");
+const { SITE_ORIGIN, indexableJobUrls } = require("./services/jobSeo");
 const {
   getPlanFromSubscription,
   normalizeStripeStatus,
@@ -502,14 +502,6 @@ app.get(apiPaths("/api/health"), (_req, res) => {
   });
 });
 
-function publicSiteOrigin() {
-  return (
-    process.env.PUBLIC_SITE_URL ||
-    process.env.FRONTEND_URL ||
-    "https://www.jobs.vision"
-  ).replace(/\/+$/, "");
-}
-
 function escapeXml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -541,7 +533,7 @@ function sitemapUrl({ loc, lastmod, changefreq, priority }) {
 
 app.get(apiPaths("/api/sitemap.xml"), async (_req, res) => {
   try {
-    const origin = publicSiteOrigin();
+    const origin = SITE_ORIGIN;
     const corePages = [
       { path: "/", changefreq: "weekly", priority: "1.0" },
       { path: "/jobs", changefreq: "daily", priority: "0.9" },
@@ -559,12 +551,19 @@ app.get(apiPaths("/api/sitemap.xml"), async (_req, res) => {
           jobs.id,
           jobs.title,
           jobs.company,
+          jobs.description,
           jobs.employer_name,
+          jobs.employer_brand,
           jobs.practice_name,
           jobs.parent_company,
+          jobs.venue_brand,
+          jobs.venue_name,
           jobs.location,
           jobs.city,
           jobs.state,
+          jobs.work_arrangement,
+          jobs.work_arrangements,
+          jobs.location_precision,
           jobs.updated_at,
           jobs.posted_at,
           jobs.created_at
@@ -595,9 +594,9 @@ app.get(apiPaths("/api/sitemap.xml"), async (_req, res) => {
           priority: page.priority,
         })
       ),
-      ...(jobs.rows || []).map((job) =>
+      ...indexableJobUrls(jobs.rows || [], origin).map(({ job, url }) =>
         sitemapUrl({
-          loc: `${origin}${jobPath(job)}`,
+          loc: url,
           lastmod: sitemapDate(job.updated_at || job.posted_at || job.created_at),
           changefreq: "daily",
           priority: "0.8",
@@ -635,6 +634,8 @@ const profileRoutes = require("./routes/profile");
 app.use(apiPaths("/api/profile"), profileRoutes);
 
 const jobRoutes = require("./routes/jobs");
+const { createJobPageHandler } = require("./services/jobPage");
+app.get(["/jobs/:id", "/jobs/:id/:slug"], createJobPageHandler(jobRoutes.findPublicJob));
 app.use(apiPaths("/api/jobs"), jobRoutes);
 
 const favoritesRoutes = require("./routes/favorites");

@@ -20,6 +20,7 @@ const {
   brandByKey,
 } = require("../services/brandRegistry");
 const { inferEmployerAttribution } = require("../services/employerAttribution");
+const { displayJobCompany, isIndexableJob } = require("../services/jobSeo");
 
 const router = express.Router();
 const requireJobManager = requireRole(["recruiter", "admin"]);
@@ -1486,10 +1487,9 @@ router.get("/recruiter", requireAuth, requireJobManager, async (req, res) => {
   }
 });
 
-router.get("/public/:id", maybeAuth, async (req, res) => {
-  try {
-    const publicJobColumns = await getPublicJobColumns();
-    const job = await one(
+async function findPublicJob(id) {
+  const publicJobColumns = await getPublicJobColumns();
+  const job = await one(
       `
         select *
         from (
@@ -1501,9 +1501,14 @@ router.get("/public/:id", maybeAuth, async (req, res) => {
             and ${rejectedImportVisibilityFilterSql("jobs")}
         ) public_job
       `,
-      [req.params.id]
-    );
+    [id]
+  );
+  return job ? { ...job, seo_company: displayJobCompany(job), seo_eligible: isIndexableJob(job) } : null;
+}
 
+router.get("/public/:id", maybeAuth, async (req, res) => {
+  try {
+    const job = await findPublicJob(req.params.id);
     if (!job) return res.status(404).json({ error: "Job not found" });
     return res.json(job);
   } catch (e) {
@@ -1511,6 +1516,8 @@ router.get("/public/:id", maybeAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch job" });
   }
 });
+
+router.findPublicJob = findPublicJob;
 
 router.post("/:id/report", maybeAuth, async (req, res) => {
   try {

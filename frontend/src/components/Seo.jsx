@@ -80,6 +80,7 @@ export default function Seo({
   title = DEFAULT_TITLE,
   description = DEFAULT_DESCRIPTION,
   canonical,
+  robots,
   ogType = "website",
   ogImage = "https://www.jobs.vision/images/clinicbg-home.webp",
   jsonLd = null,
@@ -89,6 +90,7 @@ export default function Seo({
   useEffect(() => {
     const keys = [
       ["name", "description"],
+      ["name", "robots"],
       ["property", "og:type"],
       ["property", "og:site_name"],
       ["property", "og:title"],
@@ -104,6 +106,7 @@ export default function Seo({
 
     document.title = title || DEFAULT_TITLE;
     upsertMeta("name", "description", description || DEFAULT_DESCRIPTION);
+    if (robots) upsertMeta("name", "robots", robots);
     upsertMeta("property", "og:type", ogType);
     upsertMeta("property", "og:site_name", "jobs.vision");
     upsertMeta("property", "og:title", title || DEFAULT_TITLE);
@@ -126,7 +129,7 @@ export default function Seo({
     }
 
     return () => restoreHead(snapshot, keys);
-  }, [canonical, description, jsonLdText, ogImage, ogType, title]);
+  }, [canonical, description, jsonLdText, ogImage, ogType, robots, title]);
 
   return null;
 }

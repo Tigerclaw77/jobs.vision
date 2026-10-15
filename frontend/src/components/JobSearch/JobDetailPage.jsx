@@ -22,7 +22,6 @@ import {
   jobPath,
   jobSeoDescription,
   jobSeoTitle,
-  jobSlug,
   plainText,
 } from "../../utils/jobSeo";
 import {
@@ -175,7 +174,7 @@ function jobPostingJsonLd(job = {}, canonical) {
 }
 
 export default function JobDetailPage() {
-  const { jobId, slug } = useParams();
+  const { jobId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const [job, setJob] = useState(null);
@@ -216,20 +215,20 @@ export default function JobDetailPage() {
   }, [job?.id, job?._id]);
 
   useEffect(() => {
-    if (!job || !slug) return;
+    if (!job) return;
     const canonicalPath = jobPath(job);
-    if (location.pathname !== canonicalPath && slug !== jobSlug(job)) {
+    if (location.pathname !== canonicalPath) {
       navigate(canonicalPath, { replace: true });
     }
-  }, [job, location.pathname, navigate, slug]);
+  }, [job, location.pathname, navigate]);
 
-  const canonical = job ? absoluteJobUrl(job) : absoluteJobUrl(jobId, { includeSlug: false });
+  const canonical = absoluteJobUrl(job || jobId);
   const seoTitle = job ? jobSeoTitle(job) : "Job Listing | jobs.vision";
   const seoDescription = job
     ? jobSeoDescription(job)
     : "Review an optometry or eye care job listing on jobs.vision.";
   const jsonLd = useMemo(
-    () => (job ? jobPostingJsonLd(job, canonical) : null),
+    () => (job?.seo_eligible ? jobPostingJsonLd(job, canonical) : null),
     [canonical, job]
   );
 
@@ -277,13 +276,14 @@ export default function JobDetailPage() {
 
   return (
     <main className="job-detail-page text-on-dim">
-      <Seo
+      {job || error ? <Seo
         title={seoTitle}
         description={seoDescription}
         canonical={canonical}
+        robots={job?.seo_eligible ? "index, follow" : "noindex, follow"}
         ogType="article"
         jsonLd={jsonLd}
-      />
+      /> : null}
 
       <div className="job-detail-inner">
         <Link className="job-detail-back" to="/jobs">
