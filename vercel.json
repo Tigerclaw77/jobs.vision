@@ -1,18 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "experimentalServices": {
+  "services": {
     "web": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
+      "root": "frontend",
       "framework": "create-react-app"
     },
     "api": {
-      "entrypoint": "backend/server.js",
-      "routePrefix": "/api",
+      "root": "backend",
+      "entrypoint": "server.js",
       "framework": "express",
-      "maxDuration": 60
+      "functions": {
+        "server.js": { "maxDuration": 60 }
+      }
     }
   },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ],
   "crons": [
     {
       "path": "/api/internal/job-health/run",
