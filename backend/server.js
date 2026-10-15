@@ -635,7 +635,8 @@ app.use(apiPaths("/api/profile"), profileRoutes);
 
 const jobRoutes = require("./routes/jobs");
 const { createJobPageHandler } = require("./services/jobPage");
-app.get(["/jobs/:id", "/jobs/:id/:slug"], createJobPageHandler(jobRoutes.findPublicJob));
+const { createJobPageCsp } = require("./services/jobPageCsp");
+app.get(["/jobs/:id", "/jobs/:id/:slug"], createJobPageCsp(), createJobPageHandler(jobRoutes.findPublicJob));
 app.use(apiPaths("/api/jobs"), jobRoutes);
 
 const favoritesRoutes = require("./routes/favorites");
